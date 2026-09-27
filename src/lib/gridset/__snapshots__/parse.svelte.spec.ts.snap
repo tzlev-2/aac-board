@@ -1,0 +1,1021 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`snapshot > parseGridSet על דף בגודל orgHome — 6×4, 21 תאים, 20 מלאים 1`] = `
+{
+  "language": "he-IL",
+  "pages": {
+    "דף ראשי": {
+      "autoContentCommands": {
+        "Chat.History": [
+          {
+            "id": "Action.Speak",
+            "params": {},
+          },
+        ],
+      },
+      "background": {
+        "colour": "#162F3BFF",
+      },
+      "cells": [
+        {
+          "caption": "פלט",
+          "columnSpan": 2,
+          "commands": [],
+          "contentSubType": "Chat",
+          "contentType": "Workspace",
+          "rowSpan": 1,
+          "scanBlock": 1,
+          "style": {
+            "backColour": "#FFFFFFFF",
+            "backgroundShape": 0,
+            "borderColour": "#000000FF",
+            "fontColour": "#000000FF",
+            "fontName": "Arial",
+            "fontSize": 14,
+          },
+          "x": 0,
+          "y": 0,
+        },
+        {
+          "caption": "מילה 1",
+          "columnSpan": 1,
+          "commands": [
+            {
+              "id": "Action.InsertText",
+              "params": {
+                "text": {
+                  "paragraphs": [
+                    {
+                      "sentences": [
+                        {
+                          "image": {
+                            "library": "widgit",
+                            "path": "widgit rebus\\w\\word 1.emf",
+                          },
+                          "runs": [
+                            "מילה 1",
+                          ],
+                        },
+                      ],
+                    },
+                  ],
+                },
+              },
+            },
+            {
+              "id": "Action.Speak",
+              "params": {
+                "unit": "All",
+              },
+            },
+          ],
+          "image": {
+            "library": "widgit",
+            "path": "widgit rebus\\w\\word 1.emf",
+          },
+          "rowSpan": 1,
+          "scanBlock": 2,
+          "style": {
+            "backColour": "#FFFFFFFF",
+            "backgroundShape": 0,
+            "borderColour": "#000000FF",
+            "fontColour": "#000000FF",
+            "fontName": "Arial",
+            "fontSize": 14,
+          },
+          "x": 1,
+          "y": 0,
+        },
+        {
+          "caption": "מילה 2",
+          "columnSpan": 1,
+          "commands": [
+            {
+              "id": "Action.InsertText",
+              "params": {
+                "text": {
+                  "paragraphs": [
+                    {
+                      "sentences": [
+                        {
+                          "image": {
+                            "library": "widgit",
+                            "path": "widgit rebus\\w\\word 2.emf",
+                          },
+                          "runs": [
+                            "מילה 2",
+                          ],
+                        },
+                      ],
+                    },
+                  ],
+                },
+              },
+            },
+            {
+              "id": "Action.Speak",
+              "params": {
+                "unit": "All",
+              },
+            },
+          ],
+          "image": {
+            "library": "widgit",
+            "path": "widgit rebus\\w\\word 2.emf",
+          },
+          "rowSpan": 1,
+          "scanBlock": 3,
+          "style": {
+            "backColour": "#FFFFFFFF",
+            "backgroundShape": 0,
+            "borderColour": "#000000FF",
+            "fontColour": "#000000FF",
+            "fontName": "Arial",
+            "fontSize": 14,
+          },
+          "x": 2,
+          "y": 0,
+        },
+        {
+          "caption": "מילה 3",
+          "columnSpan": 1,
+          "commands": [
+            {
+              "id": "Action.InsertText",
+              "params": {
+                "text": {
+                  "paragraphs": [
+                    {
+                      "sentences": [
+                        {
+                          "image": {
+                            "library": "widgit",
+                            "path": "widgit rebus\\w\\word 3.emf",
+                          },
+                          "runs": [
+                            "מילה 3",
+                          ],
+                        },
+                      ],
+                    },
+                  ],
+                },
+              },
+            },
+            {
+              "id": "Action.Speak",
+              "params": {
+                "unit": "All",
+              },
+            },
+          ],
+          "image": {
+            "library": "widgit",
+            "path": "widgit rebus\\w\\word 3.emf",
+          },
+          "rowSpan": 1,
+          "scanBlock": 4,
+          "style": {
+            "backColour": "#FFFFFFFF",
+            "backgroundShape": 0,
+            "borderColour": "#000000FF",
+            "fontColour": "#000000FF",
+            "fontName": "Arial",
+            "fontSize": 14,
+          },
+          "x": 3,
+          "y": 0,
+        },
+        {
+          "caption": "מילה 4",
+          "columnSpan": 1,
+          "commands": [
+            {
+              "id": "Action.InsertText",
+              "params": {
+                "text": {
+                  "paragraphs": [
+                    {
+                      "sentences": [
+                        {
+                          "image": {
+                            "library": "widgit",
+                            "path": "widgit rebus\\w\\word 4.emf",
+                          },
+                          "runs": [
+                            "מילה 4",
+                          ],
+                        },
+                      ],
+                    },
+                  ],
+                },
+              },
+            },
+            {
+              "id": "Action.Speak",
+              "params": {
+                "unit": "All",
+              },
+            },
+          ],
+          "image": {
+            "library": "widgit",
+            "path": "widgit rebus\\w\\word 4.emf",
+          },
+          "rowSpan": 1,
+          "scanBlock": 1,
+          "style": {
+            "backColour": "#FFFFFFFF",
+            "backgroundShape": 0,
+            "borderColour": "#000000FF",
+            "fontColour": "#000000FF",
+            "fontName": "Arial",
+            "fontSize": 14,
+          },
+          "x": 4,
+          "y": 0,
+        },
+        {
+          "caption": "עוד",
+          "columnSpan": 1,
+          "commands": [
+            {
+              "id": "Jump.To",
+              "params": {
+                "grid": "דף ראשי - עוד",
+              },
+            },
+          ],
+          "image": {
+            "library": "grid3x",
+            "path": "jump_back.wmf",
+          },
+          "rowSpan": 1,
+          "scanBlock": 2,
+          "style": {
+            "backColour": "#FFFFFFFF",
+            "backgroundShape": 0,
+            "borderColour": "#000000FF",
+            "fontColour": "#000000FF",
+            "fontName": "Arial",
+            "fontSize": 14,
+          },
+          "x": 5,
+          "y": 0,
+        },
+        {
+          "caption": "מילה 6",
+          "columnSpan": 1,
+          "commands": [
+            {
+              "id": "Action.InsertText",
+              "params": {
+                "text": {
+                  "paragraphs": [
+                    {
+                      "sentences": [
+                        {
+                          "image": {
+                            "library": "widgit",
+                            "path": "widgit rebus\\w\\word 6.emf",
+                          },
+                          "runs": [
+                            "מילה 6",
+                          ],
+                        },
+                      ],
+                    },
+                  ],
+                },
+              },
+            },
+            {
+              "id": "Action.Speak",
+              "params": {
+                "unit": "All",
+              },
+            },
+          ],
+          "image": {
+            "library": "widgit",
+            "path": "widgit rebus\\w\\word 6.emf",
+          },
+          "rowSpan": 1,
+          "scanBlock": 3,
+          "style": {
+            "backColour": "#FFFFFFFF",
+            "backgroundShape": 0,
+            "borderColour": "#000000FF",
+            "fontColour": "#000000FF",
+            "fontName": "Arial",
+            "fontSize": 14,
+          },
+          "x": 0,
+          "y": 1,
+        },
+        {
+          "caption": "מילה 7",
+          "columnSpan": 1,
+          "commands": [
+            {
+              "id": "Action.InsertText",
+              "params": {
+                "text": {
+                  "paragraphs": [
+                    {
+                      "sentences": [
+                        {
+                          "image": {
+                            "library": "widgit",
+                            "path": "widgit rebus\\w\\word 7.emf",
+                          },
+                          "runs": [
+                            "מילה 7",
+                          ],
+                        },
+                      ],
+                    },
+                  ],
+                },
+              },
+            },
+            {
+              "id": "Action.Speak",
+              "params": {
+                "unit": "All",
+              },
+            },
+          ],
+          "image": {
+            "library": "widgit",
+            "path": "widgit rebus\\w\\word 7.emf",
+          },
+          "rowSpan": 1,
+          "scanBlock": 4,
+          "style": {
+            "backColour": "#FFFFFFFF",
+            "backgroundShape": 0,
+            "borderColour": "#000000FF",
+            "fontColour": "#000000FF",
+            "fontName": "Arial",
+            "fontSize": 14,
+          },
+          "x": 1,
+          "y": 1,
+        },
+        {
+          "caption": "מילה 8",
+          "columnSpan": 1,
+          "commands": [
+            {
+              "id": "Action.InsertText",
+              "params": {
+                "text": {
+                  "paragraphs": [
+                    {
+                      "sentences": [
+                        {
+                          "image": {
+                            "library": "widgit",
+                            "path": "widgit rebus\\w\\word 8.emf",
+                          },
+                          "runs": [
+                            "מילה 8",
+                          ],
+                        },
+                      ],
+                    },
+                  ],
+                },
+              },
+            },
+            {
+              "id": "Action.Speak",
+              "params": {
+                "unit": "All",
+              },
+            },
+          ],
+          "image": {
+            "library": "widgit",
+            "path": "widgit rebus\\w\\word 8.emf",
+          },
+          "rowSpan": 1,
+          "scanBlock": 1,
+          "style": {
+            "backColour": "#FFFFFFFF",
+            "backgroundShape": 0,
+            "borderColour": "#000000FF",
+            "fontColour": "#000000FF",
+            "fontName": "Arial",
+            "fontSize": 14,
+          },
+          "x": 2,
+          "y": 1,
+        },
+        {
+          "caption": "מילה 9",
+          "columnSpan": 1,
+          "commands": [
+            {
+              "id": "Action.InsertText",
+              "params": {
+                "text": {
+                  "paragraphs": [
+                    {
+                      "sentences": [
+                        {
+                          "image": {
+                            "library": "widgit",
+                            "path": "widgit rebus\\w\\word 9.emf",
+                          },
+                          "runs": [
+                            "מילה 9",
+                          ],
+                        },
+                      ],
+                    },
+                  ],
+                },
+              },
+            },
+            {
+              "id": "Action.Speak",
+              "params": {
+                "unit": "All",
+              },
+            },
+          ],
+          "image": {
+            "library": "widgit",
+            "path": "widgit rebus\\w\\word 9.emf",
+          },
+          "rowSpan": 1,
+          "scanBlock": 2,
+          "style": {
+            "backColour": "#FFFFFFFF",
+            "backgroundShape": 0,
+            "borderColour": "#000000FF",
+            "fontColour": "#000000FF",
+            "fontName": "Arial",
+            "fontSize": 14,
+          },
+          "x": 3,
+          "y": 1,
+        },
+        {
+          "caption": "מילה 10",
+          "columnSpan": 1,
+          "commands": [
+            {
+              "id": "Action.InsertText",
+              "params": {
+                "text": {
+                  "paragraphs": [
+                    {
+                      "sentences": [
+                        {
+                          "image": {
+                            "library": "widgit",
+                            "path": "widgit rebus\\w\\word 10.emf",
+                          },
+                          "runs": [
+                            "מילה 10",
+                          ],
+                        },
+                      ],
+                    },
+                  ],
+                },
+              },
+            },
+            {
+              "id": "Action.Speak",
+              "params": {
+                "unit": "All",
+              },
+            },
+          ],
+          "image": {
+            "library": "widgit",
+            "path": "widgit rebus\\w\\word 10.emf",
+          },
+          "rowSpan": 1,
+          "scanBlock": 3,
+          "style": {
+            "backColour": "#FFFFFFFF",
+            "backgroundShape": 0,
+            "borderColour": "#000000FF",
+            "fontColour": "#000000FF",
+            "fontName": "Arial",
+            "fontSize": 14,
+          },
+          "x": 4,
+          "y": 1,
+        },
+        {
+          "caption": "מילה 11",
+          "columnSpan": 1,
+          "commands": [
+            {
+              "id": "Action.InsertText",
+              "params": {
+                "text": {
+                  "paragraphs": [
+                    {
+                      "sentences": [
+                        {
+                          "image": {
+                            "library": "widgit",
+                            "path": "widgit rebus\\w\\word 11.emf",
+                          },
+                          "runs": [
+                            "מילה 11",
+                          ],
+                        },
+                      ],
+                    },
+                  ],
+                },
+              },
+            },
+            {
+              "id": "Action.Speak",
+              "params": {
+                "unit": "All",
+              },
+            },
+          ],
+          "image": {
+            "library": "widgit",
+            "path": "widgit rebus\\w\\word 11.emf",
+          },
+          "rowSpan": 1,
+          "scanBlock": 4,
+          "style": {
+            "backColour": "#FFFFFFFF",
+            "backgroundShape": 0,
+            "borderColour": "#000000FF",
+            "fontColour": "#000000FF",
+            "fontName": "Arial",
+            "fontSize": 14,
+          },
+          "x": 5,
+          "y": 1,
+        },
+        {
+          "caption": "מילה 12",
+          "columnSpan": 1,
+          "commands": [
+            {
+              "id": "Action.InsertText",
+              "params": {
+                "text": {
+                  "paragraphs": [
+                    {
+                      "sentences": [
+                        {
+                          "image": {
+                            "library": "widgit",
+                            "path": "widgit rebus\\w\\word 12.emf",
+                          },
+                          "runs": [
+                            "מילה 12",
+                          ],
+                        },
+                      ],
+                    },
+                  ],
+                },
+              },
+            },
+            {
+              "id": "Action.Speak",
+              "params": {
+                "unit": "All",
+              },
+            },
+          ],
+          "image": {
+            "library": "widgit",
+            "path": "widgit rebus\\w\\word 12.emf",
+          },
+          "rowSpan": 1,
+          "scanBlock": 1,
+          "style": {
+            "backColour": "#FFFFFFFF",
+            "backgroundShape": 0,
+            "borderColour": "#000000FF",
+            "fontColour": "#000000FF",
+            "fontName": "Arial",
+            "fontSize": 14,
+          },
+          "x": 0,
+          "y": 2,
+        },
+        {
+          "caption": "מילה 13",
+          "columnSpan": 1,
+          "commands": [
+            {
+              "id": "Action.InsertText",
+              "params": {
+                "text": {
+                  "paragraphs": [
+                    {
+                      "sentences": [
+                        {
+                          "image": {
+                            "library": "widgit",
+                            "path": "widgit rebus\\w\\word 13.emf",
+                          },
+                          "runs": [
+                            "מילה 13",
+                          ],
+                        },
+                      ],
+                    },
+                  ],
+                },
+              },
+            },
+            {
+              "id": "Action.Speak",
+              "params": {
+                "unit": "All",
+              },
+            },
+          ],
+          "image": {
+            "library": "widgit",
+            "path": "widgit rebus\\w\\word 13.emf",
+          },
+          "rowSpan": 1,
+          "scanBlock": 2,
+          "style": {
+            "backColour": "#FFFFFFFF",
+            "backgroundShape": 0,
+            "borderColour": "#000000FF",
+            "fontColour": "#000000FF",
+            "fontName": "Arial",
+            "fontSize": 14,
+          },
+          "x": 1,
+          "y": 2,
+        },
+        {
+          "caption": "מילה 14",
+          "columnSpan": 1,
+          "commands": [
+            {
+              "id": "Action.InsertText",
+              "params": {
+                "text": {
+                  "paragraphs": [
+                    {
+                      "sentences": [
+                        {
+                          "image": {
+                            "library": "widgit",
+                            "path": "widgit rebus\\w\\word 14.emf",
+                          },
+                          "runs": [
+                            "מילה 14",
+                          ],
+                        },
+                      ],
+                    },
+                  ],
+                },
+              },
+            },
+            {
+              "id": "Action.Speak",
+              "params": {
+                "unit": "All",
+              },
+            },
+          ],
+          "image": {
+            "library": "widgit",
+            "path": "widgit rebus\\w\\word 14.emf",
+          },
+          "rowSpan": 1,
+          "scanBlock": 3,
+          "style": {
+            "backColour": "#FFFFFFFF",
+            "backgroundShape": 0,
+            "borderColour": "#000000FF",
+            "fontColour": "#000000FF",
+            "fontName": "Arial",
+            "fontSize": 14,
+          },
+          "x": 2,
+          "y": 2,
+        },
+        {
+          "caption": "מילה 15",
+          "columnSpan": 1,
+          "commands": [
+            {
+              "id": "Action.InsertText",
+              "params": {
+                "text": {
+                  "paragraphs": [
+                    {
+                      "sentences": [
+                        {
+                          "image": {
+                            "library": "widgit",
+                            "path": "widgit rebus\\w\\word 15.emf",
+                          },
+                          "runs": [
+                            "מילה 15",
+                          ],
+                        },
+                      ],
+                    },
+                  ],
+                },
+              },
+            },
+            {
+              "id": "Action.Speak",
+              "params": {
+                "unit": "All",
+              },
+            },
+          ],
+          "image": {
+            "library": "widgit",
+            "path": "widgit rebus\\w\\word 15.emf",
+          },
+          "rowSpan": 1,
+          "scanBlock": 4,
+          "style": {
+            "backColour": "#FFFFFFFF",
+            "backgroundShape": 0,
+            "borderColour": "#000000FF",
+            "fontColour": "#000000FF",
+            "fontName": "Arial",
+            "fontSize": 14,
+          },
+          "x": 3,
+          "y": 2,
+        },
+        {
+          "caption": "מילה 16",
+          "columnSpan": 1,
+          "commands": [
+            {
+              "id": "Action.InsertText",
+              "params": {
+                "text": {
+                  "paragraphs": [
+                    {
+                      "sentences": [
+                        {
+                          "image": {
+                            "library": "widgit",
+                            "path": "widgit rebus\\w\\word 16.emf",
+                          },
+                          "runs": [
+                            "מילה 16",
+                          ],
+                        },
+                      ],
+                    },
+                  ],
+                },
+              },
+            },
+            {
+              "id": "Action.Speak",
+              "params": {
+                "unit": "All",
+              },
+            },
+          ],
+          "image": {
+            "library": "widgit",
+            "path": "widgit rebus\\w\\word 16.emf",
+          },
+          "rowSpan": 1,
+          "scanBlock": 1,
+          "style": {
+            "backColour": "#FFFFFFFF",
+            "backgroundShape": 0,
+            "borderColour": "#000000FF",
+            "fontColour": "#000000FF",
+            "fontName": "Arial",
+            "fontSize": 14,
+          },
+          "x": 4,
+          "y": 2,
+        },
+        {
+          "caption": "מילה 17",
+          "columnSpan": 1,
+          "commands": [
+            {
+              "id": "Action.InsertText",
+              "params": {
+                "text": {
+                  "paragraphs": [
+                    {
+                      "sentences": [
+                        {
+                          "image": {
+                            "library": "widgit",
+                            "path": "widgit rebus\\w\\word 17.emf",
+                          },
+                          "runs": [
+                            "מילה 17",
+                          ],
+                        },
+                      ],
+                    },
+                  ],
+                },
+              },
+            },
+            {
+              "id": "Action.Speak",
+              "params": {
+                "unit": "All",
+              },
+            },
+          ],
+          "image": {
+            "library": "widgit",
+            "path": "widgit rebus\\w\\word 17.emf",
+          },
+          "rowSpan": 1,
+          "scanBlock": 2,
+          "style": {
+            "backColour": "#FFFFFFFF",
+            "backgroundShape": 0,
+            "borderColour": "#000000FF",
+            "fontColour": "#000000FF",
+            "fontName": "Arial",
+            "fontSize": 14,
+          },
+          "x": 5,
+          "y": 2,
+        },
+        {
+          "caption": "מילה 18",
+          "columnSpan": 1,
+          "commands": [
+            {
+              "id": "Action.InsertText",
+              "params": {
+                "text": {
+                  "paragraphs": [
+                    {
+                      "sentences": [
+                        {
+                          "image": {
+                            "library": "widgit",
+                            "path": "widgit rebus\\w\\word 18.emf",
+                          },
+                          "runs": [
+                            "מילה 18",
+                          ],
+                        },
+                      ],
+                    },
+                  ],
+                },
+              },
+            },
+            {
+              "id": "Action.Speak",
+              "params": {
+                "unit": "All",
+              },
+            },
+          ],
+          "image": {
+            "library": "widgit",
+            "path": "widgit rebus\\w\\word 18.emf",
+          },
+          "rowSpan": 1,
+          "scanBlock": 3,
+          "style": {
+            "backColour": "#FFFFFFFF",
+            "backgroundShape": 0,
+            "borderColour": "#000000FF",
+            "fontColour": "#000000FF",
+            "fontName": "Arial",
+            "fontSize": 14,
+          },
+          "x": 0,
+          "y": 3,
+        },
+        {
+          "caption": "מילה 19",
+          "columnSpan": 1,
+          "commands": [
+            {
+              "id": "Action.InsertText",
+              "params": {
+                "text": {
+                  "paragraphs": [
+                    {
+                      "sentences": [
+                        {
+                          "image": {
+                            "library": "widgit",
+                            "path": "widgit rebus\\w\\word 19.emf",
+                          },
+                          "runs": [
+                            "מילה 19",
+                          ],
+                        },
+                      ],
+                    },
+                  ],
+                },
+              },
+            },
+            {
+              "id": "Action.Speak",
+              "params": {
+                "unit": "All",
+              },
+            },
+          ],
+          "image": {
+            "library": "widgit",
+            "path": "widgit rebus\\w\\word 19.emf",
+          },
+          "rowSpan": 1,
+          "scanBlock": 4,
+          "style": {
+            "backColour": "#FFFFFFFF",
+            "backgroundShape": 0,
+            "borderColour": "#000000FF",
+            "fontColour": "#000000FF",
+            "fontName": "Arial",
+            "fontSize": 14,
+          },
+          "x": 1,
+          "y": 3,
+        },
+        {
+          "columnSpan": 1,
+          "commands": [],
+          "rowSpan": 1,
+          "scanBlock": 4,
+          "style": {
+            "backColour": "#FFFFFFFF",
+            "backgroundShape": 0,
+            "borderColour": "#000000FF",
+            "fontColour": "#000000FF",
+            "fontName": "Arial",
+            "fontSize": 14,
+          },
+          "x": 2,
+          "y": 3,
+        },
+      ],
+      "columns": 6,
+      "guid": "000563b5-579f-4924-8991-917cfe7e0414",
+      "name": "דף ראשי",
+      "predictionSource": "WordList",
+      "rows": 4,
+      "wordList": [
+        {
+          "partOfSpeech": "Pronoun",
+          "text": {
+            "paragraphs": [
+              {
+                "sentences": [
+                  {
+                    "runs": [
+                      "אני",
+                    ],
+                  },
+                ],
+              },
+            ],
+          },
+        },
+      ],
+    },
+  },
+  "startGrid": "דף ראשי",
+  "styles": {
+    "Default": {
+      "backColour": "#FFFFFFFF",
+      "fontSize": 14,
+      "name": "Default",
+    },
+  },
+  "symbolSearchKeys": [
+    "widgit",
+  ],
+}
+`;
