@@ -8,6 +8,13 @@
 		{
 			"binding": "AUDIO_CACHE",
 			"bucket_name": "aac-audio-cache"
+		},
+		// PCS symbol library. Licensed Mayer-Johnson content — the bucket is
+		// private and MUST stay private (no r2.dev URL, no custom domain).
+		// Lives in the org account (a2681969…); see docs/plans/pcs-r2.md.
+		{
+			"binding": "PCS_ASSETS",
+			"bucket_name": "aac-assets"
 		}
 	]
 }
