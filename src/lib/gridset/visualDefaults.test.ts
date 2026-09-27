@@ -9,9 +9,11 @@ import {
 	FONT_STACK,
 	THEME_FONT,
 	VISUAL_DEFAULTS,
+	captionBelowSymbolFontSizeCss,
 	captionFontSizeCss,
 	resolveFontFamily
 } from './visualDefaults';
+import { CAPTION_RIBBON_HEIGHT_RATIO } from './visualMeasured';
 
 describe('resolveFontFamily', () => {
 	it('גופן לא-מוכר נשאר ראשון ומקבל את כל ערימת-הנפילה אחריו', () => {
@@ -83,5 +85,17 @@ describe('captionFontSizeCss', () => {
 		expect(captionFontSizeCss(8).startsWith(`max(${VISUAL_DEFAULTS.captionMinFontSize},`)).toBe(
 			true
 		);
+	});
+});
+
+describe('captionBelowSymbolFontSizeCss', () => {
+	it('כולל אילוץ רצועה שנמדדה מתחת לסמל', () => {
+		const ribbonCap = (
+			(CAPTION_RIBBON_HEIGHT_RATIO / VISUAL_DEFAULTS.captionLineHeight) *
+			100
+		).toFixed(2);
+		const css = captionBelowSymbolFontSizeCss(VISUAL_DEFAULTS.captionReferenceFontSize);
+
+		expect(css.startsWith(`min(${ribbonCap}cqh,`)).toBe(true);
 	});
 });

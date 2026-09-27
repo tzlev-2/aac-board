@@ -1,12 +1,24 @@
 <script lang="ts">
 	import type { CellRendererProps } from './cellRenderers';
 	import type { SymbolResolution } from '$lib/gridset/symbols';
-	import { VISUAL_DEFAULTS, captionFontSizeCss } from '$lib/gridset/visualDefaults';
+	import {
+		VISUAL_DEFAULTS,
+		captionBelowSymbolFontSizeCss,
+		captionBelowSymbolMaxBlockCss,
+		captionFontSizeCss
+	} from '$lib/gridset/visualDefaults';
 
 	let { cell, ctx, symbols = null }: CellRendererProps = $props();
 
 	const captionAtTop = $derived(ctx?.gridSet.textAtTop ?? VISUAL_DEFAULTS.captionAtTop);
-	const captionFontSize = $derived(captionFontSizeCss(cell.style.fontSize));
+	/** תא בלי `Image` — דיו ממורכז אנכית (§4 שורות 65..134), לא מתחת לסמל. */
+	const captionOnly = $derived(cell.image == null && Boolean(cell.caption));
+	const captionFontSize = $derived(
+		captionOnly
+			? captionFontSizeCss(cell.style.fontSize)
+			: captionBelowSymbolFontSizeCss(cell.style.fontSize)
+	);
+	const captionMaxBlock = $derived(captionOnly ? undefined : captionBelowSymbolMaxBlockCss());
 
 	const iconBoxW = `${(VISUAL_DEFAULTS.iconBoxWidthRatio * 100).toFixed(3)}%`;
 	const iconTopPad = `${(((VISUAL_DEFAULTS.iconTopRatio * 217) / 277) * 100).toFixed(3)}%`;
@@ -34,8 +46,11 @@
 	{#if cell.caption}
 		<span
 			class="caption"
+			class:caption-only={captionOnly}
 			data-testid="cell-caption"
-			style="font-size: {captionFontSize}; line-height: {VISUAL_DEFAULTS.captionLineHeight}"
+			style="font-size: {captionFontSize}; line-height: {VISUAL_DEFAULTS.captionLineHeight}{captionMaxBlock
+				? `; max-block-size: ${captionMaxBlock}`
+				: ''}"
 		>
 			{cell.caption}
 		</span>
@@ -53,8 +68,10 @@
 	</div>
 {/snippet}
 
-<div class="button-cell">
-	{#if captionAtTop}
+<div class="button-cell" class:caption-only={captionOnly}>
+	{#if captionOnly}
+		{@render caption()}
+	{:else if captionAtTop}
 		{@render caption()}
 		{@render symbolBox()}
 	{:else}
@@ -74,6 +91,9 @@
 		height: 100%;
 		overflow: hidden;
 		box-sizing: border-box;
+	}
+	.button-cell.caption-only {
+		justify-content: center;
 	}
 	.top-gap {
 		width: 100%;
@@ -101,6 +121,7 @@
 		text-overflow: ellipsis;
 		white-space: nowrap;
 		max-width: 100%;
+		box-sizing: border-box;
 	}
 	.bottom-gap {
 		width: 100%;

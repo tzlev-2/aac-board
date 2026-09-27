@@ -13,6 +13,7 @@
 import type { ResolvedStyle, SizeName } from './types';
 import {
 	CAPTION_BOTTOM_MARGIN_RATIO,
+	CAPTION_RIBBON_HEIGHT_RATIO,
 	ICON_BOX_HEIGHT_RATIO,
 	ICON_BOX_WIDTH_RATIO,
 	ICON_TOP_RATIO
@@ -177,6 +178,27 @@ export function captionFontSizeCss(fontSize: number): string {
 	const cqh = (Math.max(ratio, 0) * 100).toFixed(2);
 	const cap = (captionMaxHeightRatio * 100).toFixed(2);
 	return `max(${VISUAL_DEFAULTS.captionMinFontSize}, min(${cqh}cqh, ${cap}cqh, ${VISUAL_DEFAULTS.captionMaxFontSize}))`;
+}
+
+/**
+ * ‏`font-size` לכתובית **מתחת לסמל** — `captionFontSizeCss` + אילוץ בטיחות.
+ *
+ * 🛑 האילוץ נגזר מהגיאומטריה שנמדדה (`CAPTION_RIBBON_HEIGHT_RATIO` ÷
+ * `captionLineHeight`) — **לא** טענת נאמנות על המרת `FontSize`→px; היחס
+ * `captionHeightRatio` / `captionReferenceFontSize` נשאר `// לא-מאומת מול Grid`.
+ */
+export function captionBelowSymbolFontSizeCss(fontSize: number): string {
+	const base = captionFontSizeCss(fontSize);
+	const ribbonFontCap = (
+		(CAPTION_RIBBON_HEIGHT_RATIO / VISUAL_DEFAULTS.captionLineHeight) *
+		100
+	).toFixed(2);
+	return `min(${ribbonFontCap}cqh, ${base})`;
+}
+
+/** `max-block-size` לדיו מתחת לסמל — אותה רצועה שנמדדה (§4). */
+export function captionBelowSymbolMaxBlockCss(): string {
+	return `${(CAPTION_RIBBON_HEIGHT_RATIO * 100).toFixed(2)}cqh`;
 }
 
 /**

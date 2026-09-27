@@ -88,7 +88,9 @@ function renderCell(cell: Cell, height = 200, width = 240, ctx = makeCtx()) {
 
 describe('נאמנות חזותית — כתובית', () => {
 	it('🔑 הכתובית קודמת לסמל ב-DOM וממוקמת מעליו', async () => {
-		const { screen, el } = renderCell(makeCell({ caption: 'לאכול', image: undefined }));
+		const { screen, el } = renderCell(
+			makeCell({ caption: 'לאכול', image: { library: 'widgit', path: 'food.emf' } })
+		);
 		await expect.element(screen.getByTestId('cell-caption')).toBeInTheDocument();
 
 		const caption = el.querySelector('[data-testid=cell-caption]') as HTMLElement;
@@ -128,7 +130,11 @@ describe('נאמנות חזותית — כתובית', () => {
 
 describe('נאמנות חזותית — סמל וגופן', () => {
 	it('קופסת-הסמל בגודל שנמדד (148/217 מגובה התא)', async () => {
-		const { screen, el } = renderCell(makeCell({ caption: 'לאכול' }), 217, 277);
+		const { screen, el } = renderCell(
+			makeCell({ caption: 'לאכול', image: { library: 'widgit', path: 'food.emf' } }),
+			217,
+			277
+		);
 		await expect.element(screen.getByTestId('cell-caption')).toBeInTheDocument();
 
 		const symbol = el.querySelector('.symbol') as HTMLElement;

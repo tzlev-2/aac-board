@@ -31,6 +31,9 @@ export const ICON_BOX_HEIGHT_RATIO = 148 / 217;
 export const ICON_BOX_WIDTH_RATIO = 148 / 277;
 /** דיו בשורות 177–190 ⇒ 26px מתחתית-הגוף. */
 export const CAPTION_BOTTOM_MARGIN_RATIO = 26 / 217;
+/** שטח לדיו מתחת לסמל — נמדד §4: ‏217−19−148−26 px / גוף 217. */
+export const CAPTION_RIBBON_HEIGHT_RATIO =
+	1 - ICON_TOP_RATIO - ICON_BOX_HEIGHT_RATIO - CAPTION_BOTTOM_MARGIN_RATIO;
 
 export const CELL_SHADOW = '-5px 5px 0 rgba(0, 0, 0, 0.08)';
 
