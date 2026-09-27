@@ -65,7 +65,7 @@ const spec: GridsetSpec = {
 		},
 		{
 			name: 'אוכל',
-			columns: 2,
+			columns: 3,
 			rows: 1,
 			cells: [
 				{ x: 0, y: 0, contentType: 'Workspace', contentSubType: 'Chat' },
@@ -74,7 +74,31 @@ const spec: GridsetSpec = {
 					y: 0,
 					caption: 'תפוח',
 					commands: [{ id: 'Action.InsertText', params: { text: 'תפוח' } }]
+				},
+				{
+					x: 2,
+					y: 0,
+					caption: 'לבגדים',
+					commands: [{ id: 'Jump.To', params: { grid: 'בגדים' } }]
 				}
+			]
+		},
+		/**
+		 * 🔑 דף-`WordList` כפי שהוא באמת יוצא מ-Grid: שלושת תאי ה-`AutoContent`
+		 * **ריקים מפקודות**, והשרשרת יושבת אחת לדף כולו. עד סלייס 10 הם צוירו
+		 * כ-`<div>` ולא הגיבו ללחיצה.
+		 */
+		{
+			name: 'בגדים',
+			columns: 4,
+			rows: 1,
+			wordList: [{ text: 'שמלה' }, { text: 'נעליים', partOfSpeech: 'Noun' }, { text: 'כובע' }],
+			autoContentCommands: { WordList: [{ id: 'AutoContent.Activate', params: {} }] },
+			cells: [
+				{ x: 0, y: 0, contentType: 'Workspace', contentSubType: 'Chat' },
+				{ x: 1, y: 0, contentType: 'AutoContent', contentSubType: 'WordList' },
+				{ x: 2, y: 0, contentType: 'AutoContent', contentSubType: 'WordList' },
+				{ x: 3, y: 0, contentType: 'AutoContent', contentSubType: 'WordList' }
 			]
 		}
 	]
@@ -162,6 +186,38 @@ describe('הפרוסה האנכית — קובץ → מסך → לחיצה', () 
 		const bg = getComputedStyle(cell).backgroundImage;
 		expect(bg).toContain('linear-gradient');
 		expect(bg).toContain('rgb(17, 34, 51)');
+	});
+
+	/**
+	 * 🛑 הפער של סלייס 10, כפי שנמדד על `org-1/בגדים`: ‏11 תאי `WordList`
+	 * מלאים במילים — ו-`— ריק —` פקודות בכל אחד מהם, ולכן אף אחד מהם לא היה
+	 * `<button>`. הבדיקה הזאת נכשלת על הקוד שלפני הסלייס.
+	 */
+	it('🔑 תא WordList **בלי פקודות משלו** הוא button לחיץ', async () => {
+		const screen = await mount();
+		await screen.getByRole('button', { name: 'אוכל' }).click();
+		await screen.getByRole('button', { name: 'לבגדים' }).click();
+
+		const cells = screen.getByTestId('grid-cell').elements();
+		expect(cells).toHaveLength(4);
+		// שלושת תאי ה-WordList לחיצים; מי שאינו button הוא פס-הפלט, שאין לו
+		// שרשרת בשום רמה — וזה נכון.
+		const notButtons = cells.filter((el) => el.tagName !== 'BUTTON');
+		expect(notButtons).toHaveLength(1);
+		expect(notButtons[0].querySelector('[data-testid="chat-cell"]')).not.toBeNull();
+		await expect.element(screen.getByRole('button', { name: 'שמלה' })).toBeInTheDocument();
+	});
+
+	it('🔑 לחיצה על מילה מהרשימה מרכיבה משפט בפס-הפלט', async () => {
+		const screen = await mount();
+		await screen.getByRole('button', { name: 'אוכל' }).click();
+		await screen.getByRole('button', { name: 'לבגדים' }).click();
+
+		await screen.getByRole('button', { name: 'שמלה' }).click();
+		await screen.getByRole('button', { name: 'נעליים' }).click();
+		await screen.getByRole('button', { name: 'כובע' }).click();
+
+		await expect.element(screen.getByTestId('chat-cell')).toHaveTextContent('שמלה נעליים כובע');
 	});
 
 	it('סוג-תוכן לא-נתמך מציג כתובית בלבד — בלי מפתח-פיתוח באנגלית', async () => {

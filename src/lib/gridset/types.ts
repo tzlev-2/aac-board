@@ -248,6 +248,14 @@ export interface RuntimeContext {
 	readonly page: Page;
 	readonly features: ReadonlySet<FeatureId>;
 
+	/**
+	 * 🔑 הפריט שהמשבצת מציגה כרגע — מה ש-`AutoContent.Activate` מכניסה
+	 * לפס-הפלט. הפקודה יושבת ב-`page.autoContentCommands` ומשרתת את **כל**
+	 * תאי הסוג, ולכן מה שמבדיל בין הפעלה להפעלה אינו פרמטר אלא ההקשר.
+	 * נקבע ב-`withAutoContentItem` לזמן ההפעלה בלבד; אינו קיים ב-`GridRuntime`.
+	 */
+	readonly autoContentItem?: WordListItem;
+
 	navigate(pageName: string): void;
 	back(): void;
 	home(): void;

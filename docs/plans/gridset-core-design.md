@@ -240,6 +240,58 @@ export const cellRenderers: Record<string, CellRenderer> = {
 
 ---
 
+## 2א · תא `AutoContent` — השרשרת יושבת ברמת הדף (סלייס 10, ‏28.9.2026)
+
+🛑 **הסעיף הזה נוסף אחרי שהמדידה הראתה 11 תאים מתים.** ‏`parse.ts` טען את
+`page.autoContentCommands` מהסבב הראשון — **ואף אחד לא קרא אותו**.
+‏`GridCell` חישב `interactive = cell.commands.length > 0`, ותא-`AutoContent`
+**ריק מפקודות בכוונה** (‏11 מ-11 ב-`org-1/בגדים`), ולכן צויר כ-`<div>`.
+
+**השרשרת בפועל של התא** (‏`commands.ts#cellCommands`):
+
+```
+cell.commands לא ריק                      ⇒ cell.commands (גובר!)
+cell.commands ריק ∧ contentType=AutoContent ⇒ page.autoContentCommands[contentSubType]
+אחרת                                        ⇒ ריק
+```
+
+🛑 **אין דריסה.** תא עשוי לשאת שרשרת משלו, ואז היא גוברת על טבלת הדף.
+⚠️ **המפתח הוא ה-`AutoContentType`** — נמדדו ב-org-1: ‏`WordList` ×61,
+`Prediction` ×3, ‏`Photos` ×1. הצינור גנרי לכולם; מה ש**לא** ממומש הוא
+מרנדר לסוגים האחרים, והם נשארים `UnsupportedCell`.
+
+### `AutoContent.Activate` וההקשר שנושא פריט
+
+‏158 הפעלות בלוחות-הדגימה, ‏3,342 בקורפוס. **אין לה פרמטרים** — פקודה אחת
+ברמת-הדף משרתת את כל תאי הסוג, ומה שמבדיל בין הפעלה להפעלה הוא **הפריט
+שבמשבצת**. לכן `RuntimeContext` נושא שדה אופציונלי:
+
+```ts
+readonly autoContentItem?: WordListItem;   // נקבע ב-withAutoContentItem לזמן ההפעלה
+```
+
+🔑 **האצלה מפורשת, לא spread ולא `Object.create`:** ‏`GridRuntime` מחזיק
+שדות פרטיים (`#pageName`, `#history`), וקריאה למתודה שלו דרך אובייקט-נגזר
+זורקת. ‏`withAutoContentItem` בונה מעטפת שכל קריאה בה חוזרת ל-`ctx` המקורי
+כמקבל, ולכן `$state` של חוצץ-הפלט נשאר אותו אובייקט.
+
+🛑 **הפקודה אינה נוגעת בעימוד.** תא-הניווט ("עוד"/"חזור") מסונתז
+ב-`wordListPager` ומטופל ב-`GridBoard`, ואינו עובר דרך מנוע-הפקודות כלל.
+
+### הכיסוי נמדד בשלוש רמות, לא באחת
+
+| רמה | נתיב ב-XML | הפעלות | מזהים |
+|---|---|---:|---:|
+| `cell` | `/Grid/Cells/Cell/Content/Commands` | 4,052 | 63 |
+| `autoContent` | `/Grid/AutoContentCommands/…/Commands` | 166 | 4 |
+| `page` | `/Grid/Commands` | 4 | 2 |
+
+**סך הכול 4,222 הפעלות · 66 מזהים.** ‏🛑 עד כאן המכנה היה 4,052 בלבד, ולכן
+**המדד היה יכול לטפס ל-100% בזמן ש-33.7% מהתאים מתים** — ‏`AutoContent.Activate`
+לא הייתה במכנה, ולכן לא נספרה כחסרה.
+
+---
+
 ## 3 · המודל — מה שחסר ב-`board-model.md` ומתווסף כאן
 
 `board-model.md` נכתב לפני שנקראה הסכמה במלואה. שלוש תוספות מחייבות:

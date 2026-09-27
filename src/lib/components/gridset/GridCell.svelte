@@ -10,7 +10,7 @@
 	 * באותה שרשרת, וההבדל כולו בהקשר-הריצה.
 	 */
 	import type { Cell, RuntimeContext } from '$lib/gridset/types';
-	import { executeCommands } from '$lib/gridset/commands';
+	import { cellCommands, executeCommands } from '$lib/gridset/commands';
 	import type { SymbolResolver } from '$lib/gridset/symbols';
 	import { VISUAL_DEFAULTS, resolveFontFamily } from '$lib/gridset/visualDefaults';
 	import {
@@ -45,12 +45,21 @@
 	 * שרשרת ב-XML. ותא-מילה מריץ את השרשרת של התא **המארח**, לא של הפריט.
 	 */
 	const isNav = $derived(slot?.kind === 'nav');
-	const interactive = $derived(!disabled && (isNav || cell.commands.length > 0));
+	/**
+	 * 🛑 **`cell.commands` אינו המקור.** תא `AutoContent` שואב את שרשרתו
+	 * מ-`page.autoContentCommands[contentSubType]` — ‏11 מ-11 תאי ה-`WordList`
+	 * ב-`org-1/בגדים` ריקים מפקודות, ולכן חישוב על `cell.commands` הפך את
+	 * כולם ל-`<div>` לא-לחיץ.
+	 */
+	const commands = $derived(cellCommands(cell, ctx.page));
+	const interactive = $derived(!disabled && (isNav || commands.length > 0));
 
 	function activate() {
 		if (!interactive) return;
 		if (slot?.kind === 'nav') return onNavigate?.(slot.action);
-		executeCommands(cell, ctx);
+		// הפריט נמסר להקשר: `AutoContent.Activate` אינה נושאת פרמטרים, ומה
+		// שמבדיל בין משבצת למשבצת הוא הפריט שבה.
+		executeCommands(cell, ctx, slot?.kind === 'item' ? slot.item : undefined);
 	}
 
 	const fillGradient = $derived(verticalFillGradient(cell.style.backColour));
