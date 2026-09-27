@@ -52,18 +52,12 @@ import {
 /**
  * ברירת-המחדל כשלא הוזרק פותר-סגנונות.
  *
- * 🛑 **הערכים לא-מאומתים מול Grid.** הבית הקבוע שלהם הוא
- * `visualDefaults.ts` (סלייס 3); עד המיזוג הם יושבים כאן, במקום אחד,
- * כדי שההחלפה תהיה שורה אחת ולא ציד ברחבי הקוד.
+ * 🔑 הוגדר כאן זמנית עד שסלייס הסגנונות ימוזג, והמיזוג קרה (27.9.2026) —
+ * ולכן זה ייצוא-מחדש ולא הגדרה שנייה. **מקור אמת אחד** לערכים חזותיים
+ * לא-מאומתים, כפי ש-gridset-core-design.md §5 דורש.
  */
-export const DEFAULT_RESOLVED_STYLE: ResolvedStyle = {
-	backColour: '#FFFFFFFF',
-	fontColour: '#000000FF',
-	borderColour: '#000000FF',
-	fontName: 'Arial',
-	fontSize: 14,
-	backgroundShape: 0
-};
+import { DEFAULT_RESOLVED_STYLE } from './visualDefaults';
+export { DEFAULT_RESOLVED_STYLE };
 
 export interface ParseGridSetOptions {
 	/** פותר ירושת-סגנון (סלייס 3). בלעדיו כל תא מקבל DEFAULT_RESOLVED_STYLE. */
