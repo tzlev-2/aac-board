@@ -4,6 +4,7 @@
  */
 import type { Component } from 'svelte';
 import type { Cell, RuntimeContext } from '$lib/gridset/types';
+import type { SymbolResolver } from '$lib/gridset/symbols';
 import ButtonCell from './ButtonCell.svelte';
 import ChatCell from './ChatCell.svelte';
 import UnsupportedCell from './UnsupportedCell.svelte';
@@ -11,6 +12,12 @@ import UnsupportedCell from './UnsupportedCell.svelte';
 export interface CellRendererProps {
 	cell: Cell;
 	ctx: RuntimeContext;
+	/**
+	 * פותר-הסמלים של הלוח (`createSymbolResolver`). ‏`null` = בלי סמלים
+	 * (‏SSR, בדיקות, ורינדור תא בודד) — ‏4 מכל 10 תאים מגיעים בלי סמל גם
+	 * כשיש פותר, ולכן ה-fallback הוא המסלול הראשי ולא מצב-שגיאה.
+	 */
+	symbols?: SymbolResolver | null;
 }
 
 export type CellRendererComponent = Component<CellRendererProps>;

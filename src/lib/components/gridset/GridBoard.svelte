@@ -5,13 +5,31 @@
 	 * (ראו docs/plans/gridset-core-design.md §7 — נשבר על ColumnSpan).
 	 */
 	import type { Page, RuntimeContext } from '$lib/gridset/types';
+	import { isCellAvailable } from '$lib/gridset/commands';
+	import type { SymbolResolver } from '$lib/gridset/symbols';
 	import { VISUAL_DEFAULTS, sizeNameToFr } from '$lib/gridset/visualDefaults';
 	import GridCell from './GridCell.svelte';
 
-	let { page, ctx }: { page: Page; ctx: RuntimeContext } = $props();
+	let {
+		page,
+		ctx,
+		symbols = null
+	}: { page: Page; ctx: RuntimeContext; symbols?: SymbolResolver | null } = $props();
 
 	// Hidden אינו מרונדר כלל — לא רק מוסתר חזותית.
-	const visibleCells = $derived(page.cells.filter((cell) => cell.visibility !== 'Hidden'));
+	// ואחריו שער-הזמינות: תא שהצהרת-הדרישה שלו אינה מתקיימת אינו מצויר אך
+	// שומר את משבצתו — המיקום ברשת מפורש, ולכן אין reflow. 🛑 בלי `report`
+	// כאן: כתיבה ל-$state מתוך $derived אסורה ב-Svelte 5. הדיווח יושב ב-$effect.
+	const visibleCells = $derived(
+		page.cells.filter((cell) => cell.visibility !== 'Hidden' && isCellAvailable(cell, ctx.features))
+	);
+
+	// הצהרות-דרישה שלא ניתן היה להכריע נספרות פעם אחת לכל דף, לדוח-הכיסוי.
+	$effect(() => {
+		for (const cell of page.cells) {
+			isCellAvailable(cell, ctx.features, (id) => ctx.reportUnimplemented(id));
+		}
+	});
 
 	// columnWidths/rowHeights (SizeName|null לכל עמודה/שורה) — null=רגיל=1fr.
 	// בלוחות-הדגימה כולן null, ולכן זה שקול היום ל-repeat(n, 1fr).
@@ -23,6 +41,10 @@
 	const rowTemplate = $derived(
 		Array.from({ length: page.rows }, (_, i) => `${sizeNameToFr(page.rowHeights[i])}fr`).join(' ')
 	);
+
+	// רקע-הדף — Page.background.colour נפרס (#FEF6D7FF ב-org-1) ועד כה נזרק.
+	// צבעי Grid הם #RRGGBBAA, שהוא בדיוק hex-with-alpha של CSS.
+	const background = $derived(page.background.colour ?? 'transparent');
 </script>
 
 <div
@@ -32,10 +54,11 @@
 		gap: {VISUAL_DEFAULTS.tileGap};
 		grid-template-columns: {columnTemplate};
 		grid-template-rows: {rowTemplate};
+		background-color: {background};
 	"
 >
 	{#each visibleCells as cell, i (i)}
-		<GridCell {cell} {ctx} />
+		<GridCell {cell} {ctx} {symbols} />
 	{/each}
 </div>
 
