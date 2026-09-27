@@ -107,7 +107,11 @@ export interface CoverageReport {
 	/** אחוז הפקודות (9/63) ואחוז ההפעלות (91.5%). */
 	commandPct: number;
 	activationPct: number;
-	/** פקודות שנתקלנו בהן בריצה ואין להן handler — מ-`ctx.reportUnimplemented`. */
+	/**
+	 * מה שדווח בריצה כלא-נתמך — מ-`ctx.reportUnimplemented`. כולל גם פקודות
+	 * בלי handler וגם הצהרות-דרישה שלא ניתן היה להכריע
+	 * (`Settings.RequiredFeature(no-param)`), ולכן אלה אינם בהכרח מזהי-פקודה.
+	 */
 	unimplementedSeen: readonly UsedCommand[];
 }
 
@@ -173,7 +177,7 @@ export function formatCoverageReport(report: CoverageReport): string {
 
 	if (report.unimplementedSeen.length > 0) {
 		const hit = report.unimplementedSeen.map((c) => `${c.id}×${c.uses}`);
-		lines.push(`נתקלנו בריצה בלי handler: ${hit.join(' · ')}`);
+		lines.push(`דווח כלא-נתמך בריצה: ${hit.join(' · ')}`);
 	}
 
 	return lines.join('\n');

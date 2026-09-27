@@ -23,6 +23,8 @@ function page(name: string): Page {
 		name,
 		columns: 4,
 		rows: 3,
+		columnWidths: [null, null, null, null],
+		rowHeights: [null, null, null],
 		cells: [],
 		wordList: [],
 		predictionSource: 'None',
@@ -185,27 +187,55 @@ describe('דיבור', () => {
 	});
 });
 
-describe('שומרים בהקשר אמיתי', () => {
-	it('WEB_FEATURES הריקה חוסמת תא ComputerControl', () => {
+describe('שער-הזמינות בהקשר אמיתי', () => {
+	it('תא שדורש EyeGazeAccess אינו זמין — גם כשההצהרה אחרונה', () => {
 		const rt = runtime();
 		const blocked = cell(
-			cmd('Settings.RequiredFeature', { feature: 'ComputerControl' }),
-			cmd('Jump.To', { grid: 'אוכל' })
+			cmd('Settings.RestAll', { action: 'Off' }),
+			cmd('Jump.To', { grid: 'אוכל' }),
+			cmd('Settings.RequiredFeature', { feature: 'EyeGazeAccess' })
 		);
-		expect(rt.canActivate(blocked)).toBe(false);
-		rt.activate(blocked);
-		expect(rt.pageName).toBe('בית');
+		expect(rt.isCellAvailable(blocked)).toBe(false);
 	});
 
-	it('הקשר שכן מחזיק את התכונה מפעיל את התא', () => {
-		const rt = runtime({ features: featureSet('ComputerControl') });
+	it('TouchAccess — ברירת המחדל של קלון-הווב — זמין ורץ', () => {
+		const rt = runtime();
 		const ok = cell(
-			cmd('Settings.RequiredFeature', { feature: 'ComputerControl' }),
-			cmd('Jump.To', { grid: 'אוכל' })
+			cmd('Jump.To', { grid: 'אוכל' }),
+			cmd('Settings.RequiredFeature', { feature: 'TouchAccess' })
 		);
-		expect(rt.canActivate(ok)).toBe(true);
+		expect(rt.isCellAvailable(ok)).toBe(true);
 		rt.activate(ok);
 		expect(rt.pageName).toBe('אוכל');
+	});
+
+	it('הקשר שמחזיק את התכונה פותח תא שהיה חסום', () => {
+		const rt = runtime({ features: featureSet('EyeGazeAccess') });
+		const ok = cell(
+			cmd('Jump.To', { grid: 'אוכל' }),
+			cmd('Settings.RequiredFeature', { feature: 'EyeGazeAccess' })
+		);
+		expect(rt.isCellAvailable(ok)).toBe(true);
+	});
+
+	it('🛑 הצהרה בלי פרמטר — התא זמין, והמקרה נכנס למונה', () => {
+		const rt = runtime();
+		const noParam = cell(
+			cmd('Action.InsertText', { text: 'שלום' }),
+			cmd('Settings.RequiredFeature', {})
+		);
+		expect(rt.isCellAvailable(noParam)).toBe(true);
+		expect(rt.unimplemented).toEqual({ 'Settings.RequiredFeature(no-param)': 1 });
+	});
+
+	it('הצהרה אחרונה אינה מונעת מהפקודות שלפניה לרוץ', () => {
+		const rt = runtime();
+		const real = cell(
+			cmd('Action.InsertText', { text: 'מים' }),
+			cmd('Settings.RequiredFeature', { feature: 'TouchAccess' })
+		);
+		rt.activate(real);
+		expect(rt.output.items.map((i) => i.text)).toEqual(['מים']);
 	});
 });
 

@@ -11,7 +11,7 @@
  */
 
 import { WEB_FEATURES } from './features';
-import { canActivate, executeCommands } from './commands';
+import { executeCommands, isCellAvailable } from './commands';
 import { computeCoverage, formatCoverageReport, type CoverageReport } from './coverage';
 import type {
 	Cell,
@@ -61,6 +61,11 @@ export interface RuntimeOptions {
  * חוצץ-הפלט. 🔑 רשימת פריטים עם דקדוק — לא מחרוזת: `Action.InsertText`
  * נושאת gender/number/person/pos, וחוקי הנטייה העברית (plan.md שלב E)
  * יזדקקו להם. מחלקה נפרדת כדי שה-runes יחיו על האובייקט שמחזיק אותם.
+ *
+ * 🛑 **`items` חייב להישאר `$state`.** `ChatCell.svelte` (סלייס 4) קורא
+ * `ctx.output.items` בתוך `$derived`; אם המערך יוחלף בשדה רגיל, פס-הפלט
+ * פשוט לא יתעדכן — בלי שגיאה ובלי שבדיקה בצד אחד מהשניים תתפוס את זה.
+ * `runtime.svelte.test.ts` מאמת את הריאקטיביות בדפדפן אמיתי.
  */
 export class OutputBuffer {
 	#items = $state<OutputItem[]>([]);
@@ -230,26 +235,35 @@ export class GridRuntime implements RuntimeContext {
 
 	// ── פקודות לא-ממומשות ──────────────────────────────────────────────────
 
-	/** נצבר במונה. לעולם לא זורק ולא שותק — מודפס פעם אחת לכל מזהה. */
+	/**
+	 * נצבר במונה. לעולם לא זורק ולא שותק — מודפס פעם אחת לכל מזהה.
+	 * מקבל גם פקודות בלי handler וגם הצהרות-דרישה שלא ניתן היה להכריע.
+	 */
 	reportUnimplemented(id: CommandId): void {
 		const seen = this.#unimplemented[id] ?? 0;
 		this.#unimplemented = { ...this.#unimplemented, [id]: seen + 1 };
 		if (seen === 0) {
 			this.#onUnimplemented?.(id);
-			if (import.meta.env.DEV) console.warn(`[gridset] פקודה בלי מימוש: ${id}`);
+			if (import.meta.env.DEV) console.warn(`[gridset] דווח כלא-נתמך: ${id}`);
 		}
 	}
 
 	// ── נוחות לקומפוננטות ──────────────────────────────────────────────────
 
-	/** מריץ את שרשרת-הפקודות של התא בהקשר הזה. */
+	/**
+	 * מריץ את שרשרת-הפקודות של התא בהקשר הזה.
+	 * 🔑 נקרא **רק על תא זמין** — הזמינות נבדקת ברינדור, לא כאן.
+	 */
 	activate(cell: Cell): void {
 		executeCommands(cell, this);
 	}
 
-	/** האם התא ניתן להפעלה — תא שנחסם בשומר מוצג מעומעם, לא נעלם. */
-	canActivate(cell: Cell): boolean {
-		return canActivate(cell, this);
+	/**
+	 * שער-הרינדור: האם התא זמין בהקשר הזה. תא שאינו זמין אינו מצויר אך
+	 * שומר את משבצתו. הצהרה שלא ניתן להכריע נספרת ב-`reportUnimplemented`.
+	 */
+	isCellAvailable(cell: Cell): boolean {
+		return isCellAvailable(cell, this.features, (id) => this.reportUnimplemented(id));
 	}
 
 	coverage(): CoverageReport {

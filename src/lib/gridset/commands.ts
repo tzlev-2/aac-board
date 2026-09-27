@@ -1,5 +1,5 @@
 /**
- * שרשרת-הפקודות של gridset — רג'יסטרי, מריץ, ושומרים שעוצרים.
+ * שרשרת-הפקודות של gridset — רג'יסטרי, מריץ, ושער-זמינות.
  *
  * 🔑 **רג'יסטרי, לא `switch`.** הקטלוג מונה 353 פקודות, 63 בשימוש בלוחות
  * שנותחו, ותשע מהן מכסות 91.5% מההפעלות. הוספת אחת מ-54 הנותרות חייבת
@@ -8,15 +8,18 @@
  * 🛑 **הקובץ הזה נבדק בלי DOM.** אין כאן import של stores, של tts, ושל שום
  * דבר שנוגע ב-`window`. כל מה ש-handler יכול לעשות עובר דרך `RuntimeContext`.
  *
- * מקור: docs/plans/gridset-core-design.md §1 · docs/briefs/5-commands-engine.md.
+ * מקור: docs/plans/gridset-core-design.md §1 (מתוקן 27.9.2026) ·
+ * docs/briefs/5-commands-engine.md (סבב 2).
  */
 
+import { isKnownFeature } from './features';
 import type {
 	Cell,
 	CommandHandler,
 	CommandId,
 	CommandInvocation,
 	CommandResult,
+	FeatureId,
 	Grammar,
 	ImageRef,
 	OutputItem,
@@ -82,9 +85,10 @@ function paramToBool(value: ParamValue | undefined): boolean | undefined {
 }
 
 /**
- * דקדוק מפרמטרי `Action.InsertText`. 🔑 הערכים **עבריים** (`gender=זכר`)
- * ונשמרים כפי שהם — חוקי הנטייה הם plan.md שלב E ואינם בסבב הזה, אבל
- * המודל נושא את השדות מהיום.
+ * דקדוק מפרמטרי `Action.InsertText`. 🔑 הערכים **עבריים** (`gender=זכר`,
+ * `number=יחיד`, `person=גוף שלישי`) ונשמרים **גלמיים** — אין כאן מיפוי
+ * לאנגלית. חוקי הנטייה הם plan.md שלב E ואינם בסבב הזה, אבל המודל נושא
+ * את השדות מהיום.
  */
 function grammarFromParams(params: Record<string, ParamValue>): Grammar {
 	const grammar: Grammar = {};
@@ -99,34 +103,104 @@ function grammarFromParams(params: Record<string, ParamValue>): Grammar {
 	return grammar;
 }
 
-// ── שומרים ───────────────────────────────────────────────────────────────
+// ── שער-הזמינות ──────────────────────────────────────────────────────────
+// 🛑 תוקן 27.9.2026 אחרי אימות מול 116 קובצי .gridset.
+//
+// `Settings.RequiredFeature` **אינה פקודת-שומר**. היא הפקודה האחרונה
+// ב-4,014 מ-4,155 המופעים (96.6%), ובלוחות הארגון ב-126 מ-126 — ולכן אין
+// לה מה לעצור. זו **הצהרת-דרישה של התא בתחביר של פקודה**, וההשפעה שלה היא
+// בזמן **רינדור**: תא שדרישתו אינה מתקיימת אינו מצויר, אך שומר את משבצתו.
+//
+// שתי מסקנות שנקנו בדם באימות:
+//   1. בדיקת ראש-שרשרת בלבד מחמיצה 54% מהמופעים (68 מ-126 יושבים ב-index 1,
+//      אחרי `Settings.RestAll`/`Jump.To`) — לכן סורקים את **כל** השרשרת.
+//   2. `'halt'` לא רק מיותר כאן אלא מזיק: בעשרה תאים `Jump.To` מקדים את
+//      ההצהרה, הניווט כבר התבצע, ו-`'halt'` אינו מבטל דבר.
+//
+// 🛑 וזה אינו `Cell.visibility` — אלמנט נפרד (1,555 מופעים), מנגנון אחר.
+
+/** `ok` = הדרישה מתקיימת · `blocked` = אינה מתקיימת · `unknown` = לא ניתן להכריע. */
+export type Availability = 'ok' | 'blocked' | 'unknown';
 
 /**
- * פרדיקט-שומר: `true` = השרשרת ממשיכה, `false` = היא נעצרת.
- *
- * 🔑 מופרד מה-handler בכוונה: `canActivate` צריך **להעריך** את השומר בלי
- * להריץ את השרשרת, כדי שתא חסום ייראה מעומעם ולא ייעלם.
+ * כלל-זמינות: פקודה שמצהירה על דרישה מהסביבה. רג'יסטרי, בדיוק כמו
+ * הפקודות — דרישה חדשה היא ערך במפה.
  */
-export type GuardPredicate = (params: Record<string, ParamValue>, ctx: RuntimeContext) => boolean;
-
-function requiredFeatureSatisfied(
+export type AvailabilityRule = (
 	params: Record<string, ParamValue>,
-	ctx: RuntimeContext
-): boolean {
+	features: ReadonlySet<FeatureId>
+) => Availability;
+
+/** מזהה שמדווח כשהצהרת-דרישה מגיעה בלי פרמטר `feature` (280 מופעים). */
+export const REQUIREMENT_WITHOUT_PARAM = 'Settings.RequiredFeature(no-param)';
+
+function requiredFeatureAvailability(
+	params: Record<string, ParamValue>,
+	features: ReadonlySet<FeatureId>
+): Availability {
 	const feature = paramToText(params.feature).trim();
-	// שומר בלי שם-תכונה אינו ניתן להערכה — לא עוצרים על סמך נתון חסר.
-	if (!feature) return true;
-	return ctx.features.has(feature);
+
+	// 🛑 `<Command ID="Settings.RequiredFeature" />` בלי פרמטר כלל — 280 מופעים
+	// בחבילה, **56 מתוך 126 בלוחות שלנו**. מימוש תמים כותב
+	// `features.has(undefined)`, מקבל `false`, ומסתיר 56 תאים בשקט.
+	// הוכרע: אין פרמטר = אין דרישה. התא זמין, והמקרה מדווח כדי שיהיה נראה.
+	if (!feature) return 'unknown';
+
+	// שם שאינו באחד משנים-עשר הערכים שנמדדו ⇒ נתון חדש, לא הכרעה. לא מסתירים
+	// תא על סמך מה שלא ידוע — מדווחים ומציגים.
+	if (!isKnownFeature(feature)) return 'unknown';
+
+	return features.has(feature) ? 'ok' : 'blocked';
 }
 
-/** רג'יסטרי השומרים. שומר חדש = ערך במפה, בדיוק כמו פקודה. */
-export const guardRegistry: Partial<Record<CommandId, GuardPredicate>> = {
-	'Settings.RequiredFeature': requiredFeatureSatisfied
+/** רג'יסטרי כללי-הזמינות. */
+export const availabilityRules: Partial<Record<CommandId, AvailabilityRule>> = {
+	'Settings.RequiredFeature': requiredFeatureAvailability
 };
 
-/** האם המזהה הוא פקודת-שומר. */
-export function isGuardCommand(id: CommandId): boolean {
-	return guardRegistry[id] !== undefined;
+/**
+ * האם התא זמין — **שער רינדור**, נקרא לפני הציור ולא בזמן ההפעלה.
+ *
+ * 🔑 סורק את **כל השרשרת**, ללא תלות במקום ההצהרה. תא שאינו זמין אינו
+ * מצויר אך שומר את משבצתו — בלי reflow, ובלי להריץ שום פקודה.
+ *
+ * @param report דיווח על הצהרה שלא ניתן להכריע (בלי פרמטר / שם לא מוכר).
+ *               בדרך כלל `ctx.reportUnimplemented`.
+ */
+export function isCellAvailable(
+	cell: Cell,
+	features: ReadonlySet<FeatureId>,
+	report?: (id: CommandId) => void
+): boolean {
+	for (const inv of cell.commands) {
+		const rule = availabilityRules[inv.id];
+		if (!rule) continue;
+		const verdict = rule(inv.params, features);
+		if (verdict === 'blocked') return false;
+		if (verdict === 'unknown') {
+			const feature = paramToText(inv.params.feature).trim();
+			report?.(feature ? `${inv.id}(${feature})` : REQUIREMENT_WITHOUT_PARAM);
+		}
+	}
+	return true;
+}
+
+/**
+ * ההצהרה שחוסמת את התא — למי שרוצה להסביר *למה* התא אינו מצויר.
+ * סורקת את כל השרשרת, כמו `isCellAvailable`.
+ */
+export function unmetRequirement(
+	cell: Cell,
+	features: ReadonlySet<FeatureId>
+): { command: CommandInvocation; feature: string } | undefined {
+	for (const inv of cell.commands) {
+		const rule = availabilityRules[inv.id];
+		if (!rule) continue;
+		if (rule(inv.params, features) === 'blocked') {
+			return { command: inv, feature: paramToText(inv.params.feature).trim() };
+		}
+	}
+	return undefined;
 }
 
 // ── רג'יסטרי הפקודות ─────────────────────────────────────────────────────
@@ -136,6 +210,11 @@ export const commandRegistry: Partial<Record<CommandId, CommandHandler>> = {
 	/**
 	 * 1,736 הפעלות. `text` הוא טקסט עשיר; `gender`/`number`/`person`/`pos`
 	 * נישאים לחוצץ-הפלט, ו-`showincelllabel` נשמר לרינדור.
+	 *
+	 * ℹ️ `indicatorenabled` מופיע ב-1,739 מ-1,739 המופעים ו**מושמט בכוונה**:
+	 * הוא שולט במחוון-המצב של Grid 3 (הנקודה שמסמנת פקודה פעילה בממשק
+	 * הפיזי), ואין לו מקבילה בקלון-הווב. אינו נשמר כדי לא להעמיד פנים
+	 * שהמידע משפיע על משהו — כשיהיה מחוון, הפרמטר יחזור לכאן.
 	 */
 	'Action.InsertText': (params, ctx) => {
 		const raw = params.text;
@@ -187,12 +266,14 @@ export const commandRegistry: Partial<Record<CommandId, CommandHandler>> = {
 	},
 
 	/**
-	 * 126 הפעלות. 🛑 **פקודת-שומר** — אינה מאפיין של תא ואינה מתעדת כלום.
-	 * תפקידה היחיד הוא לעצור את השרשרת כשהתכונה אינה זמינה.
+	 * 126 הפעלות. 🛑 **no-op בזמן הרצה, בכוונה.**
+	 *
+	 * זו הצהרת-דרישה שנצרכת ב-`isCellAvailable` לפני הרינדור, ולא פעולה.
+	 * היא אחרונה בשרשרת ב-126 מ-126 המופעים בלוחות שלנו — אין לה מה לעצור,
+	 * ובעשרה תאים שבהם `Jump.To` מקדים אותה עצירה כבר הייתה מאחרת את
+	 * הרכבת. נשארת ברג'יסטרי כדי שלא תיספר כפקודה לא-ממומשת.
 	 */
-	'Settings.RequiredFeature': (params, ctx) => {
-		return requiredFeatureSatisfied(params, ctx) ? undefined : 'halt';
-	},
+	'Settings.RequiredFeature': () => {},
 
 	/** 118 הפעלות. בונה מילה אות-אחר-אות בתוך פריט אחד בחוצץ. */
 	'Action.Letter': (params, ctx) => {
@@ -210,18 +291,24 @@ export function implementedCommandIds(): CommandId[] {
 // ── המריץ ────────────────────────────────────────────────────────────────
 
 /**
- * מריץ שרשרת-פקודות. 🛑 **אינו `forEach`** — handler שמחזיר `'halt'`
- * מפסיק את השרשרת, וזה כל המנגנון של `Settings.RequiredFeature`.
+ * מריץ שרשרת-פקודות. handler שמחזיר `'halt'` מפסיק את השרשרת — המנגנון
+ * נשאר בחוזה (`CommandResult`) עבור פקודות עתידיות, אף שאף אחת מתשע
+ * הפקודות של הסבב אינה משתמשת בו.
  *
  * פקודה בלי handler נספרת ב-`ctx.reportUnimplemented` והשרשרת ממשיכה:
  * לעולם לא זורקים, ולעולם לא שותקים.
+ *
+ * 🔑 נקרא **רק על תא זמין** — `isCellAvailable` הוא השער, לא המריץ.
+ *
+ * @param registry הזרקה לבדיקות; ברירת המחדל היא הרג'יסטרי הגלובלי.
  */
 export function executeCommandChain(
 	commands: readonly CommandInvocation[],
-	ctx: RuntimeContext
+	ctx: RuntimeContext,
+	registry: Partial<Record<CommandId, CommandHandler>> = commandRegistry
 ): void {
 	for (const inv of commands) {
-		const handler = commandRegistry[inv.id];
+		const handler = registry[inv.id];
 		if (!handler) {
 			ctx.reportUnimplemented(inv.id);
 			continue;
@@ -234,30 +321,4 @@ export function executeCommandChain(
 /** מריץ את שרשרת-הפקודות של תא. */
 export function executeCommands(cell: Cell, ctx: RuntimeContext): void {
 	executeCommandChain(cell.commands, ctx);
-}
-
-/**
- * האם התא ניתן להפעלה בהקשר הנוכחי.
- *
- * 🔑 בודק **רק את פקודות-השומר שבראש השרשרת** — ברגע שמופיעה פקודה שאינה
- * שומר, הבדיקה נגמרת (אין הרצה, אין תופעות-לוואי). תא שנופל כאן מוצג
- * מעומעם, כמו `Visibility=Disabled`, ו**אינו נעלם**.
- */
-export function canActivate(cell: Cell, ctx: RuntimeContext): boolean {
-	for (const inv of cell.commands) {
-		const guard = guardRegistry[inv.id];
-		if (!guard) break;
-		if (!guard(inv.params, ctx)) return false;
-	}
-	return true;
-}
-
-/** השומר הראשון שחוסם את התא — למי שרוצה להסביר למשתמש *למה* הוא מעומעם. */
-export function blockingGuard(cell: Cell, ctx: RuntimeContext): CommandInvocation | undefined {
-	for (const inv of cell.commands) {
-		const guard = guardRegistry[inv.id];
-		if (!guard) return undefined;
-		if (!guard(inv.params, ctx)) return inv;
-	}
-	return undefined;
 }
