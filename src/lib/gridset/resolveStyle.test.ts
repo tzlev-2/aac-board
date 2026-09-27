@@ -50,12 +50,27 @@ describe('parseStyles', () => {
 		expect(styles['Default'].Name).toBeUndefined();
 	});
 
-	it('פורס TileColour כשדה לא-ממופה (נשמר, לא נזרק)', () => {
+	// TileColour הוא צבע רביעי נפרד מ-BackColour — 3,356 מופעים ברמת התא
+	// (gridset-schema.tsv:101), פי 15 מהקטלוג. נכנס ל-ResolvedStyle 27.9.2026.
+	it('פורס TileColour כשדה ממופה ומעביר אותו ל-ResolvedStyle', () => {
 		const xml = `<Styles><Style Key="Spotify Keyboard"><TileColour>#0078D4FF</TileColour></Style></Styles>`;
 
 		const styles = parseStyles(xml);
+		expect(styles['Spotify Keyboard'].tileColour).toBe('#0078D4FF');
 
-		expect(styles['Spotify Keyboard'].TileColour).toBe('#0078D4FF');
+		const resolved = createStyleResolver(styles)({ basedOnStyle: 'Spotify Keyboard', overrides: {} });
+		expect(resolved.tileColour).toBe('#0078D4FF');
+	});
+
+	it('עקיפה מקומית של TileColour גוברת על הסגנון הנקוב', () => {
+		const styles = parseStyles(`<Styles><Style Key="S"><TileColour>#0078D4FF</TileColour></Style></Styles>`);
+
+		const resolved = createStyleResolver(styles)({
+			basedOnStyle: 'S',
+			overrides: { tileColour: '#123456FF' }
+		});
+
+		expect(resolved.tileColour).toBe('#123456FF');
 	});
 
 	it('סגנון ריק לגמרי (כמו b002 Default בנתונים האמיתיים) לא נזרק', () => {

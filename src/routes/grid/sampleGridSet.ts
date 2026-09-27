@@ -12,7 +12,8 @@ const style: ResolvedStyle = {
 	borderColour: '#CCCCCCFF',
 	fontName: 'Arial',
 	fontSize: 22,
-	backgroundShape: 1
+	backgroundShape: 1,
+	tileColour: '#00000000'
 };
 
 const cells: Cell[] = [

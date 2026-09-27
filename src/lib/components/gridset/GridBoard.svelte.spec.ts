@@ -13,7 +13,8 @@ const style: ResolvedStyle = {
 	borderColour: '#00000000',
 	fontName: 'Arial',
 	fontSize: 20,
-	backgroundShape: 1
+	backgroundShape: 1,
+	tileColour: '#00000000'
 };
 
 function makeCell(overrides: Partial<Cell> = {}): Cell {

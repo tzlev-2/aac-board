@@ -88,23 +88,35 @@ export type FeatureId =
 	| 'Email'; // 1
 
 // ── סגנון ────────────────────────────────────────────────────────────────
-// סדר הפתירה: Default → שרשרת BasedOnStyle → הסגנון הנקוב → עקיפות התא.
+// 🛑 תוקן 27.9.2026: סדר הפתירה הוא **שתי רמות**, לא שרשרת —
+//    DEFAULT → הסגנון הנקוב (רשומה שטוחה) → עקיפות התא.
+//    BasedOnStyle קיים רק על התא (gridset-schema.tsv:96), ולא בתוך
+//    StyleData/Styles/Style. ראו gridset-core-design.md §5.
 
 export interface Style {
+	/** ⚠️ זהו ה-`Key` (המזהה שאליו `BasedOnStyle` מפנה), לא שם-התצוגה.
+	 *  `<Name>` נשמר בנפרד תחת המפתח `Name`, והוא שונה מה-`Key` ב-92.6%
+	 *  מהסגנונות (2,396 מ-2,587) — למשל Key="style 18" / Name="Netflix 3". */
 	name: string;
-	basedOnStyle?: string;
 	backColour?: string; // #RRGGBBAA — 🛑 אלפא בסוף
 	fontColour?: string;
 	borderColour?: string;
 	fontName?: string;
-	/** 🛑 יכול להיות שברי — 132 מ-2,221 הסגנונות נושאים 18.666… (המרת pt→px). parseInt מקטע ומתנגש. */
+	/**
+	 * 🛑 **אינו רשימה סגורה של 20 שלמים.** נמדד ב-styles.tsv: 26 ערכים שונים,
+	 * מהם 6 שברים (18.666… ×75 · 14.666… ×35 · 26.666… ×13 ועוד) — 132 סגנונות.
+	 * parseInt לא רק מקטע אלא **מתנגש**: 14.666… הופך ל-14.
+	 * הנפוץ ביותר הוא 24 (439/2,221) — כלומר ברירת-המחדל אינה שרירותית.
+	 */
 	fontSize?: number;
-	backgroundShape?: number; // enum 1..10, הסמנטיקה טרם פוענחה (plan.md שלב C)
-	tileGap?: string;
+	/** enum. ברמת התא קיים גם **0** (5,984 מופעים); בקטלוג 1–7, 9, 10 — לא 1..10 רצוף. הסמנטיקה טרם פוענחה (plan.md שלב C). */
+	backgroundShape?: number;
+	/** 🔑 צבע רביעי, נפרד מ-BackColour. ברמת התא 3,356 מופעים — פי 15 מהקטלוג (228). */
+	tileColour?: string;
 	[k: string]: unknown; // שדות שטרם מופו — נשמרים ולא נזרקים
 }
 
-/** סגנון אחרי פתירת שרשרת הירושה. כל שדה סופי. */
+/** סגנון אחרי הפתירה הדו-שלבית. כל שדה סופי. */
 export interface ResolvedStyle {
 	backColour: string;
 	fontColour: string;
@@ -112,6 +124,7 @@ export interface ResolvedStyle {
 	fontName: string;
 	fontSize: number;
 	backgroundShape: number;
+	tileColour: string;
 }
 
 /**

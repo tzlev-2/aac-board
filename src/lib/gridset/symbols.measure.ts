@@ -30,7 +30,8 @@ const DUMMY_STYLE: ResolvedStyle = {
 	borderColour: '#000000FF',
 	fontName: 'Arial',
 	fontSize: 14,
-	backgroundShape: 1
+	backgroundShape: 1,
+	tileColour: '#00000000'
 };
 
 function stripCdata(xml: string): string {

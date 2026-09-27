@@ -15,7 +15,8 @@ const STYLE: ResolvedStyle = {
 	borderColour: '#000000FF',
 	fontName: 'Arial',
 	fontSize: 16,
-	backgroundShape: 1
+	backgroundShape: 1,
+	tileColour: '#00000000'
 };
 
 function page(name: string): Page {

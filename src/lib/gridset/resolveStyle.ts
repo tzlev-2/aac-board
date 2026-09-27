@@ -34,7 +34,8 @@ const FIELD_MAP: Partial<Record<string, keyof Style>> = {
 	BorderColour: 'borderColour',
 	FontName: 'fontName',
 	FontSize: 'fontSize',
-	BackgroundShape: 'backgroundShape'
+	BackgroundShape: 'backgroundShape',
+	TileColour: 'tileColour'
 };
 
 const NUMERIC_FIELDS = new Set<keyof Style>(['fontSize', 'backgroundShape']);
@@ -102,7 +103,8 @@ const STYLE_FIELDS = [
 	'borderColour',
 	'fontName',
 	'fontSize',
-	'backgroundShape'
+	'backgroundShape',
+	'tileColour'
 ] as const satisfies readonly (keyof ResolvedStyle)[];
 
 function applyStyleOverrides(base: ResolvedStyle, overrides: Partial<Style>): ResolvedStyle {
