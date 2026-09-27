@@ -43,7 +43,8 @@ const fakeSymbols: SymbolResolver = {
 		unresolved: 0,
 		byLibrary: {},
 		resolvedByLibrary: {},
-		byMatch: {} as never
+		byMatch: {} as never,
+		resolvedBySource: {}
 	})
 };
 

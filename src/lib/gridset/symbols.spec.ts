@@ -6,10 +6,12 @@ import {
 	normalizeSearchTerm,
 	pickPictogram,
 	primaryLanguage,
+	pcsSymbolId,
 	rankImageRefs,
 	symbolBaseName,
 	type PictogramSearch
 } from './symbols';
+import { PCS_AVAILABLE_IDS } from './pcs-manifest';
 import type { Cell, GridSet, ImageRef, ResolvedStyle, RichText } from './types';
 
 // ── עזרי-בנייה ───────────────────────────────────────────────────────────
@@ -115,6 +117,31 @@ describe('symbolBaseName', () => {
 });
 
 // ── אסיפת מועמדים ודירוגם ────────────────────────────────────────────────
+
+describe('pcsSymbolId', () => {
+	it('מרפד את המזהה ל-5 ספרות — מוסכמת השמות של PCS COLOR', () => {
+		expect(pcsSymbolId(ref('MJPCS#', '3424.wmf'))).toBe('03424');
+		expect(pcsSymbolId(ref('MJPCS#', '85.wmf'))).toBe('00085');
+		expect(pcsSymbolId(ref('MJPCS#', '18957.wmf'))).toBe('18957');
+	});
+
+	it('חסר-רגישות לאות גדולה, וסובל קדם-ספרייה שנשאר ב-path', () => {
+		expect(pcsSymbolId(ref('mjpcs#', '3424.wmf'))).toBe('03424');
+		expect(pcsSymbolId(ref('MJPCS#', '[MJPCS#]3424.wmf'))).toBe('03424');
+	});
+
+	it('🛑 מזהה לא-מספרי מוחזר null — שני החריגים שנמדדו בקורפוס', () => {
+		// ‏`PCS COLOR` שטוחה, אין בה תיקיית `hebrew\` ⇒ אין קובץ לשניהם.
+		expect(pcsSymbolId(ref('MJPCS#', 'hebrew\\db0201.wmf'))).toBeNull();
+		expect(pcsSymbolId(ref('MJPCS#', 'hebrew\\mop.wmf'))).toBeNull();
+	});
+
+	it('אינו נוגע ב-ref שאינו של PCS', () => {
+		expect(pcsSymbolId(ref('widgit', 'widgit rebus\\h\\have.emf'))).toBeNull();
+		expect(pcsSymbolId(ref('grid3x', '3424.wmf'))).toBeNull();
+		expect(pcsSymbolId(undefined)).toBeNull();
+	});
+});
 
 describe('collectImageRefs', () => {
 	it('מקדים את סמל התא לסמלים שעל המשפטים, ובלי כפילויות', () => {
@@ -252,13 +279,70 @@ describe('createSymbolResolver', () => {
 
 	it('ref של PCS — לא נשלח חיפוש באנגלית, והכתובית היא המפתח היחיד', async () => {
 		const search = fakeSearch({ 'he:פירות': [result(2462, 'פירות')] });
-		const resolver = createSymbolResolver(gridSet(), { search, cache: null });
+		// 🛑 ‏`pcsBaseUrl: ''` מפורש. ‏`10078` **קיים** במניפסט, ולכן בלי זה
+		// הבדיקה תלויה בכך שאין `VITE_PROXY_URL` בסביבה — ותישבר ברגע שיהיה.
+		const resolver = createSymbolResolver(gridSet(), { search, cache: null, pcsBaseUrl: '' });
 
 		const resolution = await resolver.resolve(
 			cell({ image: ref('MJPCS#', '10078.wmf'), caption: 'פירות' })
 		);
 
 		expect(resolution).toMatchObject({ url: pictogramUrl(2462), lang: 'he', library: 'mjpcs#' });
+		expect(search.calls).toEqual(['he:פירות']);
+	});
+
+	it('🔑 ‏PCS שקיים בדלי נפתר משם — ו**אף חיפוש לא נשלח**', async () => {
+		// ‏`10078` נמצא במניפסט (שמיוצר מהדלי עצמו), ולכן אין לו מה לחפש.
+		expect(PCS_AVAILABLE_IDS.has('10078')).toBe(true);
+		const search = fakeSearch({ 'he:פירות': [result(2462, 'פירות')] });
+		const resolver = createSymbolResolver(gridSet(), {
+			search,
+			cache: null,
+			pcsBaseUrl: 'https://proxy.example'
+		});
+
+		const resolution = await resolver.resolve(
+			cell({ image: ref('MJPCS#', '10078.wmf'), caption: 'פירות' })
+		);
+
+		expect(resolution).toMatchObject({
+			url: 'https://proxy.example/v1/img/pcs/10078',
+			source: 'pcs',
+			query: '10078',
+			library: 'mjpcs#'
+		});
+		// זה העיקר: ‏lookup מדויק אינו נוגע ברשת בכלל.
+		expect(search.calls).toEqual([]);
+		expect(resolver.stats().resolvedBySource).toEqual({ pcs: 1 });
+	});
+
+	it('🛑 מזהה PCS שאינו בדלי נופל ל-ARASAAC ואינו מחזיר תמונה שבורה', async () => {
+		expect(PCS_AVAILABLE_IDS.has('99999')).toBe(false);
+		const search = fakeSearch({ 'he:פירות': [result(2462, 'פירות')] });
+		const resolver = createSymbolResolver(gridSet(), {
+			search,
+			cache: null,
+			pcsBaseUrl: 'https://proxy.example'
+		});
+
+		const resolution = await resolver.resolve(
+			cell({ image: ref('MJPCS#', '99999.wmf'), caption: 'פירות' })
+		);
+
+		expect(resolution).toMatchObject({ url: pictogramUrl(2462), source: 'arasaac', lang: 'he' });
+		expect(search.calls).toEqual(['he:פירות']);
+		expect(resolver.stats().resolvedBySource).toEqual({ arasaac: 1 });
+	});
+
+	it('בלי pcsBaseUrl שכבת ה-PCS כבויה, וההתנהגות זהה לקודמת', async () => {
+		const search = fakeSearch({ 'he:פירות': [result(2462, 'פירות')] });
+		const resolver = createSymbolResolver(gridSet(), { search, cache: null, pcsBaseUrl: '' });
+
+		const resolution = await resolver.resolve(
+			cell({ image: ref('MJPCS#', '10078.wmf'), caption: 'פירות' })
+		);
+
+		expect(resolution.source).toBe('arasaac');
 		expect(search.calls).toEqual(['he:פירות']);
 	});
 
@@ -399,7 +483,8 @@ describe('createSymbolResolver', () => {
 			unresolved: 3,
 			byLibrary: { widgit: 2, grid3x: 1, none: 1 },
 			resolvedByLibrary: { widgit: 1 },
-			byMatch: { exact: 1, loose: 0 }
+			byMatch: { exact: 1, loose: 0 },
+			resolvedBySource: { arasaac: 1 }
 		});
 	});
 

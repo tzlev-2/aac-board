@@ -34,6 +34,7 @@
 
 import { pictogramUrl, searchPictograms, type ArasaacResult } from '$lib/services/arasaac';
 import { createSymbolCache, type CachedMatch, type SymbolCache } from './symbol-cache';
+import { PCS_AVAILABLE_IDS } from './pcs-manifest';
 import type { Cell, GridSet, ImageRef, ParamValue, RichText } from './types';
 
 // ── החוזה החוצה ──────────────────────────────────────────────────────────
@@ -43,7 +44,7 @@ export type MatchQuality = 'exact' | 'loose';
 
 export interface SymbolResolution {
 	url: string | null;
-	source: 'arasaac' | 'none';
+	source: 'arasaac' | 'pcs' | 'none';
 	/** מה חיפשנו בפועל — לדיאגנוסטיקה. מחרוזת ריקה = לא היה מה לחפש. */
 	query: string;
 	/** שדות-דיאגנוסטיקה נוספים; קיימים רק כשהפתירה הצליחה. */
@@ -62,8 +63,22 @@ export interface SymbolResolverStats {
 	byLibrary: Record<string, number>;
 	/** מתוכן — אלה שנפתרו. ההפרש מ-`byLibrary` הוא שיעור-הכשל לכל ספרייה. */
 	resolvedByLibrary: Record<string, number>;
-	/** התפלגות דרגות-ההתאמה בין הפתירות שהצליחו. */
+	/**
+	 * התפלגות דרגות-ההתאמה בין הפתירות שהצליחו.
+	 *
+	 * 🛑 **הסכום כאן קטן מ-`resolved`** מאז שנוספה שכבת PCS: פתירת-PCS היא
+	 * lookup מדויק לפי מזהה ולא התאמת-מילת-מפתח, ולכן אין לה `MatchQuality`
+	 * והיא אינה נספרת כאן. הפער הוא בדיוק `resolvedBySource.pcs`.
+	 */
 	byMatch: Record<MatchQuality, number>;
+	/**
+	 * הפתירות שהצליחו, לפי המקור שהגיש אותן.
+	 *
+	 * 🔑 בלי זה אי-אפשר לדווח כיסוי בכלל: ‏PCS ו-ARASAAC נבדלים בסוג הראיה
+	 * (‏lookup מדויק מול התאמת-מילה), ולכן "‏61% נפתרו" חסר-משמעות אם אינו
+	 * אומר כמה מכל אחד.
+	 */
+	resolvedBySource: Record<string, number>;
 }
 
 export interface SymbolResolver {
@@ -95,6 +110,14 @@ export interface SymbolResolverOptions {
 	cache?: SymbolCache | null;
 	/** גודל התמונה ב-URL של ARASAAC. */
 	size?: number;
+	/**
+	 * כתובת-הבסיס של הוורקר שמגיש את סמלי ה-PCS מהדלי הפרטי.
+	 *
+	 * 🔑 **ריק ⇒ שכבת ה-PCS כבויה לגמרי**, וההתנהגות זהה למה שהיה לפניה. זו
+	 * ברירת-המחדל כשאין `VITE_PROXY_URL`, והיא מכוונת: ‏build בלי פרוקסי לא
+	 * אמור לייצר `<img>` שמצביע לשום מקום.
+	 */
+	pcsBaseUrl?: string;
 }
 
 // ── מפתח-החיפוש שנגזר מ-`ImageRef` ───────────────────────────────────────
@@ -128,6 +151,37 @@ export function symbolBaseName(ref: ImageRef | undefined): string | null {
 		.trim();
 	if (name.length < 2 || !HAS_LETTER.test(name)) return null;
 	return name;
+}
+
+// ── PCS — שכבה ראשונה, ‏lookup מדויק ולא חיפוש ───────────────────────────
+
+/** הספרייה של PCS ב-`ImageRef`. ‏ב-XML האמיתי מופיע גם `[MJPCS#]` וגם `[mjpcs#]`. */
+const PCS_LIBRARY = 'mjpcs#';
+/** מזהה עשרוני עירום — מה ש-`[MJPCS#]` נושא במקום מושג. */
+const PCS_NUMERIC_ID = /^\d+$/;
+
+/**
+ * מזהה ה-PCS מתוך `ImageRef`, מרופד ל-5 ספרות — או `null`.
+ *
+ * `{ library: 'MJPCS#', path: '3424.wmf' }` → `'03424'`
+ *
+ * 🔑 **זה ההבדל מ-`symbolBaseName`, והוא העיקר.** שם-הבסיס מחפש *מושג*, ולכן
+ * הוא מחזיר `null` לשם שאין בו אות — כלומר לכל הפניית PCS. כאן בדיוק ההיפך:
+ * המספר **הוא** המפתח, והפתירה היא lookup ישיר לקובץ ולא ניחוש לפי מילה.
+ *
+ * מחזיר `null` כשהמזהה אינו מספרי. נמדד: **‏2 מ-123 המזהים בקורפוס** הם כאלה
+ * — ‏`hebrew\db0201` ו-`hebrew\mop`. הם נושאים תיקיית-משנה `hebrew\`, ו-
+ * ‏`PCS COLOR` שטוחה (‏`rclone lsd` החזיר אפס תיקיות) ⇒ **אין להם קובץ אצלנו.**
+ */
+export function pcsSymbolId(ref: ImageRef | undefined): string | null {
+	if (!ref || ref.library.trim().toLowerCase() !== PCS_LIBRARY) return null;
+	const path = ref.path.replace(LIBRARY_PREFIX, '');
+	const leaf = path.split(/[\\/]/).pop() ?? '';
+	const id = leaf.replace(FILE_EXTENSION, '').trim();
+	if (!PCS_NUMERIC_ID.test(id)) return null;
+	// ‏אין חיתוך ל-5: מזהה ארוך מזה פשוט לא יימצא במניפסט וייפול ל-ARASAAC,
+	// ‏וזה עדיף על מפתח שקוצר בשקט והצביע לסמל **אחר**.
+	return id.padStart(5, '0');
 }
 
 // ── אסיפת המועמדים מן התא, ודירוגם לפי `symbolSearchKeys` ─────────────────
@@ -286,6 +340,11 @@ export function createSymbolResolver(
 	const cache = options.cache === null ? null : (options.cache ?? createSymbolCache());
 	const size = options.size ?? 300;
 	const minMatch = options.minMatch ?? 'exact';
+	// ‏אותו מקור של `proxy-client.ts` — הוורקר שמגיש את הדלי הפרטי. ריק ⇒ כבוי.
+	const pcsBaseUrl = (
+		options.pcsBaseUrl ??
+		((typeof import.meta !== 'undefined' && import.meta.env?.VITE_PROXY_URL) || '')
+	).replace(/\/+$/, '');
 	const captionLang = primaryLanguage(gridSet.language);
 
 	const stats: SymbolResolverStats = {
@@ -293,7 +352,8 @@ export function createSymbolResolver(
 		unresolved: 0,
 		byLibrary: {},
 		resolvedByLibrary: {},
-		byMatch: { exact: 0, loose: 0 }
+		byMatch: { exact: 0, loose: 0 },
+		resolvedBySource: {}
 	};
 
 	/** תא שנפתר פעם אחת אינו נספר פעמיים ואינו נשלח שוב לרשת. */
@@ -327,6 +387,8 @@ export function createSymbolResolver(
 		if (resolution.url) {
 			stats.resolved += 1;
 			stats.resolvedByLibrary[library] = (stats.resolvedByLibrary[library] ?? 0) + 1;
+			stats.resolvedBySource[resolution.source] =
+				(stats.resolvedBySource[resolution.source] ?? 0) + 1;
 			if (resolution.match) stats.byMatch[resolution.match] += 1;
 		} else {
 			stats.unresolved += 1;
@@ -341,6 +403,37 @@ export function createSymbolResolver(
 			: primary.library.trim()
 				? primary.library.trim().toLowerCase()
 				: EMBEDDED_LIBRARY;
+
+		// 🔑 **‏PCS קודם לכל חיפוש — וזה אינו "ניחוש טוב יותר" אלא סוג-ראיה אחר.**
+		// ‏`[MJPCS#]` נושא מזהה מספרי, ולכן הפתירה היא **‏lookup ישיר לקובץ**:
+		// ‏`id.zfill(5) + '.png'` בדלי. שכבות ה-ARASAAC שמתחת מתאימות *מילה*
+		// לסמל, ולכן הן תמיד הימור. מדידה: ‏`org-3` נפתר ב-15% בלבד דרך
+		// שם-הבסיס, כי אין במזהה מספרי מה לחפש.
+		//
+		// 🛑 **ורק אם הקובץ באמת בדלי** (`pcs-manifest.ts`). בלי הבדיקה הזאת
+		// ‏PCS היה "מצליח" תמיד — ‏URL נבנה גם למזהה שאין לו קובץ — ו**מנצח**
+		// את ARASAAC, שאולי כן היה פותר את התא דרך הכתובית העברית. התוצאה
+		// הייתה החלפת סמל נכון ב-`<img>` שבור.
+		//
+		// עובר על **כל** ה-refs ולא רק על הראשון: תא יכול לשאת כמה refs
+		// (נמדד: ‏18 מ-903 ב-`org-1`), והדירוג לפי `symbolSearchKeys` מדרג
+		// מועמדים-לחיפוש — הוא לא נועד להכריע בין lookup לחיפוש.
+		//
+		// ‏`library` המדווח נשאר זה של ה-ref הראשון, כדי ש-`byLibrary` ישמור
+		// על אותה סמנטיקה שנמדדה עד כה. ההפרדה בין המקורות היא ב-`resolvedBySource`.
+		if (pcsBaseUrl) {
+			for (const ref of refs) {
+				const pcsId = pcsSymbolId(ref);
+				if (pcsId !== null && PCS_AVAILABLE_IDS.has(pcsId)) {
+					return {
+						url: `${pcsBaseUrl}/v1/img/pcs/${pcsId}`,
+						source: 'pcs',
+						query: pcsId,
+						library
+					};
+				}
+			}
+		}
 
 		// 🛑 **הסדר בין שני המפתחות שרירותי, ומוצהר ככזה.** מה שנמדד הוא
 		// *כיסוי* (`symbols.measure.ts` מחשב `resolved/total` ותו לא) — ומכיסוי
@@ -424,7 +517,8 @@ export function createSymbolResolver(
 				unresolved: stats.unresolved,
 				byLibrary: { ...stats.byLibrary },
 				resolvedByLibrary: { ...stats.resolvedByLibrary },
-				byMatch: { ...stats.byMatch }
+				byMatch: { ...stats.byMatch },
+				resolvedBySource: { ...stats.resolvedBySource }
 			};
 		}
 	};

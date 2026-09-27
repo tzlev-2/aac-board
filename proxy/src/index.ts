@@ -1,4 +1,4 @@
-import { Hono } from 'hono';
+import { Hono, type Context } from 'hono';
 import { cors } from 'hono/cors';
 import type { Env, ProxyError, TtsResponse } from './types';
 import { ttsHash } from './domain/hash';
@@ -240,6 +240,68 @@ app.get('/v1/voices/gemini', (c) => {
 			{ id: 'Callirrhoe', name: 'Callirrhoe (רגוע)' },
 			{ id: 'Autonoe', name: 'Autonoe (בהיר)' }
 		]
+	});
+});
+
+// ---------------------------------------------------------------------------
+// GET /v1/img/pcs/:id
+// Serves one PCS symbol from the private R2 bucket.
+//
+// PCS is licensed Mayer-Johnson content. The bucket is private and this is the
+// only way bytes leave it, so the gate below is the whole protection.
+// ---------------------------------------------------------------------------
+
+/**
+ * Authorization gate for the licensed-image routes.
+ *
+ * Returns a Response to send back when access is denied, or `null` to proceed.
+ * Every path that is not an explicit allow ends in a denial — an unset
+ * PCS_AUTH_MODE denies, so a deploy that forgets to configure it is safe.
+ */
+function denyImageAccess(c: Context<{ Bindings: Env }>): Response | null {
+	const mode = c.env.PCS_AUTH_MODE;
+
+	if (mode === 'dev-open') return null;
+
+	// Cloudflare Access puts a signed JWT on every request that passed its
+	// policy. Checking that the header merely *exists* is not verification —
+	// anyone can send a header — so until the signature check lands we refuse
+	// rather than pretend. Better a broken image than a false sense of a gate.
+	if (mode === 'access-jwt') {
+		return c.json<ProxyError>(
+			{ error: 'Access JWT verification is not implemented yet', code: 'internal' },
+			503
+		);
+	}
+
+	return c.json<ProxyError>({ error: 'Forbidden', code: 'unauthorized' }, 403);
+}
+
+app.get('/v1/img/pcs/:id', async (c) => {
+	const denied = denyImageAccess(c);
+	if (denied) return denied;
+
+	const id = c.req.param('id');
+
+	// Keys are the numeric PCS id zero-padded to 5 digits. Anchoring the
+	// pattern also rules out traversal and any other key shape.
+	if (!/^[0-9]{5}$/.test(id)) {
+		return c.json<ProxyError>({ error: 'Invalid PCS id', code: 'invalid_request' }, 400);
+	}
+
+	const obj = await c.env.PCS_ASSETS.get(`img/pcs/${id}.png`);
+	if (obj === null) {
+		return c.json<ProxyError>({ error: 'Symbol not found', code: 'not_found' }, 404);
+	}
+
+	return new Response(obj.body, {
+		status: 200,
+		headers: {
+			'Content-Type': 'image/png',
+			// `private` on purpose: licensed content must not be stored by any
+			// shared cache between us and the authenticated browser.
+			'Cache-Control': 'private, max-age=31536000, immutable'
+		}
 	});
 });
 

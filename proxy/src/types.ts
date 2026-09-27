@@ -1,8 +1,21 @@
 /** Cloudflare Worker environment bindings for aac-proxy. */
 export interface Env {
 	AUDIO_CACHE: R2Bucket;
+	/** PCS symbol library (licensed). Private bucket, org account. */
+	PCS_ASSETS: R2Bucket;
 	ELEVENLABS_API_KEY: string;
 	GEMINI_API_KEY: string;
+	/**
+	 * Gate for the licensed-image routes. FAILS CLOSED: any value other than
+	 * the two below — including unset — makes `/v1/img/**` return 403.
+	 *
+	 * - `dev-open`   local development only. Never set this on a deployment.
+	 * - `access-jwt` require a verified Cloudflare Access JWT.
+	 *
+	 * Rationale: an accidental `wrangler deploy` must not expose PCS. The
+	 * default of "no variable" is the safe one, so forgetting is safe.
+	 */
+	PCS_AUTH_MODE?: string;
 }
 
 /** TTS providers supported by the proxy. */
