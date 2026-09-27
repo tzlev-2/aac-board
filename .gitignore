@@ -27,3 +27,8 @@ test-results
 /worker-configuration.d.ts
 
 .codenomad
+# Worktrees
+/.worktrees
+
+# Fixtures מורשים — לא נכנסים לריפו הציבורי
+*.gridset
