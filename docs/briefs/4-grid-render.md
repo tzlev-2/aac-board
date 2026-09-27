@@ -141,7 +141,7 @@ export const cellRenderers: Record<string, Component<CellProps>> = {
 (`ExtraSmall|Small|Large|ExtraLarge`, ‏`null` = רגיל). ‏`grid-template-columns`
 צריך לכבד אותן במקום `repeat(n, 1fr)` אחיד. המיפוי מ-שם-מידה ל-`fr` הוא
 **ערך לא-מאומת** → ‏`visualDefaults.ts`.
-🔑 בלוחות הארגון כל ההגדרות הן `null`, ולכן ההתנהגות הנוכחית נכונה עבורן —
+🔑 בלוחות-הדגימה כל ההגדרות הן `null`, ולכן ההתנהגות הנוכחית נכונה עבורן —
 זו הכנה ללוחות מורה.
 
 ## 8 · הערה שעוברת לסלייס 5

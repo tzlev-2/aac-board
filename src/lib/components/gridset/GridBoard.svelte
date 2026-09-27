@@ -14,7 +14,7 @@
 	const visibleCells = $derived(page.cells.filter((cell) => cell.visibility !== 'Hidden'));
 
 	// columnWidths/rowHeights (SizeName|null לכל עמודה/שורה) — null=רגיל=1fr.
-	// בלוחות הארגון כולן null, ולכן זה שקול היום ל-repeat(n, 1fr).
+	// בלוחות-הדגימה כולן null, ולכן זה שקול היום ל-repeat(n, 1fr).
 	const columnTemplate = $derived(
 		Array.from({ length: page.columns }, (_, i) => `${sizeNameToFr(page.columnWidths[i])}fr`).join(
 			' '

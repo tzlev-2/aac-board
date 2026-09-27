@@ -61,7 +61,7 @@ export function isCellAvailable(cell: Cell, features: ReadonlySet<FeatureId>): b
 **`WEB_FEATURES` בסבב הזה:** ‏`new Set(['TouchAccess','PointerAccess'])` — מה
 שדפדפן מספק ודאית. ‏`Dwell` יתווסף כשיהיה מימוש dwell-click; לרשום זאת בהערה.
 
-### 🛑 280 מופעים בלי שום פרמטר — 56 מתוך 126 בלוחות שלנו
+### 🛑 280 מופעים בלי שום פרמטר — 56 מתוך 126 בלוחות-הדגימה
 
 `<Command ID="Settings.RequiredFeature" />` בלי `<Parameter>` בכלל. מימוש תמים
 כותב `features.has(undefined)`, מקבל `false`, ו**מסתיר 56 תאים בשקט**.
@@ -132,7 +132,7 @@ export function isCellAvailable(cell: Cell, features: ReadonlySet<FeatureId>): b
 🛑 **מה שמפיל: המודל של `Settings.RequiredFeature` שנתתי לך בבריף היה שגוי.**
 מימשת אותו מילה-במילה, כולל `new Set([])`. התיקון בתכנון, לא באשמתך.
 
-## חוסם 1 · `canActivate` מחמיץ 54% מהמופעים בלוחות שלנו
+## חוסם 1 · `canActivate` מחמיץ 54% מהמופעים בלוחות-הדגימה
 
 ‏`commands.ts:246-253` עוצר בפקודה הראשונה שאינה שומר (`break` בשורה 249).
 **סריקה של ארבעת הלוחות הארגוניים:**
@@ -151,7 +151,7 @@ export function isCellAvailable(cell: Cell, features: ReadonlySet<FeatureId>): b
 
 ## חוסם 2 · `'halt'` הוא no-op על כל תא אמיתי — ובמקרה אחד מזיק
 
-השומר הוא הפקודה **האחרונה ב-126 מתוך 126** המופעים בלוחות שלנו (‏3,888 מ-4,029
+השומר הוא הפקודה **האחרונה ב-126 מתוך 126** המופעים בלוחות-הדגימה (‏3,888 מ-4,029
 בחבילה). אין אחריו מה לעצור.
 
 🛑 **והנזק:** בעשרה תאים `Jump.To` **מקדים** את השומר. המשתמש לוחץ, **הניווט
@@ -176,7 +176,7 @@ commandRegistry['Settings.RequiredFeature'] = () => {};   // no-op
 ## ראוי-תיקון · `WEB_FEATURES` ריקה שוללת מגע ומצביע
 
 ‏`features.ts:51` הוא `new Set([])`, בנאמנות לבריף השגוי. התכונות שנדרשות בפועל
-בלוחות שלנו: ‏`EyeGazeAccess` 58 (נכון לשלול) · ללא-`feature` 56 ·
+בלוחות-הדגימה: ‏`EyeGazeAccess` 58 (נכון לשלול) · ללא-`feature` 56 ·
 **`TouchAccess` 8** · **`PointerAccess` 2** · `SwitchAccess` 2.
 
 ‏`new Set(['TouchAccess', 'PointerAccess'])` — מה שדפדפן מספק ודאית.

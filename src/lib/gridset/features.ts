@@ -43,7 +43,7 @@ export const KNOWN_FEATURES = [
  * `feature=ComputerControl` בא מעמודת `sample_param_values` ב-TSV, שהיא
  * **דגימה אלפביתית** ולא הערך הנפוץ. `ComputerControl` הוא 1.7% מהמופעים.
  *
- * בלוחות הארגון נדרשות בפועל: `EyeGazeAccess` 58 (נכון לשלול) · ללא-פרמטר
+ * בלוחות-הדגימה נדרשות בפועל: `EyeGazeAccess` 58 (נכון לשלול) · ללא-פרמטר
  * 56 · `TouchAccess` 8 · `PointerAccess` 2 · `SwitchAccess` 2.
  *
  * ⏳ `Dwell` הוא 92.4% מהמופעים בחבילה (ו-0 אצלנו), והוא **כן ניתן למימוש

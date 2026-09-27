@@ -14,14 +14,14 @@ import type { CommandId } from './types';
 
 export interface UsedCommand {
 	id: CommandId;
-	/** הפעלות בלוחות שלנו (`used_by_us`). */
+	/** הפעלות בלוחות-הדגימה (`used_by_us`). */
 	uses: number;
 }
 
 /** גודל הקטלוג המלא ב-commands.tsv. */
 export const CATALOG_SIZE = 353;
 
-/** 63 הפקודות שנצפו בלוחות שלנו, מהנפוצה לנדירה. */
+/** 63 הפקודות שנצפו בלוחות-הדגימה, מהנפוצה לנדירה. */
 export const USED_COMMANDS: readonly UsedCommand[] = [
 	{ id: 'Action.InsertText', uses: 1736 },
 	{ id: 'Jump.To', uses: 464 },
@@ -88,11 +88,11 @@ export const USED_COMMANDS: readonly UsedCommand[] = [
 	{ id: 'Speech.Stop', uses: 1 }
 ];
 
-/** סך ההפעלות בלוחות שלנו (4,052). */
+/** סך ההפעלות בלוחות-הדגימה (4,052). */
 export const TOTAL_ACTIVATIONS = USED_COMMANDS.reduce((sum, c) => sum + c.uses, 0);
 
 export interface CoverageReport {
-	/** פקודות שיש להן handler והן בשימוש בלוחות שלנו. */
+	/** פקודות שיש להן handler והן בשימוש בלוחות-הדגימה. */
 	implemented: readonly UsedCommand[];
 	/** פקודות שבשימוש ואין להן handler. */
 	missing: readonly UsedCommand[];
