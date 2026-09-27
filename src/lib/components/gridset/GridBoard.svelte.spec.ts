@@ -142,7 +142,8 @@ describe('GridBoard', () => {
 	});
 
 	it('סוג לא-מוכר נותן UnsupportedCell', async () => {
-		const cell = makeCell({ contentType: 'AutoContent', contentSubType: 'WordList', caption: 'ר' });
+		// WordList נתמך מאז פאזה 3א — Camera הוא סוג אמיתי בנתונים שאין לו מרנדר.
+		const cell = makeCell({ contentType: 'LiveCell', contentSubType: 'Camera', caption: 'ר' });
 		const p = makePage({ cells: [cell] });
 		const screen = render(GridBoard, { page: p, ctx: makeCtx(p) });
 
@@ -221,7 +222,7 @@ describe('cellRenderers registry', () => {
 	});
 
 	it('סוג לא רשום נופל ל-UnsupportedCell', () => {
-		const cell = makeCell({ contentType: 'AutoContent', contentSubType: 'WordList' });
+		const cell = makeCell({ contentType: 'LiveCell', contentSubType: 'Camera' });
 		expect(resolveCellRenderer(cell)).toBe(UnsupportedCell);
 	});
 });

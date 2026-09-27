@@ -21,19 +21,35 @@
 		verticalFillGradient
 	} from '$lib/gridset/visualMeasured';
 	import { resolveCellRenderer } from './cellRenderers';
+	import type { WordListSlot } from '$lib/gridset/wordListPager';
 
 	let {
 		cell,
 		ctx,
-		symbols = null
-	}: { cell: Cell; ctx: RuntimeContext; symbols?: SymbolResolver | null } = $props();
+		symbols = null,
+		slot,
+		onNavigate
+	}: {
+		cell: Cell;
+		ctx: RuntimeContext;
+		symbols?: SymbolResolver | null;
+		slot?: WordListSlot;
+		/** תא-ניווט של WordList — העימוד הוא מצב של הדף, ולכן GridBoard מטפל. */
+		onNavigate?: (action: 'next' | 'first') => void;
+	} = $props();
 
 	const Renderer = $derived(resolveCellRenderer(cell));
 	const disabled = $derived(cell.visibility === 'Disabled');
-	const interactive = $derived(!disabled && cell.commands.length > 0);
+	/**
+	 * 🛑 תא-ניווט לחיץ למרות ש-`cell.commands` ריק — הוא מסונתז ואין לו
+	 * שרשרת ב-XML. ותא-מילה מריץ את השרשרת של התא **המארח**, לא של הפריט.
+	 */
+	const isNav = $derived(slot?.kind === 'nav');
+	const interactive = $derived(!disabled && (isNav || cell.commands.length > 0));
 
 	function activate() {
 		if (!interactive) return;
+		if (slot?.kind === 'nav') return onNavigate?.(slot.action);
 		executeCommands(cell, ctx);
 	}
 
@@ -78,7 +94,7 @@
 		opacity: {disabled ? VISUAL_DEFAULTS.disabledOpacity : 1};
 	"
 >
-	<Renderer {cell} {ctx} {symbols} />
+	<Renderer {cell} {ctx} {symbols} {slot} />
 </svelte:element>
 
 <style>

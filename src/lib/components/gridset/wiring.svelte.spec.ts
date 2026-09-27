@@ -58,8 +58,8 @@ const spec: GridsetSpec = {
 					x: 4,
 					y: 1,
 					caption: 'רשימת מילים',
-					contentType: 'AutoContent',
-					contentSubType: 'WordList'
+					contentType: 'LiveCell',
+					contentSubType: 'Camera'
 				}
 			]
 		},
@@ -168,7 +168,7 @@ describe('הפרוסה האנכית — קובץ → מסך → לחיצה', () 
 		const screen = await mount();
 
 		const unsupported = screen.getByTestId('unsupported-cell').element();
-		expect(unsupported.getAttribute('data-unsupported-type')).toBe('AutoContent/WordList');
+		expect(unsupported.getAttribute('data-unsupported-type')).toBe('LiveCell/Camera');
 		expect(unsupported.textContent?.trim()).toBe('רשימת מילים');
 		expect(screen.getByTestId('unsupported-cell-type').elements()).toHaveLength(0);
 	});

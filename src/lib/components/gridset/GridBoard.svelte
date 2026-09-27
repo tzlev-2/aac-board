@@ -9,6 +9,7 @@
 	import type { SymbolResolver } from '$lib/gridset/symbols';
 	import { sizeNameToFr } from '$lib/gridset/visualDefaults';
 	import { gutterRatioForCellSpacing, verticalFillGradient } from '$lib/gridset/visualMeasured';
+	import { pageWordList } from '$lib/gridset/wordListPager';
 	import GridCell from './GridCell.svelte';
 
 	let {
@@ -48,6 +49,33 @@
 	);
 
 	const gutterK = $derived(gutterRatioForCellSpacing(ctx.gridSet.cellSpacing));
+
+	/**
+	 * עימוד ה-`WordList` — פאזה 3א, נמדד מ-Grid האמיתי
+	 * (`derived/wordlist-overflow.md`).
+	 *
+	 * 🛑 **המצב מקומי ונשכח:** ‏`page` הוא של המופע הנוכחי של הדף, לא של
+	 * הלוח. יציאה וחזרה ⇒ עמוד 0. **אין להחזיק אותו ב-store גלובלי.**
+	 */
+	let wordListPage = $state(0);
+	$effect(() => {
+		page.name;
+		wordListPage = 0;
+	});
+
+	const paged = $derived(pageWordList(page.cells, page.wordList, wordListPage));
+
+	function navigate(action: 'next' | 'first') {
+		wordListPage = action === 'next' ? wordListPage + 1 : 0;
+	}
+
+	/**
+	 * תא-`WordList` בלי פריט **אינו מצויר** — לא קופסה ריקה ולא placeholder;
+	 * זה רקע-לוח נקי, כפי שנמדד. תא שאינו `WordList` אינו במפה ולכן עובר.
+	 */
+	const drawnCells = $derived(
+		visibleCells.filter((cell) => paged.slots.get(cell)?.kind !== 'empty')
+	);
 </script>
 
 <div
@@ -63,8 +91,8 @@
 			background: {backgroundFill};
 		"
 	>
-		{#each visibleCells as cell, i (i)}
-			<GridCell {cell} {ctx} {symbols} />
+		{#each drawnCells as cell, i (i)}
+			<GridCell {cell} {ctx} {symbols} slot={paged.slots.get(cell)} onNavigate={navigate} />
 		{/each}
 	</div>
 </div>

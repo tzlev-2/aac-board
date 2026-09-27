@@ -5,9 +5,11 @@
 import type { Component } from 'svelte';
 import type { Cell, RuntimeContext } from '$lib/gridset/types';
 import type { SymbolResolver } from '$lib/gridset/symbols';
+import type { WordListSlot } from '$lib/gridset/wordListPager';
 import ButtonCell from './ButtonCell.svelte';
 import ChatCell from './ChatCell.svelte';
 import UnsupportedCell from './UnsupportedCell.svelte';
+import WordListCell from './WordListCell.svelte';
 
 export interface CellRendererProps {
 	cell: Cell;
@@ -18,6 +20,11 @@ export interface CellRendererProps {
 	 * כשיש פותר, ולכן ה-fallback הוא המסלול הראשי ולא מצב-שגיאה.
 	 */
 	symbols?: SymbolResolver | null;
+	/**
+	 * מה מוצג בתא `AutoContent/WordList` בעמוד הנוכחי — מחושב ברמת הדף
+	 * ב-`wordListPager`, כי העימוד תלוי בכל תאי-הדף ולא בתא בודד.
+	 */
+	slot?: WordListSlot;
 }
 
 export type CellRendererComponent = Component<CellRendererProps>;
@@ -29,7 +36,8 @@ export function cellRendererKey(cell: Pick<Cell, 'contentType' | 'contentSubType
 
 export const cellRenderers: Record<string, CellRendererComponent> = {
 	default: ButtonCell,
-	'Workspace/Chat': ChatCell
+	'Workspace/Chat': ChatCell,
+	'AutoContent/WordList': WordListCell
 };
 
 export function resolveCellRenderer(cell: Cell): CellRendererComponent {
