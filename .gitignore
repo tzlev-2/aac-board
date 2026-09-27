@@ -32,3 +32,6 @@ test-results
 
 # Fixtures מורשים — לא נכנסים לריפו הציבורי
 *.gridset
+
+# צילומי השוואה — מקומי בלבד, לא נכנס לגיט
+/.screenshots
