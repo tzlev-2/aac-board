@@ -1,5 +1,19 @@
 # AAC Board — יומן פיתוח (Walkthrough)
 
+## 2026-09-27 19:45
+
+### סלייס 9 — `visual-2`: מדידות studio (מרזב · HSL · Theme+Shape)
+
+מקור: `grid-reference/derived/visual-measured.md`. `visualMeasured.ts` מרכז
+נוסחאות וערכים; קומפוננטות צורכות משם.
+
+- **מרזב = שוליים:** `GridBoard` — `padding` ו-`gap` זהים, `g = k·cellH` ב-`cqh`
+  (לא אחוז מרוחב). `k=0.168` / `ExtraLarge→0.214`.
+- **גרדיאנט:** `verticalFillGradient` — ΔL=±0.0275 ב-HSL על תא ורקע דף.
+- **צורות:** `resolveBackgroundCorner(shape, theme)`; `border-radius` כקירוב ל-squircle.
+- **סמל/תווית:** קופסה 148/277×148/217; `TextAtTop`/`CellSpacing` נקראים מ-settings.
+- **🛑 לא יושם:** מקדם `FontSize→px`; `tileBorderWidth` נשאר 2px (border-width:0 שבר ב-vitest).
+
 ## 2026-09-27 18:55
 
 ### סלייס 8 — `visual-1`: ארבעת הפערים שנסגרים בלי studio

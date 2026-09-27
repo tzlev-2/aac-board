@@ -159,7 +159,9 @@ describe('הפרוסה האנכית — קובץ → מסך → לחיצה', () 
 		const screen = await mount();
 		const cell = screen.getByRole('button', { name: 'אוכל' }).element();
 
-		expect(getComputedStyle(cell).backgroundColor).toBe('rgb(17, 34, 51)');
+		const bg = getComputedStyle(cell).backgroundImage;
+		expect(bg).toContain('linear-gradient');
+		expect(bg).toContain('rgb(17, 34, 51)');
 	});
 
 	it('סוג-תוכן לא-נתמך מציג כתובית בלבד — בלי מפתח-פיתוח באנגלית', async () => {

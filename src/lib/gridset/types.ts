@@ -230,6 +230,10 @@ export interface GridSet {
 	startGrid: string; // settings.xml <StartGrid>
 	language: string; // "he-IL"
 	theme?: string;
+	/** `<Appearance><CellSpacing>` — רק ExtraLarge נמדד ל-k; שאר הערכים לא-מאומתים. */
+	cellSpacing?: SizeName;
+	/** `<Appearance><TextAtTop>1</TextAtTop>` — חסר ⇒ תווית מתחת (נמדד org-1). */
+	textAtTop?: boolean;
 	symbolSearchKeys: string[]; // ["widgit","sstix#","dbr#he"] — סדר עדיפות
 	pages: Record<string, Page>;
 	styles: Record<string, Style>; // הגולמיים; הפתירה כבר בתוך Cell.style

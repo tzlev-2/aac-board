@@ -636,6 +636,7 @@ describe('settings.xml', () => {
 		expect(set.startGrid).toBe('00 בחירת גירסה');
 		expect(set.language).toBe('he-IL');
 		expect(set.theme).toBe('Kids');
+		expect(set.cellSpacing).toBe('Large');
 		expect(set.symbolSearchKeys).toEqual(['widgit', 'sstix#', 'dbr#he']);
 	});
 

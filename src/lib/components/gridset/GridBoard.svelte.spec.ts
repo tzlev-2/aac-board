@@ -203,9 +203,8 @@ describe('GridBoard', () => {
 	it('הרשת מוגדרת להתמתח לגובה הזמין (flex:1) ולא רק לתוכן', () => {
 		const p = makePage();
 		const screen = render(GridBoard, { page: p, ctx: makeCtx(p) });
-		const computed = getComputedStyle(screen.getByTestId('grid-board').element());
-
-		expect(computed.flexGrow).toBe('1');
+		const wrap = screen.getByTestId('grid-board').element().parentElement!;
+		expect(getComputedStyle(wrap).flexGrow).toBe('1');
 	});
 });
 

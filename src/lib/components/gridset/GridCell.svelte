@@ -13,6 +13,13 @@
 	import { executeCommands } from '$lib/gridset/commands';
 	import type { SymbolResolver } from '$lib/gridset/symbols';
 	import { VISUAL_DEFAULTS, resolveFontFamily } from '$lib/gridset/visualDefaults';
+	import {
+		CELL_SHADOW,
+		cornerClipPath,
+		cornerToCss,
+		resolveBackgroundCorner,
+		verticalFillGradient
+	} from '$lib/gridset/visualMeasured';
 	import { resolveCellRenderer } from './cellRenderers';
 
 	let {
@@ -23,17 +30,25 @@
 
 	const Renderer = $derived(resolveCellRenderer(cell));
 	const disabled = $derived(cell.visibility === 'Disabled');
-	/**
-	 * תא בלי שרשרת-פקודות אינו לחיץ, ולכן גם אינו כפתור: פס-הפלט
-	 * (`Workspace/Chat`) ותאי-תצוגה אחרים נשארים `<div>` ואינם נכנסים לסדר
-	 * המיקוד. תא עם פקודות הוא `<button>` אמיתי — מקלדת ומקריא-מסך בחינם.
-	 */
 	const interactive = $derived(!disabled && cell.commands.length > 0);
 
 	function activate() {
 		if (!interactive) return;
 		executeCommands(cell, ctx);
 	}
+
+	const fillGradient = $derived(verticalFillGradient(cell.style.backColour));
+	const corner = $derived(
+		resolveBackgroundCorner({
+			shape: cell.style.backgroundShape,
+			theme: ctx.gridSet.theme
+		})
+	);
+	const borderRadius = $derived(cornerToCss(corner));
+	const clipPathCss = $derived.by(() => {
+		const p = cornerClipPath(corner);
+		return p ? `clip-path: ${p};` : '';
+	});
 </script>
 
 <svelte:element
@@ -50,14 +65,16 @@
 	onclick={interactive ? activate : undefined}
 	style="
 		--x: {cell.x}; --y: {cell.y}; --cspan: {cell.columnSpan}; --rspan: {cell.rowSpan};
-		background-color: {cell.style.backColour};
+		background: {fillGradient};
 		color: {cell.style.fontColour};
 		border-color: {cell.style.borderColour};
 		font-family: {resolveFontFamily(cell.style.fontName)};
 		font-size: {cell.style.fontSize}px;
 		border-width: {VISUAL_DEFAULTS.tileBorderWidth};
-		border-radius: {VISUAL_DEFAULTS.tileBorderRadius};
+		border-radius: {borderRadius};
+		{clipPathCss}
 		padding: {VISUAL_DEFAULTS.tilePadding};
+		box-shadow: {CELL_SHADOW};
 		opacity: {disabled ? VISUAL_DEFAULTS.disabledOpacity : 1};
 	"
 >
@@ -72,18 +89,7 @@
 		box-sizing: border-box;
 		border-style: solid;
 		overflow: hidden;
-		/* 🔑 התא הוא **קונטיינר-שאילתה**, וזה מה שמאפשר לכתובית ולסמל להימדד
-		   מול גובה התא בפועל (`cqh`) במקום ב-px מוחלטים — ראו
-		   `visualDefaults.captionFontSizeCss`. ‏`size` (ולא `inline-size`) כי
-		   הממד שמעניין הוא הגובה; גודל התא נקבע ממילא מהרשת ולא מהתוכן.
-		   🛑 מי שמסיר את השורה הזאת שובר את גודל-הגופן **בלי שגיאה**: `cqh`
-		   נופל ל-small viewport, והכותרות חוזרות להיות ננסיות.
-		   🛑 ובכיוון השני — `container-type: size` גורר `contain: size`, ולכן תא
-		   שמרונדר **מחוץ ל-`GridBoard`** (בדיקה, תצוגה מבודדת) אינו גדל לפי
-		   תוכנו: שם צריך לקבוע לו גובה מפורש. */
 		container-type: size;
-		/* איפוס ברירות-המחדל של <button> — כדי שהמעבר div→button לא ישנה
-		   כלום חזותית: הגופן והצבע באים מהסגנון שלמעלה, לא מה-user agent. */
 		margin: 0;
 		font: inherit;
 		text-align: inherit;

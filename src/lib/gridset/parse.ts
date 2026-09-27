@@ -135,9 +135,10 @@ function parseSettings(root: Element): Omit<GridSet, 'pages' | 'styles'> {
 	const appearance = childByName(root, 'Appearance');
 	const keys = childByName(childByName(root, 'PictureSearch'), 'PictureSearchKeys');
 
-	const settings: Pick<GridSet, 'startGrid' | 'language' | 'symbolSearchKeys'> & {
-		theme?: string;
-	} = {
+	const settings: Pick<
+		GridSet,
+		'startGrid' | 'language' | 'symbolSearchKeys' | 'theme' | 'cellSpacing' | 'textAtTop'
+	> = {
 		startGrid: textOfChild(root, 'StartGrid') ?? '',
 		language: textOfChild(root, 'Language') ?? '',
 		// סדר העדיפות של ספריות הסמלים הוא סדר המסמך — לא לסדר מחדש
@@ -147,6 +148,12 @@ function parseSettings(root: Element): Omit<GridSet, 'pages' | 'styles'> {
 	};
 	const theme = textOfChild(appearance, 'Theme');
 	if (theme) settings.theme = theme;
+	const cellSpacing = textOfChild(appearance, 'CellSpacing');
+	if (cellSpacing && (SIZE_NAMES as readonly string[]).includes(cellSpacing)) {
+		settings.cellSpacing = cellSpacing as SizeName;
+	}
+	const textAtTop = textOfChild(appearance, 'TextAtTop');
+	if (textAtTop === '1') settings.textAtTop = true;
 	return settings;
 }
 

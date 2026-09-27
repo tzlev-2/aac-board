@@ -47,10 +47,38 @@ const fakeSymbols: SymbolResolver = {
 	})
 };
 
-const ctx = { features: new Set(), reportUnimplemented: () => {} } as unknown as RuntimeContext;
+function makeCtx(textAtTop = true): RuntimeContext {
+	return {
+		gridSet: {
+			startGrid: 't',
+			language: 'he-IL',
+			symbolSearchKeys: [],
+			pages: {},
+			styles: {},
+			theme: 'Kids',
+			textAtTop
+		},
+		page: {} as RuntimeContext['page'],
+		features: new Set(),
+		reportUnimplemented: () => {},
+		navigate: () => {},
+		back: () => {},
+		home: () => {},
+		output: {
+			insert: () => {},
+			insertLetter: () => {},
+			clear: () => {},
+			deleteWord: () => {},
+			deleteLetter: () => {},
+			items: []
+		},
+		speak: () => {},
+		stopSpeaking: () => {}
+	} as RuntimeContext;
+}
 
 /** התא חייב גובה אמיתי — `cqh` נמדד מול ה-container, והוא זה שנבדק. */
-function renderCell(cell: Cell, height = 200, width = 240) {
+function renderCell(cell: Cell, height = 200, width = 240, ctx = makeCtx()) {
 	const screen = render(GridCell, { cell, ctx, symbols: fakeSymbols });
 	const el = screen.getByTestId('grid-cell').element() as HTMLElement;
 	el.style.height = `${height}px`;
@@ -99,21 +127,17 @@ describe('נאמנות חזותית — כתובית', () => {
 });
 
 describe('נאמנות חזותית — סמל וגופן', () => {
-	it('הסמל תופס את היחס שנמדד מגובה התא', async () => {
-		const { screen, el } = renderCell(makeCell({ caption: 'לאכול' }), 200);
+	it('קופסת-הסמל בגודל שנמדד (148/217 מגובה התא)', async () => {
+		const { screen, el } = renderCell(makeCell({ caption: 'לאכול' }), 217, 277);
 		await expect.element(screen.getByTestId('cell-caption')).toBeInTheDocument();
 
-		const img = el.querySelector('img') as HTMLImageElement;
-		// 🛑 `cqh` מודד את ה-**content-box**, ו-`clientHeight` כולל את ה-padding.
-		// ‏(נצרב כאן: ההפרש של 12px נראה כמו באג בקוד ולא בבדיקה.)
+		const symbol = el.querySelector('.symbol') as HTMLElement;
 		const cs = getComputedStyle(el);
-		const contentHeight =
-			el.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
-
-		expect(parseFloat(getComputedStyle(img).maxBlockSize)).toBeCloseTo(
-			contentHeight * VISUAL_DEFAULTS.iconSizeRatio,
-			0
-		);
+		const innerW =
+			el.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight) - parseFloat(cs.borderLeftWidth) * 2;
+		const box = symbol.getBoundingClientRect();
+		expect(box.width / innerW).toBeCloseTo(VISUAL_DEFAULTS.iconBoxWidthRatio, 1);
+		expect(box.height / box.width).toBeCloseTo(1, 2);
 	});
 
 	it('גופן לא-מוכר מקבל ערימת-נפילה, ולא גופן-מערכת שרירותי', async () => {

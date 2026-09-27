@@ -11,6 +11,12 @@
  */
 
 import type { ResolvedStyle, SizeName } from './types';
+import {
+	CAPTION_BOTTOM_MARGIN_RATIO,
+	ICON_BOX_HEIGHT_RATIO,
+	ICON_BOX_WIDTH_RATIO,
+	ICON_TOP_RATIO
+} from './visualMeasured';
 
 export const DEFAULT_RESOLVED_STYLE: ResolvedStyle = {
 	// הערך הנפוץ ביותר בפועל עבור BackColour (508/3,282) — visual-model.md §צבע.
@@ -35,16 +41,21 @@ export const DEFAULT_RESOLVED_STYLE: ResolvedStyle = {
 
 /**
  * מה שאינו חלק מ-`ResolvedStyle` — גאומטריה ו-chrome של התא.
- * 🛑 כל ערך כאן **לא-מאומת מול Grid**: גודל-הסמל, מיקומו, רדיוס-הפינה והמרווח
- * הפנימי אינם קיימים ב-XML ונסגרים במדידה דיפרנציאלית (plan.md שלב C).
+ * ערכים שנמדדו בגל 2: `visualMeasured.ts`.
  */
 export const VISUAL_DEFAULTS = {
-	tileGap: '4px',
-	tileBorderRadius: '8px',
-	tilePadding: '6px',
+	/** @deprecated — המרזב ב-GridBoard (padding+gap); לא gap פנימי בתא. */
+	tileGap: '0px',
+	tilePadding: '0px',
+	// לא-מאומת מול Grid — org-1 דף-בית: מסגרות שקופות (#FFFFFF00); עובי לא נמדד שם.
 	tileBorderWidth: '2px',
-	/** יחס גובה-התא שהסמל תופס, כשלא ידוע גודל אמיתי מה-XML */
-	iconSizeRatio: 0.6,
+	/** נמדד: אזור סמל 148×148 / גוף 277×217 — visual-measured.md §5 */
+	iconBoxHeightRatio: ICON_BOX_HEIGHT_RATIO,
+	iconBoxWidthRatio: ICON_BOX_WIDTH_RATIO,
+	iconTopRatio: ICON_TOP_RATIO,
+	captionBottomMarginRatio: CAPTION_BOTTOM_MARGIN_RATIO,
+	/** @deprecated — השתמש ב-iconBoxHeightRatio */
+	iconSizeRatio: ICON_BOX_HEIGHT_RATIO,
 	symbolFontSize: '1.5em',
 	disabledOpacity: 0.4,
 	unsupportedBadgeGap: '2px',
@@ -60,11 +71,10 @@ export const VISUAL_DEFAULTS = {
 	 * נושא את התג — ולכן **ברירת-המחדל היא תווית למעלה**, והמופעים שכן נצפו הם
 	 * מי שסטו ממנה וחזרו אליה.
 	 *
-	 * 🛑 לא-מאומת מול Grid: הערך **אינו נקרא מה-XML** בסלייס הזה. ‏`TextAtTop` הוא
-	 * מאפיין ברמת סדרת-הלוחות, וקליטתו דורשת שדה ב-`GridSet` שב-`types.ts` —
-	 * קובץ-חוזה שהסלייס הזה חסום מלגעת בו. כשהשדה ייקלט, הוא גובר על הערך כאן.
+	 * ברירת-מחדל כש-`TextAtTop` חסר ב-XML: תווית **מתחת** (נמדד org-1, צילום 01).
+	 * `GridSet.textAtTop === true` גובר.
 	 */
-	captionAtTop: true,
+	captionAtTop: false,
 
 	/**
 	 * 🛑 לא-מאומת מול Grid — אבל **כן נמדד מצילום-ייחוס אחד**, ולכן הנה המספרים

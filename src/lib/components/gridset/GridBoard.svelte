@@ -7,7 +7,8 @@
 	import type { Page, RuntimeContext } from '$lib/gridset/types';
 	import { isCellAvailable } from '$lib/gridset/commands';
 	import type { SymbolResolver } from '$lib/gridset/symbols';
-	import { VISUAL_DEFAULTS, sizeNameToFr } from '$lib/gridset/visualDefaults';
+	import { sizeNameToFr } from '$lib/gridset/visualDefaults';
+	import { gutterRatioForCellSpacing, verticalFillGradient } from '$lib/gridset/visualMeasured';
 	import GridCell from './GridCell.svelte';
 
 	let {
@@ -42,33 +43,52 @@
 		Array.from({ length: page.rows }, (_, i) => `${sizeNameToFr(page.rowHeights[i])}fr`).join(' ')
 	);
 
-	// רקע-הדף — Page.background.colour נפרס (#FEF6D7FF ב-org-1) ועד כה נזרק.
-	// צבעי Grid הם #RRGGBBAA, שהוא בדיוק hex-with-alpha של CSS.
-	const background = $derived(page.background.colour ?? 'transparent');
+	const backgroundFill = $derived(
+		page.background.colour ? verticalFillGradient(page.background.colour) : 'transparent'
+	);
+
+	const gutterK = $derived(gutterRatioForCellSpacing(ctx.gridSet.cellSpacing));
 </script>
 
 <div
-	class="grid"
-	data-testid="grid-board"
-	style="
-		gap: {VISUAL_DEFAULTS.tileGap};
-		grid-template-columns: {columnTemplate};
-		grid-template-rows: {rowTemplate};
-		background-color: {background};
-	"
+	class="grid-wrap"
+	style="--grid-rows: {page.rows}; --gutter-k: {gutterK}"
 >
-	{#each visibleCells as cell, i (i)}
-		<GridCell {cell} {ctx} {symbols} />
-	{/each}
+	<div
+		class="grid"
+		data-testid="grid-board"
+		style="
+			grid-template-columns: {columnTemplate};
+			grid-template-rows: {rowTemplate};
+			background: {backgroundFill};
+		"
+	>
+		{#each visibleCells as cell, i (i)}
+			<GridCell {cell} {ctx} {symbols} />
+		{/each}
+	</div>
 </div>
 
 <style>
+	.grid-wrap {
+		flex: 1 1 auto;
+		min-height: 0;
+		height: 100%;
+		width: 100%;
+		container-type: size;
+	}
 	.grid {
 		display: grid;
 		direction: rtl;
 		width: 100%;
 		height: 100%;
-		flex: 1 1 auto;
-		min-height: 0;
+		box-sizing: border-box;
+		/* 🔑 מרזב = שוליים: g = k·cellH, ואותו g ל-padding ול-gap (ב-cqh). */
+		--gutter: calc(
+			100cqh * var(--gutter-k) /
+				(var(--grid-rows) + var(--gutter-k) * (var(--grid-rows) + 1))
+		);
+		padding: var(--gutter);
+		gap: var(--gutter);
 	}
 </style>
