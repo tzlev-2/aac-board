@@ -37,7 +37,7 @@ Grids/<שם הדף>/grid.xml
 | `spans` | ‏`ColumnSpan`/`RowSpan` גדולים לצד רשת אחידה |
 | `sparseCoords` | תאים **בלי** מאפיין `X` ו/או `Y` (ברירת מחדל 0) |
 | `richTextShapes` | שלוש הצורות: `Text/p/s/r` · `Text/s/r` · `Text/r` |
-| `styleChain` | שרשרת `BasedOnStyle` בעומק 3 עד `Default`, עם עקיפות מקומיות |
+| `styleTwoLevel` | סגנון נקוב שטוח ב-`StyleData` + `BasedOnStyle` על התא + עקיפות מקומיות. 🛑 **לא שרשרת** — ראו תכנון §5 |
 | `contentTypes` | תא `Workspace/Chat` · `AutoContent/WordList` · `LiveCell` · `ContentSubSubType` |
 | `guarded` | תא ששרשרתו נפתחת ב-`Settings.RequiredFeature feature=ComputerControl` |
 | `visibility` | `Hidden` · `Disabled` · `PointerAndTouchOnly` |
