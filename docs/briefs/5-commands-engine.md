@@ -17,31 +17,57 @@
 בשימוש **63**. הוספת פקודה חייבת להיות **ערך במפה**, לא ענף בקוד —
 54 הפקודות הנותרות ייכנסו אחרי הסבב הזה בלי לגעת במריץ.
 
-## 🛑 פקודות-שומר — זה המנגנון שאסור לפספס
+## 🛑 `Settings.RequiredFeature` — תוקן 27.9.2026, וזו **אינה** פקודת-שומר
 
-`Settings.RequiredFeature` (‏4,155 הפעלות, ‏126 בלוחות שלנו) **אינה מאפיין של
-תא ואינה מתעדת כלום** — היא פקודה בשרשרת שתפקידה **לעצור אותה** כשהתכונה
-אינה זמינה. לכן המריץ אינו `forEach`:
+הגרסה הראשונה של הבריף הזה טעתה. **נמדד ישירות מ-116 קובצי `.gridset`**
+ב-`~/work/grid-mapping/raw/` (הם קיימים — ראו תכנון §6):
+
+| מיקום בשרשרת | מופעים | % |
+|---|---:|---:|
+| **אחרונה** | **4,014** | **96.6%** |
+| לפני-אחרונה | 78 | 1.9% |
+| ראשונה | 57 | 1.4% |
+
+השרשרת הנפוצה (‏2,529): ‏`Settings.RestEyeGaze · Settings.RestPointer ·
+Settings.RestSwitch · Settings.RequiredFeature`.
+
+🔑 **זו הצהרת-דרישה של התא בתחביר של פקודה.** היא אחרונה, ולכן אין לה מה
+לעצור. ההשפעה היא **בזמן רינדור**: תא שדרישתו אינה מתקיימת **אינו מצויר אך
+שומר את משבצתו**.
+
+**מה זה אומר למימוש:**
 
 ```ts
-export function executeCommands(cell: Cell, ctx: RuntimeContext) {
-  for (const inv of cell.commands) {
-    const handler = commandRegistry[inv.id];
-    if (!handler) { ctx.reportUnimplemented(inv.id); continue; }
-    if (handler(inv.params, ctx) === 'halt') return;
-  }
-}
+// המנגנון המרכזי — שער רינדור
+export function isCellAvailable(cell: Cell, features: ReadonlySet<FeatureId>): boolean
 ```
 
-`Settings.RequiredFeature` מחזירה `'halt'` כש-`!ctx.features.has(params.feature)`.
+‏`executeCommands` **כן** מכבד `'halt'` (זול, ו-57 המופעים בראש אמיתיים) —
+אבל אל תציג את זה כמנגנון העיקרי, ואל תקרא לו `canActivate` כאילו הוא שער
+הפעלה. **שנה את השם ל-`isCellAvailable` ואת הסמנטיקה לשער-רינדור.**
 
-**‏`features.ts`:** קלון-ווב אינו מחזיק `ComputerControl` ולא `EyeGaze`.
-הקבוצה מוצהרת **במקום אחד** — לא נבדקת ad-hoc בתוך handler.
+🛑 **וזה אינו `Visibility`** — ‏`Cell/Visibility` הוא אלמנט נפרד (1,555).
 
-🔑 **נגזרת לרינדור:** תא ששרשרתו נפתחת בשומר שאינו מתקיים אמור להיראות
-מעומעם ולא להיעלם. לחשוף `canActivate(cell, ctx): boolean` שבודק בדיוק את
-הפקודות-שומר בראש השרשרת. בלי זה — **לוחות אמיתיים ייראו שבורים**
-(סיכון #1 ב-`plan.md`).
+### `WEB_FEATURES` — ההנחה הראשונה הייתה הפוכה
+
+‏12 ערכי `feature`, רשימה סגורה שנמדדה, כבר ב-`types.ts`. ‏**`Dwell` הוא
+3,581 מהמופעים — 92.4%** ו-`ComputerControl` הוא 65 (‏1.7%).
+
+🛑 הבריף הקודם אמר "קלון-ווב אינו מחזיק `ComputerControl` ולא `EyeGaze`" —
+הציטוט ההוא בא מ-`derived/commands.tsv`, שבו `sample_param_values` הוא **דגימה
+אלפביתית** (`parse_gridsets.py:138`: ‏`sorted(v)[0]`) ולא הערך הנפוץ. בפועל רוב
+המופעים הם `Dwell`, שהוא **כן** ניתן למימוש בווב.
+
+**`WEB_FEATURES` בסבב הזה:** ‏`new Set(['TouchAccess','PointerAccess'])` — מה
+שדפדפן מספק ודאית. ‏`Dwell` יתווסף כשיהיה מימוש dwell-click; לרשום זאת בהערה.
+
+### 🛑 280 מופעים בלי שום פרמטר — 56 מתוך 126 בלוחות שלנו
+
+`<Command ID="Settings.RequiredFeature" />` בלי `<Parameter>` בכלל. מימוש תמים
+כותב `features.has(undefined)`, מקבל `false`, ו**מסתיר 56 תאים בשקט**.
+
+**הוכרע: מופע בלי פרמטר = אין דרישה** (התא זמין), ‏+ `reportUnimplemented`
+כדי שזה יהיה נראה. חייבת להיות בדיקה על זה.
 
 ## תשע הפקודות של הסבב — 91.5% מההפעלות
 
@@ -54,7 +80,7 @@ export function executeCommands(cell: Cell, ctx: RuntimeContext) {
 | `Action.Clear` | 212 | — |
 | `Action.Speak` | 212 | `movecaret` · `unit` (`All`…) |
 | `Action.DeleteWord` | 204 | — |
-| `Settings.RequiredFeature` | 126 | `feature` — **שומר** |
+| `Settings.RequiredFeature` | 126 | `feature` — **הצהרת-דרישה, ראו למעלה** |
 | `Action.Letter` | 118 | `letter` |
 
 ## 🔑 חוצץ-הפלט נושא דקדוק, לא מחרוזת
@@ -77,9 +103,14 @@ export function executeCommands(cell: Cell, ctx: RuntimeContext) {
 
 ## בדיקות
 ‏`commands.ts` חייב להיבדק **בלי DOM** — ‏`RuntimeContext` מזויף (fake).
-שרשרת שנעצרת בשומר · שרשרת שממשיכה כשהתכונה קיימת · `Jump.Back` על מחסנית
-ריקה אינו קורס · `Action.InsertText` שומרת דקדוק · פקודה לא-מוכרת נספרת
-וממשיכה · תשע הפקודות, כל אחת בדיקה.
+
+`isCellAvailable`: תכונה מתקיימת → זמין · אינה מתקיימת → לא זמין ·
+**בלי פרמטר → זמין** (ולא מוסתר) · ‏`RequiredFeature` אחרונה בשרשרת אינה
+מונעת מהפקודות שלפניה לרוץ.
+
+`executeCommands`: ‏`'halt'` עוצר את מה שאחריו (57 המופעים שבראש) ·
+`Jump.Back` על מחסנית ריקה אינו קורס · `Action.InsertText` שומרת דקדוק ·
+פקודה לא-מוכרת נספרת וממשיכה · תשע הפקודות, כל אחת בדיקה.
 
 ## קריטריון קבלה
 `bun run test:unit` · `bun run check` ירוקים · דוח כיסוי מדפיס 9/63.

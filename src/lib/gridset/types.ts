@@ -65,18 +65,27 @@ export type CommandHandler = (
 ) => CommandResult;
 
 // ── תכונות ───────────────────────────────────────────────────────────────
-// Settings.RequiredFeature (4,155 הפעלות) עוצרת שרשרת כשהתכונה אינה זמינה.
-// הקבוצה מוצהרת במקום אחד — לא נבדקת ad-hoc בכל handler.
+// Settings.RequiredFeature (4,155 מופעים) היא הצהרת-דרישה של התא בתחביר של
+// פקודה — אחרונה בשרשרת ב-96.6% מהמופעים, ולכן שער *רינדור* ולא עצירת-הרצה.
+// ראו gridset-core-design.md §1. הקבוצה מוצהרת במקום אחד.
 
+/**
+ * רשימה סגורה שנמדדה מ-116 קובצי .gridset (סך 3,875 מופעים עם פרמטר).
+ * 🛑 אין לנחש שמות: EyeGaze / Environment / Phone אינם קיימים בנתונים.
+ */
 export type FeatureId =
-	| 'ComputerControl'
-	| 'EyeGaze'
-	| 'Environment'
-	| 'Phone'
-	| 'Email'
-	| 'Music'
-	| 'Camera'
-	| (string & {});
+	| 'Dwell' // 3,581 — 92.4%
+	| 'SecondScreen' // 77
+	| 'ComputerControl' // 65
+	| 'EyeGazeAccess' // 59
+	| 'TouchAccess' // 27
+	| 'PointerAccess' // 23
+	| 'SwitchAccess' // 21
+	| 'MusicVideo' // 17
+	| 'EnvironmentControl' // 2
+	| 'ShareCommand' // 1
+	| 'WebBrowser' // 1
+	| 'Email'; // 1
 
 // ── סגנון ────────────────────────────────────────────────────────────────
 // סדר הפתירה: Default → שרשרת BasedOnStyle → הסגנון הנקוב → עקיפות התא.

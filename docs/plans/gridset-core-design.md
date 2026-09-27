@@ -54,35 +54,71 @@ type CommandHandler = (params: CommandParams, ctx: RuntimeContext) => CommandRes
 export const commandRegistry: Partial<Record<CommandId, CommandHandler>> = { … };
 ```
 
-### 🛑 פקודות-שומר — המנגנון שאסור לפספס
+### 🛑 `Settings.RequiredFeature` — תוקן 27.9.2026, וזו אינה פקודת-שומר
 
-`Settings.RequiredFeature` **אינה מאפיין של תא ואינה מתעדת כלום** — היא
-פקודה בשרשרת, עם פרמטר `feature`, שתפקידה **לעצור את השרשרת** כשהתכונה
-אינה זמינה. לכן המריץ אינו לולאה פשוטה:
+**הגרסה הראשונה של הסעיף הזה הייתה שגויה.** היא קבעה שזו פקודה בראש השרשרת
+שעוצרת אותה. **נמדד ישירות מ-116 קובצי `.gridset`** ב-`~/work/grid-mapping/raw/`:
 
-```ts
-export function executeCommands(cell: Cell, ctx: RuntimeContext) {
-  for (const inv of cell.commands) {
-    const handler = commandRegistry[inv.id];
-    if (!handler) { ctx.reportUnimplemented(inv.id); continue; }
-    if (handler(inv.params, ctx) === 'halt') return;   // ← השומר עצר
-  }
-}
-```
+| מיקום בשרשרת | מופעים | % |
+|---|---:|---:|
+| **אחרונה** | **4,014** | **96.6%** |
+| אחת לפני האחרונה | 78 | 1.9% |
+| **ראשונה** | 57 | 1.4% |
+| באמצע | 6 | 0.1% |
 
-**‏`Settings.RequiredFeature` היא גם מה שקובע אם התא נראה פעיל מלכתחילה.**
-תא שהשרשרת שלו נפתחת בשומר שאינו מתקיים מוצג מעומעם (‏`Visibility=Disabled`
-בפועל), לא נעלם. ‏🛑 בלי זה — לוחות קיימים ייראו שבורים (סיכון #1 ב-`plan.md`).
+השרשרת הנפוצה ביותר (‏2,529 מופעים) היא
+`Settings.RestEyeGaze · Settings.RestPointer · Settings.RestSwitch · Settings.RequiredFeature`.
 
-### רג'יסטרי התכונות
+🔑 **המסקנה:** זו **הצהרת-דרישה של התא, בתחביר של פקודה** — לא שומר-הרצה.
+היא כמעט תמיד אחרונה, ולכן אין לה מה לעצור. ההשפעה שלה היא **בזמן רינדור**:
+תא שדרישתו אינה מתקיימת **אינו מצויר, אך שומר את משבצתו** (בלי reflow).
 
 ```ts
-type FeatureId = 'ComputerControl' | 'EyeGaze' | 'Environment' | 'Phone' | …;
-export const WEB_FEATURES: ReadonlySet<FeatureId> = new Set([]);  // נבנה בהדרגה
+// המנגנון האמיתי — שער רינדור, לא עצירת-הרצה
+export function isCellAvailable(cell: Cell, features: ReadonlySet<FeatureId>): boolean
 ```
 
-קלון-ווב אינו מחזיק `ComputerControl` ולא `EyeGaze`. הקבוצה מוצהרת **במקום
-אחד**, לא נבדקת ad-hoc בכל handler.
+`executeCommands` **כן** מכבד `'halt'` — זה זול, ו-57 המופעים שבראש השרשרת
+אמיתיים. אבל **המנגנון המרכזי הוא שער הרינדור**, ולא הפוך.
+
+🛑 **וזה אינו `Visibility`.** ‏`Cell/Visibility` הוא אלמנט נפרד (1,555 מופעים,
+`Hidden|Disabled|PointerAndTouchOnly`). שני מנגנונים, לא אחד.
+
+### שנים-עשר ערכי `feature` — רשימה סגורה שנמדדה
+
+| `feature` | מופעים | % |
+|---|---:|---:|
+| **`Dwell`** | **3,581** | **92.4%** |
+| `SecondScreen` | 77 | 2.0% |
+| `ComputerControl` | 65 | 1.7% |
+| `EyeGazeAccess` | 59 | 1.5% |
+| `TouchAccess` | 27 | 0.7% |
+| `PointerAccess` | 23 | 0.6% |
+| `SwitchAccess` | 21 | 0.5% |
+| `MusicVideo` | 17 | 0.4% |
+| `EnvironmentControl` · `ShareCommand` · `WebBrowser` · `Email` | 5 | 0.1% |
+
+🛑 **שלושה שמות שניחשתי כאן אינם קיימים בנתונים:** ‏`EyeGaze` (השם הוא
+`EyeGazeAccess`) · ‏`Environment` (`EnvironmentControl`) · ‏**`Phone`** (אינו
+קיים כלל). הרשימה נמדדה — אין מה לנחש.
+
+🛑 **ומקור הטעות שווה תיעוד:** ציטטתי `feature=ComputerControl`
+מ-`derived/commands.tsv`. העמודה `sample_param_values` היא **דגימה אלפביתית**
+(`parse_gridsets.py:138` כותב `sorted(v)[0]`), לא הערך הנפוץ. ‏`ComputerControl`
+הוא 1.7%. מי שמתכנן לפי ה-TSV לבדו מתכנן סביב הזנב.
+
+🔑 **נגזרת ל-`WEB_FEATURES`:** ‏`Dwell` הוא 92.4%, והוא **כן ניתן למימוש בווב**
+(dwell-click). ההנחה הראשונה שלי — "קלון-ווב אינו מחזיק את התכונות, לכן התאים
+ייחסמו" — הפוכה: רוב המופעים הם על תכונה שאנחנו יכולים לספק.
+
+### 280 מופעים בלי שום פרמטר — הכרעה מפורשת
+
+`<Command ID="Settings.RequiredFeature" />` בלי `<Parameter>`, ‏**56 מתוך 126
+המופעים בלוחות שלנו**. 🛑 מימוש תמים כותב `features.has(undefined)` ומכריע
+`false` — כלומר **מסתיר 56 תאים בשקט**.
+
+**הוכרע:** מופע בלי פרמטר = **אין דרישה** (התא זמין), ‏+ ‏`reportUnimplemented`
+כדי שזה יהיה נראה. לא `false`, ולא זריקה.
 
 ### מדיניות פקודה לא-ממומשת
 
@@ -239,9 +275,13 @@ studio (`plan.md` שלב C). בסבב הזה — ערכי-ברירת-מחדל **
 **הוכרע 27.9.2026:** ‏`fflate` + `DOMParser` בצד-הלקוח. ‏`.gridset` הוא ZIP.
 מורה גוררת קובץ והאפליקציה קוראת אותו — אין שלב preprocess.
 
-‏🛑 **אין אף `.gridset` על המכונה.** ‏ה-TSV-ים תחת `derived/` הם התוצר;
-המקור אינו כאן. לכן **fixture סינתטי הוא תנאי מקדים לבדיקות**, והוא נבנה
-מתוך הסכמה עצמה. ‏`*.gridset` ב-`.gitignore` — תוכן Smartbox מורשה אינו
+🛑 **תוקן 27.9.2026: קובצי המקור כן קיימים** — ‏`~/work/grid-mapping/raw/`:
+‏`org-1..4.gridset` ו-112 מובנים תחת `bundled/`. הקביעה הקודמת ("אין אף
+`.gridset` על המכונה") נבעה מחיפוש ב-`~/Projects` ו-`/tmp` בעומק 4 בלבד.
+
+**ה-fixture הסינתטי נשאר נחוץ** — תוכן Smartbox מורשה אינו נכנס לריפו
+ציבורי, ולכן בדיקות ה-CI צריכות fixture משלהן. אבל **אימות מול הקובץ האמיתי
+אפשרי מקומית ורצוי**, וזה קריטריון-הקבלה האמיתי של הפרסר. ‏`*.gridset` ב-`.gitignore` — תוכן Smartbox מורשה אינו
 נכנס לריפו ציבורי.
 
 **סמלים:** ‏`ImageRef` נפתר מול `src/lib/services/arasaac.ts` הקיים.

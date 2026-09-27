@@ -47,10 +47,14 @@ Grids/<שם הדף>/grid.xml
 
 ## עוגני-אמת — לבנות לפי הסכמה, לא לפי הדמיון
 
-מקור יחיד: `~/Projects/tzlev-docs-repo/aac-board/grid-reference/derived/gridset-schema.tsv`
-(‏199 שורות: נתיב · מאפיין · שכיחות · ערכי-דוגמה). **לקרוא אותו בפועל** —
-הוא מכיל את שמות האלמנטים המדויקים והערכים החוקיים. דוגמאות פרמטרים:
-`commands.tsv` עמודת `sample_param_values`.
+שני מקורות, בסדר הזה:
+1. **הקובץ האמיתי** — `~/work/grid-mapping/raw/org-1.gridset`. ‏ZIP; פתח וקרא.
+2. `~/Projects/tzlev-docs-repo/aac-board/grid-reference/derived/gridset-schema.tsv`
+   (‏199 שורות: נתיב · מאפיין · שכיחות · ערכי-דוגמה).
+
+🛑 **אל תסתמך על העמודה `sample_param_values` ב-`commands.tsv`** — היא **דגימה
+אלפביתית** (`parse_gridsets.py:138`: `sorted(v)[0]`), לא הערך הנפוץ. היא הטעתה
+את התכנון פעם אחת כבר היום.
 
 🛑 **צבעים הם `#RRGGBBAA` — אלפא בסוף**, לא בהתחלה.
 🛑 **`X=0` הוא התא הימני.** ה-fixture כותב קואורדינטות כמו Grid; ההיפוך הוא
