@@ -59,7 +59,9 @@
 		if (slot?.kind === 'nav') return onNavigate?.(slot.action);
 		// הפריט נמסר להקשר: `AutoContent.Activate` אינה נושאת פרמטרים, ומה
 		// שמבדיל בין משבצת למשבצת הוא הפריט שבה.
-		executeCommands(cell, ctx, slot?.kind === 'item' ? slot.item : undefined);
+		// ‏`void` — השרשרת עשויה להכיל `CommandExecution.Wait` ואז היא נמשכת
+		// אחרי הלחיצה. אין למה להמתין כאן: המצב חי ב-runes ומתעדכן מעצמו.
+		void executeCommands(cell, ctx, slot?.kind === 'item' ? slot.item : undefined);
 	}
 
 	const fillGradient = $derived(verticalFillGradient(cell.style.backColour));

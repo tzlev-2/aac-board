@@ -64,6 +64,7 @@ function makeCtx(page: Page): RuntimeContext {
 		output: {
 			insert: () => {},
 			insertLetter: () => {},
+			appendToStream: () => {},
 			clear: () => {},
 			deleteWord: () => {},
 			deleteLetter: () => {},

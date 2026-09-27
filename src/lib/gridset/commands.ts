@@ -2,8 +2,11 @@
  * שרשרת-הפקודות של gridset — רג'יסטרי, מריץ, ושער-זמינות.
  *
  * 🔑 **רג'יסטרי, לא `switch`.** הקטלוג מונה 353 פקודות, 63 בשימוש בלוחות
- * שנותחו, ותשע מהן מכסות 91.5% מההפעלות. הוספת אחת מ-54 הנותרות חייבת
- * להיות **ערך במפה** — בלי לגעת במריץ.
+ * שנותחו, ו-15 מהן מכסות 95.3% מההפעלות בשלוש הרמות. הוספת אחת
+ * מהנותרות חייבת להיות **ערך במפה** — בלי לגעת במריץ. ‏🛑 סלייס 11 שבר את
+ * הכלל פעם אחת ובמכוון: ‏`CommandExecution.Wait` היא הפקודה הראשונה שהמריץ
+ * **כן** נדרש להכיר, כי השהיה אינה "עוד ערך במפה". ראו `CommandPause`
+ * ב-`types.ts`.
  *
  * 🛑 **הקובץ הזה נבדק בלי DOM.** אין כאן import של stores, של tts, ושל שום
  * דבר שנוגע ב-`window`. כל מה ש-handler יכול לעשות עובר דרך `RuntimeContext`.
@@ -18,6 +21,7 @@ import type {
 	CommandHandler,
 	CommandId,
 	CommandInvocation,
+	CommandPause,
 	CommandResult,
 	FeatureId,
 	Grammar,
@@ -83,6 +87,48 @@ function paramToBool(value: ParamValue | undefined): boolean | undefined {
 	const raw = paramToText(value).trim().toLowerCase();
 	if (!raw) return undefined;
 	return raw === 'yes' || raw === '1' || raw === 'true' || raw === 'on';
+}
+
+/**
+ * ‏`waittime` → מילישניות. הפורמט הוא `TimeSpan` של .NET.
+ *
+ * **נמדד** ב-44 המופעים ב-`org-1..org-4`: ‏`00:00:02` ×36 · ‏`00:00:03` ×6 ·
+ * ‏`00:00:01.5000000` ×2 — כלומר `hh:mm:ss` עם שבריר-שנייה אופציונלי.
+ * ‏`00:00:01.5000000` הוא הראיה שאסור ל-`parseInt` על מקטע-השניות.
+ *
+ * ‏`d.hh:mm:ss` (יום מוביל) חוקי ב-`TimeSpan` ונתמך כאן — **לא-מאומת מול Grid**,
+ * לא נצפה באף מופע. מחרוזת חסרה או פגומה ⇒ ‏0, כלומר בלי השהיה.
+ */
+export function parseWaitTimeMs(raw: string): number {
+	const value = raw.trim();
+	if (!value) return 0;
+	// 🛑 `Number('-00')` הוא `-0`, ו-`-0 < 0` הוא **false** — בדיקת-סימן על
+	// המספרים לבדה הייתה מקבלת `-00:00:02` כ-2,000ms. הסימן נפסל על המחרוזת.
+	if (value.includes('-')) return 0;
+
+	// `1.02:03:04` — היום מופרד בנקודה מהשעות, ורק כשיש שלושה מקטעי-זמן.
+	let days = 0;
+	let rest = value;
+	const dayMatch = /^(\d+)\.(?=\d+:\d+:\d+)/.exec(value);
+	if (dayMatch) {
+		days = Number(dayMatch[1]);
+		rest = value.slice(dayMatch[0].length);
+	}
+
+	const parts = rest.split(':');
+	if (parts.length > 3) return 0;
+	const nums = parts.map(Number);
+	if (nums.some((n) => !Number.isFinite(n))) return 0;
+
+	// מקטע אחד = שניות · שניים = mm:ss · שלושה = hh:mm:ss.
+	const [h, m, sec] =
+		nums.length === 3 ? nums : nums.length === 2 ? [0, nums[0], nums[1]] : [0, 0, nums[0]];
+	return Math.round(((days * 24 + h) * 3600 + m * 60 + sec) * 1000);
+}
+
+/** האם התוצאה היא בקשת-השהיה (ולא `void`/`'halt'`). */
+export function isCommandPause(result: CommandResult): result is CommandPause {
+	return typeof result === 'object' && result !== null && 'pauseMs' in result;
 }
 
 /**
@@ -267,7 +313,9 @@ export function withAutoContentItem(
 }
 
 // ── רג'יסטרי הפקודות ─────────────────────────────────────────────────────
-// תשע פקודות = 3,709 מתוך 4,052 ההפעלות בלוחות-הדגימה (91.5%).
+// 15 פקודות = 4,025 מתוך 4,222 ההפעלות בשלוש הרמות בלוחות-הדגימה (95.3%).
+// ברמת-התא: 14 פקודות = 3,859 מתוך 4,052 (95.2%). ב-`org-1` בלבד — כל שלוש
+// הרמות — 1,113 מתוך 1,152 (96.6%), ולפני הסלייס 1,046 (90.8%).
 
 export const commandRegistry: Partial<Record<CommandId, CommandHandler>> = {
 	/**
@@ -346,6 +394,74 @@ export const commandRegistry: Partial<Record<CommandId, CommandHandler>> = {
 	},
 
 	/**
+	 * ‏33 הפעלות (‏22 ב-`org-1`). **‏`letter` הוא תו-פיסוק בודד**, ונמדדו 19
+	 * ערכים שונים: ‏`.` ‏`?` ‏`-` ‏`=` ×3 · ‏`:` ‏`,` ‏`\'` ‏`!` ‏`×` ‏`÷` ×2 ·
+	 * ‏`;` ‏`#` ‏`₪` ‏`)` ‏`(` ‏`@` ‏`&` ‏`"` ‏`+` ×1.
+	 *
+	 * 🛑 **‏`appendToStream` ולא `insertLetter`** — פיסוק נדבק למילה שלפניו.
+	 * ‏`insertLetter` פותחת פריט חדש כשאין מילה בבנייה (למשל אחרי
+	 * ‏`Action.InsertText`), ואז ‏`ChatCell` — שמחבר פריטים ברווח — היה מציג
+	 * ‏"עוגה !" במקום "עוגה!".
+	 */
+	'Action.Punctuation': (params, ctx) => {
+		const letter = paramToText(params.letter);
+		if (!letter) return;
+		ctx.output.appendToStream(letter);
+	},
+
+	/**
+	 * ‏30 הפעלות (‏20 ב-`org-1`). ‏`letter` הוא ספרה בודדת — נמדד `0`–`9`,
+	 * שלוש פעמים כל אחת, ואין ערך אחר.
+	 *
+	 * 🔑 **אותו מנגנון כמו `Action.Letter`** ולא כמו `Action.Punctuation`:
+	 * ספרות בונות **מילה** (‏`1`·`2`·`3` ⇒ ‏"123"), ולכן הן פותחות פריט חדש
+	 * כשאין מילה בבנייה ואינן נדבקות למילה הקודמת.
+	 */
+	'Action.Number': (params, ctx) => {
+		const letter = paramToText(params.letter);
+		if (!letter) return;
+		ctx.output.insertLetter(letter);
+	},
+
+	/**
+	 * ‏30 הפעלות (‏15 ב-`org-1`). **בלי פרמטרים כלל** — נמדד ב-30 מ-30.
+	 *
+	 * מה שהיא עושה אצלנו: **סוגרת את המילה שבבנייה**, כך שהאות הבאה תפתח
+	 * פריט חדש. ‏`ChatCell` כבר מחבר פריטים ברווח, ולכן אין צורך בשבב-רווח
+	 * נפרד — והוא היה נראה כשבב ריק בפס-הפלט.
+	 */
+	'Action.Space': (_params, ctx) => {
+		ctx.output.appendToStream(' ');
+	},
+
+	/**
+	 * ‏13 הפעלות (‏**9** ב-`org-1`; ‏4 ב-`org-2`, ‏0 ב-`org-3/4`).
+	 * **בלי פרמטרים כלל** — נמדד ב-13 מ-13.
+	 * ⚠️ הבריף ייחס את ‏13 ל-`org-1`; ‏13 הוא הסך על ארבעת הלוחות.
+	 */
+	'Action.DeleteLetter': (_params, ctx) => {
+		ctx.output.deleteLetter();
+	},
+
+	/**
+	 * ‏44 הפעלות (‏1 ב-`org-1`, ‏1 ב-`org-2`, ‏21 ב-`org-3`, ‏21 ב-`org-4`).
+	 *
+	 * 🛑 **זהו באג התנהגותי שנמדד, ולא סתם פקודה חסרה.** השרשרת השכיחה היא
+	 * ‏`Action.InsertText → CommandExecution.Wait → Jump.To` (‏40 תאים
+	 * ב-`org-3/4`, למשל ‏(‏4,0) ב-"עמוד ראשי" = "מה"). בלי מימוש, **הקפיצה
+	 * מתבצעת מיָד** והמשתמש לא רואה את המילה שהוא בחר נכנסת לפס-הפלט.
+	 * ‏שרשרת שנייה שנמדדה: ‏`Wait → Photos.Snapshot → SpeechPlaySound` (org-1,
+	 * דף "מצלמה") — שם ה-`Wait` היא **ראשונה** בשרשרת.
+	 *
+	 * ‏`cancellable=1` ב-44 מ-44 — **לעולם לא נמדד `0`**, ולא נמדד מה מבטל
+	 * את ההמתנה. הערך נקרא, נמסר, ו**אינו נצרך**. ראו `CommandPause`.
+	 */
+	'CommandExecution.Wait': (params) => ({
+		pauseMs: parseWaitTimeMs(paramToText(params.waittime)),
+		cancellable: paramToBool(params.cancellable) ?? false
+	}),
+
+	/**
 	 * **158 הפעלות ברמת-הדף** (‏3,342 בקורפוס) — הפקודה שמפעילה את
 	 * ‏2,025 תאי ה-`AutoContent`. אין לה פרמטרים: מה שמבדיל בין הפעלה להפעלה
 	 * הוא `ctx.autoContentItem`, הפריט שבמשבצת.
@@ -382,23 +498,39 @@ export function implementedCommandIds(): CommandId[] {
 
 // ── המריץ ────────────────────────────────────────────────────────────────
 
+/** המתנה אמיתית. מוזרקת כדי שהמריץ ייבדק בלי טיימר אמיתי. */
+const realDelay = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
+
+export interface ExecuteOptions {
+	/** הזרקה לבדיקות; ברירת המחדל היא הרג'יסטרי הגלובלי. */
+	registry?: Partial<Record<CommandId, CommandHandler>>;
+	/** ההשהיה שמריצה `CommandExecution.Wait`. ברירת מחדל: `setTimeout`. */
+	delay?: (ms: number) => Promise<void>;
+}
+
 /**
- * מריץ שרשרת-פקודות. handler שמחזיר `'halt'` מפסיק את השרשרת — המנגנון
- * נשאר בחוזה (`CommandResult`) עבור פקודות עתידיות, אף שאף אחת מתשע
- * הפקודות של הסבב אינה משתמשת בו.
+ * מריץ שרשרת-פקודות. ‏handler שמחזיר `'halt'` מפסיק את השרשרת; ‏handler
+ * שמחזיר `CommandPause` **משהה את המשך השרשרת** ואז ממשיך.
  *
  * פקודה בלי handler נספרת ב-`ctx.reportUnimplemented` והשרשרת ממשיכה:
  * לעולם לא זורקים, ולעולם לא שותקים.
  *
  * 🔑 נקרא **רק על תא זמין** — `isCellAvailable` הוא השער, לא המריץ.
  *
- * @param registry הזרקה לבדיקות; ברירת המחדל היא הרג'יסטרי הגלובלי.
+ * 🛑 **הפונקציה `async`, אבל שרשרת בלי `Wait` רצה סינכרונית לחלוטין.**
+ * ב-`async function` כל מה שלפני ה-`await` הראשון מתבצע בקריאה עצמה; ומכיוון
+ * שה-`await` היחיד כאן הוא בתוך `if (isCommandPause(...))`, שרשרת שאין בה
+ * ‏`CommandExecution.Wait` אינה נוגעת בתור-המיקרו. זה **לא** פרט-מימוש אגבי:
+ * הוא מה שמשאיר 30 טסטים סינכרוניים קיימים ירוקים, ומונע השהיית-frame בכל
+ * לחיצה על תא. אל להפוך את ה-`for` ל-`for await` ואל להוסיף `await` בראשו.
  */
-export function executeCommandChain(
+export async function executeCommandChain(
 	commands: readonly CommandInvocation[],
 	ctx: RuntimeContext,
-	registry: Partial<Record<CommandId, CommandHandler>> = commandRegistry
-): void {
+	options: ExecuteOptions = {}
+): Promise<void> {
+	const { registry = commandRegistry, delay = realDelay } = options;
+
 	for (const inv of commands) {
 		const handler = registry[inv.id];
 		if (!handler) {
@@ -407,6 +539,7 @@ export function executeCommandChain(
 		}
 		const result: CommandResult = handler(inv.params, ctx);
 		if (result === 'halt') return;
+		if (isCommandPause(result) && result.pauseMs > 0) await delay(result.pauseMs);
 	}
 }
 
@@ -416,6 +549,11 @@ export function executeCommandChain(
  * @param item הפריט שהמשבצת מציגה (‏`WordListSlot` מסוג `item`). בלעדיו
  *             `AutoContent.Activate` אינה יודעת מה להכניס.
  */
-export function executeCommands(cell: Cell, ctx: RuntimeContext, item?: WordListItem): void {
-	executeCommandChain(cellCommands(cell, ctx.page), withAutoContentItem(ctx, item));
+export function executeCommands(
+	cell: Cell,
+	ctx: RuntimeContext,
+	item?: WordListItem,
+	options?: ExecuteOptions
+): Promise<void> {
+	return executeCommandChain(cellCommands(cell, ctx.page), withAutoContentItem(ctx, item), options);
 }

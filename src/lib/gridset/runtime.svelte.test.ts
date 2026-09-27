@@ -101,3 +101,120 @@ describe('ריאקטיביות', () => {
 		expect(visited).toEqual(['בית', 'אוכל', 'בית']);
 	});
 });
+
+describe('חוצץ-הפלט האמיתי — פיסוק, רווח ומחיקת-אות', () => {
+	/** מה ש-`ChatCell` מציג בפועל: הפריטים מחוברים ברווח. */
+	function line(rt: ReturnType<typeof createRuntime>): string {
+		return rt.output.items.map((item) => item.text).join(' ');
+	}
+
+	it('🛑 משפט אמיתי מהמקלדת של org-1: ארבע מילים, רווח וסימן-פיסוק', () => {
+		const rt = createRuntime(gridSet(), { speech: silentSpeech });
+		for (const word of ['אני', 'רוצה', 'לאכול']) {
+			executeCommands(cell('Action.InsertText', { text: word }), rt);
+		}
+		// המילה הרביעית נבנית אות-אחר-אות, כמו בדף "מקלדת מלאה - ראשי".
+		for (const letter of ['ע', 'ו', 'ג', 'ה']) {
+			executeCommands(cell('Action.Letter', { letter }), rt);
+		}
+		executeCommands(cell('Action.Punctuation', { letter: '!' }), rt);
+
+		expect(line(rt)).toBe('אני רוצה לאכול עוגה!');
+		expect(rt.output.items).toHaveLength(4);
+	});
+
+	it('🔑 רווח סוגר את המילה — האות שאחריו פותחת מילה חדשה', () => {
+		const rt = createRuntime(gridSet(), { speech: silentSpeech });
+		for (const letter of ['ש', 'ל']) {
+			executeCommands(cell('Action.Letter', { letter }), rt);
+		}
+		executeCommands(cell('Action.Space'), rt);
+		for (const letter of ['ד', 'ג']) {
+			executeCommands(cell('Action.Letter', { letter }), rt);
+		}
+		expect(rt.output.items.map((i) => i.text)).toEqual(['של ', 'דג']);
+		// 🛑 ה-getter מכווץ רווחים — הרווח אינו מכפיל את המפריד.
+		expect(rt.outputText).toBe('של דג');
+	});
+
+	it('פיסוק אינו סוגר את המילה שבבנייה', () => {
+		const rt = createRuntime(gridSet(), { speech: silentSpeech });
+		for (const letter of ['ל', 'א']) {
+			executeCommands(cell('Action.Letter', { letter }), rt);
+		}
+		executeCommands(cell('Action.Punctuation', { letter: '!' }), rt);
+		executeCommands(cell('Action.Letter', { letter: '?' }), rt);
+		expect(rt.output.items.map((i) => i.text)).toEqual(['לא!?']);
+	});
+
+	it('Action.DeleteLetter מוחקת אות אחת מהמילה האחרונה', () => {
+		const rt = createRuntime(gridSet(), { speech: silentSpeech });
+		executeCommands(cell('Action.InsertText', { text: 'שלום' }), rt);
+		executeCommands(cell('Action.DeleteLetter'), rt);
+		expect(line(rt)).toBe('שלו');
+	});
+
+	it('Action.Number בונה מספר כמילה אחת', () => {
+		const rt = createRuntime(gridSet(), { speech: silentSpeech });
+		for (const digit of ['1', '2', '3']) {
+			executeCommands(cell('Action.Number', { letter: digit }), rt);
+		}
+		expect(rt.output.items.map((i) => i.text)).toEqual(['123']);
+	});
+
+	it('רווח על חוצץ ריק אינו מייצר שבב', () => {
+		const rt = createRuntime(gridSet(), { speech: silentSpeech });
+		executeCommands(cell('Action.Space'), rt);
+		expect(rt.output.items).toEqual([]);
+	});
+
+	it('🔑 פס-הפלט ריאקטיבי גם דרך appendToStream', () => {
+		const rt = createRuntime(gridSet(), { speech: silentSpeech });
+		const snapshots: string[] = [];
+		const cleanup = $effect.root(() => {
+			const text = $derived(line(rt));
+			$effect(() => void snapshots.push(text));
+		});
+		flushSync();
+		executeCommands(cell('Action.InsertText', { text: 'מה' }), rt);
+		flushSync();
+		executeCommands(cell('Action.Punctuation', { letter: '?' }), rt);
+		flushSync();
+		cleanup();
+		expect(snapshots).toEqual(['', 'מה', 'מה?']);
+	});
+});
+
+describe('CommandExecution.Wait במריץ החי', () => {
+	it('🛑 Jump.To שאחרי Wait אינו מנווט מיָד — הדף מתחלף רק אחרי ההשהיה', async () => {
+		const rt = createRuntime(gridSet(), { speech: silentSpeech });
+		const waitCell: Cell = {
+			x: 0,
+			y: 0,
+			columnSpan: 1,
+			rowSpan: 1,
+			commands: [
+				{ id: 'Action.InsertText', params: { text: 'מה' } },
+				{ id: 'CommandExecution.Wait', params: { waittime: '00:00:02', cancellable: '1' } },
+				{ id: 'Jump.To', params: { grid: 'אוכל' } }
+			],
+			style: STYLE
+		};
+
+		let release: (() => void) | undefined;
+		const chain = executeCommands(waitCell, rt, undefined, {
+			delay: () =>
+				new Promise<void>((resolve) => {
+					release = resolve;
+				})
+		});
+
+		// 🔑 הראיה: המילה כבר בפס-הפלט, והדף **עוד לא** התחלף.
+		expect(rt.output.items.map((i) => i.text)).toEqual(['מה']);
+		expect(rt.page.name).toBe('בית');
+
+		release?.();
+		await chain;
+		expect(rt.page.name).toBe('אוכל');
+	});
+});
