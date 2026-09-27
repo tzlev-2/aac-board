@@ -47,12 +47,14 @@ describe('buildGridset', () => {
 		expect(cells[2].hasAttribute('Y')).toBe(false);
 	});
 
-	it('nilCaption — <CaptionAndImage nil="true" /> בלי Caption/Image', () => {
+	it('nilCaption — <CaptionAndImage xsi:nil="true" /> בלי Caption/Image', () => {
 		const files = unzipSync(buildGridset(fixtures.nilCaption));
 		const doc = parseXml(strFromU8(files['Grids/nil/grid.xml']));
 		const nilCell = doc.querySelectorAll('Cells > Cell')[0];
 		const captionAndImage = nilCell.querySelector('CaptionAndImage');
-		expect(captionAndImage?.getAttribute('nil')).toBe('true');
+		expect(
+			captionAndImage?.getAttributeNS('http://www.w3.org/2001/XMLSchema-instance', 'nil')
+		).toBe('true');
 		expect(captionAndImage?.children.length).toBe(0);
 	});
 

@@ -24,6 +24,11 @@ function escapeAttr(value: string): string {
 	return escapeXml(value).replace(/"/g, '&quot;');
 }
 
+// כל שלושת שורשי ה-XML האמיתיים מכריזים על ה-namespace הזה (אומת מול
+// org-1.gridset). `xsi:nil` (fixture `nilCaption`) דורש הכרזה על אלמנט-אב,
+// אחרת ה-parser זורק על prefix לא-מוכרז.
+const XSI_XMLNS = 'xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"';
+
 function sentenceXml(sentence: FixtureSentence): string {
 	const attrs = sentence.image ? ` Image="${escapeAttr(sentence.image)}"` : '';
 	const runs = sentence.runs.map((r) => `<r>${escapeXml(r)}</r>`).join('');
@@ -61,10 +66,25 @@ function cellXml(cell: FixtureCell): string {
 	if (cell.columnSpan !== undefined) attrs.push(`ColumnSpan="${cell.columnSpan}"`);
 	if (cell.rowSpan !== undefined) attrs.push(`RowSpan="${cell.rowSpan}"`);
 
+	// 🛑 סדר-הבנים אומת מול org-1.gridset (b005.gridset למקרה עם Commands+ContentType
+	// יחד): ContentType → ContentSubType → ContentSubSubType → Commands →
+	// CaptionAndImage → Style. לא הסדר "האינטואיטיבי".
 	const content: string[] = [];
 
+	if (cell.contentType) content.push(`<ContentType>${escapeXml(cell.contentType)}</ContentType>`);
+	if (cell.contentSubType)
+		content.push(`<ContentSubType>${escapeXml(cell.contentSubType)}</ContentSubType>`);
+	if (cell.contentSubSubType)
+		content.push(`<ContentSubSubType>${escapeXml(cell.contentSubSubType)}</ContentSubSubType>`);
+
+	if (cell.commands?.length) {
+		content.push(`<Commands>${cell.commands.map(commandXml).join('')}</Commands>`);
+	}
+
 	if (cell.caption === null) {
-		content.push('<CaptionAndImage nil="true" />');
+		// 🛑 xsi:nil, לא nil גולמי — כך זה נכתב בפועל (org-1.gridset), ודורש
+		// את הכרזת ה-namespace על <Grid> (XSI_XMLNS).
+		content.push('<CaptionAndImage xsi:nil="true" />');
 	} else if (cell.caption !== undefined || cell.image !== undefined) {
 		const inner = [
 			cell.caption !== undefined ? `<Caption>${escapeXml(cell.caption)}</Caption>` : '',
@@ -73,24 +93,14 @@ function cellXml(cell: FixtureCell): string {
 		content.push(`<CaptionAndImage>${inner}</CaptionAndImage>`);
 	}
 
-	if (cell.commands?.length) {
-		content.push(`<Commands>${cell.commands.map(commandXml).join('')}</Commands>`);
-	}
-
-	if (cell.contentType) content.push(`<ContentType>${escapeXml(cell.contentType)}</ContentType>`);
-	if (cell.contentSubType)
-		content.push(`<ContentSubType>${escapeXml(cell.contentSubType)}</ContentSubType>`);
-	if (cell.contentSubSubType)
-		content.push(`<ContentSubSubType>${escapeXml(cell.contentSubSubType)}</ContentSubSubType>`);
-
 	if (cell.basedOnStyle !== undefined || cell.styleOverrides) {
 		const style: string[] = [];
 		if (cell.basedOnStyle !== undefined)
 			style.push(`<BasedOnStyle>${escapeXml(cell.basedOnStyle)}</BasedOnStyle>`);
 		const o = cell.styleOverrides ?? {};
 		if (o.backColour) style.push(`<BackColour>${o.backColour}</BackColour>`);
-		if (o.fontColour) style.push(`<FontColour>${o.fontColour}</FontColour>`);
 		if (o.borderColour) style.push(`<BorderColour>${o.borderColour}</BorderColour>`);
+		if (o.fontColour) style.push(`<FontColour>${o.fontColour}</FontColour>`);
 		if (o.fontName) style.push(`<FontName>${escapeXml(o.fontName)}</FontName>`);
 		if (o.fontSize !== undefined) style.push(`<FontSize>${o.fontSize}</FontSize>`);
 		if (o.backgroundShape !== undefined)
@@ -99,8 +109,10 @@ function cellXml(cell: FixtureCell): string {
 		content.push(`<Style>${style.join('')}</Style>`);
 	}
 
-	const siblings = [`<Content>${content.join('')}</Content>`];
+	// 🛑 Visibility הוא אח של Content, ולפניו — לא אחריו (אומת מול b005.gridset).
+	const siblings: string[] = [];
 	if (cell.visibility) siblings.push(`<Visibility>${cell.visibility}</Visibility>`);
+	siblings.push(`<Content>${content.join('')}</Content>`);
 
 	const attrString = attrs.length ? ` ${attrs.join(' ')}` : '';
 	return `<Cell${attrString}>${siblings.join('')}</Cell>`;
@@ -113,49 +125,56 @@ function wordListItemXml(item: FixtureWordListItem): string {
 	return `<WordListItem>${parts.join('')}</WordListItem>`;
 }
 
+// 🛑 סדר-הבנים של <Grid> אומת מול org-1.gridset + b001/b033.gridset (bundled):
+// [PredictionSource?] → ColumnDefinitions → RowDefinitions → [Commands דף?] →
+// AutoContentCommands (תמיד, גם ריק) → Cells → WordList (תמיד, Items ריק אם אין).
 function gridXml(page: FixturePage): string {
 	const columnDefs = Array.from({ length: page.columns }, () => '<ColumnDefinition />').join('');
 	const rowDefs = Array.from({ length: page.rows }, () => '<RowDefinition />').join('');
 	const cells = page.cells.map(cellXml).join('');
 
-	const parts = [
-		`<ColumnDefinitions>${columnDefs}</ColumnDefinitions>`,
-		`<RowDefinitions>${rowDefs}</RowDefinitions>`,
-		`<Cells>${cells}</Cells>`
-	];
+	const parts: string[] = [];
 
-	if (page.wordList?.length) {
-		parts.push(
-			`<WordList><Items>${page.wordList.map(wordListItemXml).join('')}</Items></WordList>`
-		);
-	}
 	if (page.predictionSource) {
 		parts.push(`<PredictionSource>${page.predictionSource}</PredictionSource>`);
 	}
-	if (page.autoContentCommands) {
-		const collections = Object.entries(page.autoContentCommands)
-			.map(
-				([type, commands]) =>
-					`<AutoContentCommandCollection AutoContentType="${escapeAttr(type)}"><Commands>${commands
-						.map(commandXml)
-						.join('')}</Commands></AutoContentCommandCollection>`
-			)
-			.join('');
-		parts.push(`<AutoContentCommands>${collections}</AutoContentCommands>`);
-	}
+
+	parts.push(`<ColumnDefinitions>${columnDefs}</ColumnDefinitions>`);
+	parts.push(`<RowDefinitions>${rowDefs}</RowDefinitions>`);
+
 	if (page.commands?.length) {
 		parts.push(`<Commands>${page.commands.map(commandXml).join('')}</Commands>`);
 	}
 
-	return `<?xml version="1.0" encoding="utf-8"?><Grid>${parts.join('')}</Grid>`;
+	const collections = Object.entries(page.autoContentCommands ?? {})
+		.map(
+			([type, commands]) =>
+				`<AutoContentCommandCollection AutoContentType="${escapeAttr(type)}"><Commands>${commands
+					.map(commandXml)
+					.join('')}</Commands></AutoContentCommandCollection>`
+		)
+		.join('');
+	parts.push(`<AutoContentCommands>${collections}</AutoContentCommands>`);
+
+	parts.push(`<Cells>${cells}</Cells>`);
+
+	const items = page.wordList?.length
+		? `<Items>${page.wordList.map(wordListItemXml).join('')}</Items>`
+		: '<Items />';
+	parts.push(`<WordList>${items}</WordList>`);
+
+	return `<?xml version="1.0" encoding="utf-8"?><Grid ${XSI_XMLNS}>${parts.join('')}</Grid>`;
 }
 
+// 🛑 סדר-הבנים אומת מול org-1.gridset: Name → BackColour → BorderColour →
+// FontColour → FontName → FontSize → BackgroundShape (TileColour לא נצפה
+// בקבצים שנבדקו — הושאר אחרון, ללא עיגון).
 function namedStyleXml(style: FixtureNamedStyle): string {
 	const parts: string[] = [];
 	if (style.name) parts.push(`<Name>${escapeXml(style.name)}</Name>`);
 	if (style.backColour) parts.push(`<BackColour>${style.backColour}</BackColour>`);
-	if (style.fontColour) parts.push(`<FontColour>${style.fontColour}</FontColour>`);
 	if (style.borderColour) parts.push(`<BorderColour>${style.borderColour}</BorderColour>`);
+	if (style.fontColour) parts.push(`<FontColour>${style.fontColour}</FontColour>`);
 	if (style.fontName) parts.push(`<FontName>${escapeXml(style.fontName)}</FontName>`);
 	if (style.fontSize !== undefined) parts.push(`<FontSize>${style.fontSize}</FontSize>`);
 	if (style.backgroundShape !== undefined)
@@ -165,7 +184,7 @@ function namedStyleXml(style: FixtureNamedStyle): string {
 }
 
 function stylesXml(styles: FixtureNamedStyle[]): string {
-	return `<?xml version="1.0" encoding="utf-8"?><StyleData><Styles>${styles
+	return `<?xml version="1.0" encoding="utf-8"?><StyleData ${XSI_XMLNS}><Styles>${styles
 		.map(namedStyleXml)
 		.join('')}</Styles></StyleData>`;
 }
@@ -173,7 +192,7 @@ function stylesXml(styles: FixtureNamedStyle[]): string {
 function settingsXml(spec: GridsetSpec): string {
 	const startGrid = spec.startGrid ?? spec.pages[0].name;
 	const language = spec.language ?? 'he-IL';
-	return `<?xml version="1.0" encoding="utf-8"?><GridSetSettings><StartGrid>${escapeXml(
+	return `<?xml version="1.0" encoding="utf-8"?><GridSetSettings ${XSI_XMLNS}><StartGrid>${escapeXml(
 		startGrid
 	)}</StartGrid><Language>${escapeXml(language)}</Language></GridSetSettings>`;
 }
