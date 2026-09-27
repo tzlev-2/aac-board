@@ -12,7 +12,7 @@
 	import type { Cell, RuntimeContext } from '$lib/gridset/types';
 	import { executeCommands } from '$lib/gridset/commands';
 	import type { SymbolResolver } from '$lib/gridset/symbols';
-	import { VISUAL_DEFAULTS } from '$lib/gridset/visualDefaults';
+	import { VISUAL_DEFAULTS, resolveFontFamily } from '$lib/gridset/visualDefaults';
 	import { resolveCellRenderer } from './cellRenderers';
 
 	let {
@@ -53,7 +53,7 @@
 		background-color: {cell.style.backColour};
 		color: {cell.style.fontColour};
 		border-color: {cell.style.borderColour};
-		font-family: {cell.style.fontName};
+		font-family: {resolveFontFamily(cell.style.fontName)};
 		font-size: {cell.style.fontSize}px;
 		border-width: {VISUAL_DEFAULTS.tileBorderWidth};
 		border-radius: {VISUAL_DEFAULTS.tileBorderRadius};
@@ -72,6 +72,16 @@
 		box-sizing: border-box;
 		border-style: solid;
 		overflow: hidden;
+		/* 🔑 התא הוא **קונטיינר-שאילתה**, וזה מה שמאפשר לכתובית ולסמל להימדד
+		   מול גובה התא בפועל (`cqh`) במקום ב-px מוחלטים — ראו
+		   `visualDefaults.captionFontSizeCss`. ‏`size` (ולא `inline-size`) כי
+		   הממד שמעניין הוא הגובה; גודל התא נקבע ממילא מהרשת ולא מהתוכן.
+		   🛑 מי שמסיר את השורה הזאת שובר את גודל-הגופן **בלי שגיאה**: `cqh`
+		   נופל ל-small viewport, והכותרות חוזרות להיות ננסיות.
+		   🛑 ובכיוון השני — `container-type: size` גורר `contain: size`, ולכן תא
+		   שמרונדר **מחוץ ל-`GridBoard`** (בדיקה, תצוגה מבודדת) אינו גדל לפי
+		   תוכנו: שם צריך לקבוע לו גובה מפורש. */
+		container-type: size;
 		/* איפוס ברירות-המחדל של <button> — כדי שהמעבר div→button לא ישנה
 		   כלום חזותית: הגופן והצבע באים מהסגנון שלמעלה, לא מה-user agent. */
 		margin: 0;
