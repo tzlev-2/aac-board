@@ -97,6 +97,7 @@ export interface Style {
 	fontColour?: string;
 	borderColour?: string;
 	fontName?: string;
+	/** 🛑 יכול להיות שברי — 132 מ-2,221 הסגנונות נושאים 18.666… (המרת pt→px). parseInt מקטע ומתנגש. */
 	fontSize?: number;
 	backgroundShape?: number; // enum 1..10, הסמנטיקה טרם פוענחה (plan.md שלב C)
 	tileGap?: string;
@@ -168,6 +169,14 @@ export type PredictionSource =
 	| 'WordListAndPredictor'
 	| 'LastSuggestedAndWordList';
 
+/**
+ * מידת עמודה/שורה. חסר = רגיל.
+ * נמדד: Width מפורש ב-11,400 מ-58,701 הגדרות-עמודה (29.7% מהדפים),
+ * Height ב-4,575 מ-44,667. 🔑 בלוחות הארגון עצמם: 0 מ-1,963 — הרשתות
+ * שלנו אחידות, ואי-האחידות כולה בלוחות המובנים של Grid.
+ */
+export type SizeName = 'ExtraSmall' | 'Small' | 'Large' | 'ExtraLarge';
+
 // ── דף ───────────────────────────────────────────────────────────────────
 
 export interface Page {
@@ -175,6 +184,10 @@ export interface Page {
 	guid?: string;
 	columns: number; // אורך <ColumnDefinitions>, לא מאפיין
 	rows: number;
+	/** מאפיין Width של כל <ColumnDefinition> לפי הסדר; null = רגיל. */
+	columnWidths: (SizeName | null)[];
+	/** מאפיין Height של כל <RowDefinition> לפי הסדר; null = רגיל. */
+	rowHeights: (SizeName | null)[];
 	cells: Cell[]; // רק תאים שנכתבו; השאר ריקים
 
 	/** 🔑 המנוע נגזר מהדף, לא גלובלי. /Grid/WordList — אחד לכל אחד מ-7,057 הדפים. */

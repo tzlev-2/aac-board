@@ -78,3 +78,76 @@ export const cellRenderers: Record<string, Component<CellProps>> = {
 ## מחוץ להיקף
 ביצוע פקודות ולחיצות (סלייס 5) · מנועי WordList/Prediction — ‏`UnsupportedCell`
 מספיק · נאמנות פיקסלים · פתירת קבצי סמל אמיתיים (‏`arasaac.ts` בהמשך).
+
+---
+
+# סבב 2 — תיקונים אחרי אימות (27.9.2026)
+
+המאמת נתן `GO` עם שבעה ממצאים, ואישר בדיקה גאומטרית ב-DOM ששלושת שערי ה-🛑
+עומדים: ‏`ChatCell` הוא **ילד ישיר** של הרשת עם `grid-column: 1 / span 4`,
+אפס היפוך `x` בקוד, ואפס נגיעה בקבצים האסורים. מה שלמטה הוא מה שכן חסר.
+
+## 1 · 🛑 `fontName` נזרק — לוח אמיתי ייראה אחיד-גופן ושגוי
+
+‏`GridCell.svelte:23-29` מחיל `backColour`, `fontColour`, `borderColour`
+ו-`fontSize` — **אבל לא `font-family`**. ‏2,150 מ-3,283 הסגנונות נושאים
+`FontName`, בשמונה גופנים (‏Booster 1,343 · Medrano 388 · Roboto 224 · Arial 96
+· Sassoon Infant 77). הבריף דרש "לצרוך `cell.style` כפי שהוא".
+
+## 2 · 🛑 `border: 2px solid` קשיח — הערך היחיד שמשפיע על כל תא
+
+‏`GridCell.svelte:40`. ‏§5 בתכנון מונה במפורש רדיוס-פינה ומרווח-פנימי כערכים
+שאינם ב-XML וחייבים להיות מרוכזים — **רוחב-מסגרת מאותה משפחה בדיוק**.
+‏`visualDefaults.ts:12-19` לא מכיל אותו, ולכן הוא לא יתחלף בשורה אחת כשסלייס 3
+יתמזג. להעביר לשם.
+
+בחומרה נמוכה יותר, אותו טיפול: ‏`UnsupportedCell.svelte:23,38-42`
+(`gap: 2px`, ‏`font-size: .7em`, ‏`opacity: .7`, ‏`border-radius: 4px`)
+ו-`ButtonCell.svelte:43`.
+
+## 3 · 🛑 עמעום `Disabled` נשבר בשקט בלי האב
+
+‏`GridCell.svelte:46` כותב `opacity: var(--disabled-opacity)`, והמשתנה מוגדר
+**רק** על מכולת ה-grid (`GridBoard.svelte:25`). המאמת מדד: בלי האב אותו תא עובר
+ל-`opacity: 1`, ‏`padding: 0`, ‏`border-radius: 0` — **הנגישות נשברת בלי שגיאה**.
+הבדיקה הקיימת (`spec:117-125`) בודקת `aria-disabled` ו-`pointer-events` בלבד.
+
+‏🔑 זה רלוונטי **מיָדית**: תא נהיה בלתי-זמין מ-`Settings.RequiredFeature`, ובלוחות
+שלנו זה 126 תאים. ‏`var(--disabled-opacity, 0.4)` — fallback לכל המשתנים.
+
+## 4 · 🛑 אין בדיקת-DOM ש-`ChatCell` באמת בתוך הרשת
+
+‏`GridBoard.svelte.spec.ts:142-146` בודקת רק את הרג'יסטרי
+(`resolveCellRenderer(cell) === ChatCell`) — היא תמשיך לעבור גם אם מישהו יעקוף
+את `GridCell` ויציב את הפס כרצועה. **זהו הסעיף שהפרויקט נפסל עליו והוא לא
+מגודר בטסט.** בדיקה שמרנדרת דף עם `Workspace/Chat` ומאמתת `grid-column`,
+`span`, ושהאלמנט הוא צאצא של `[data-testid=grid-board]`.
+
+## 5 · אין בדיקה ל-`PointerAndTouchOnly`
+ההתנהגות נכונה היום (`GridCell.svelte:13` בודק `=== 'Disabled'`), אבל אין מה
+שיעצור רגרסיה שתעמעם גם אותו. ערך אמיתי מתוך 1,555 מופעי `Visibility`.
+
+## 6 · הרשת אינה ממלאת את הגובה — **והפער בבריף שלי**
+
+‏`GridBoard.svelte:34-41` נותן `width: 100%` בלי `height`, ולכן
+`grid-template-rows: repeat(var(--rows), 1fr)` חסר-אפקט: נמדד `.grid-page`
+בגובה 700px והרשת 236px. לוח AAC אמור למלא מסך.
+‏🛑 **ה-CSS הועתק מילולית מהבריף שלי** — הפער שלי, לא שלך. ‏`height: 100%`
+והמכולה צריכה גובה מוגדר.
+
+## 7 · מידות עמודה ושורה — נוספו לחוזה
+
+`types.ts` הורחב: ‏`Page.columnWidths: (SizeName|null)[]` ו-`rowHeights`
+(`ExtraSmall|Small|Large|ExtraLarge`, ‏`null` = רגיל). ‏`grid-template-columns`
+צריך לכבד אותן במקום `repeat(n, 1fr)` אחיד. המיפוי מ-שם-מידה ל-`fr` הוא
+**ערך לא-מאומת** → ‏`visualDefaults.ts`.
+🔑 בלוחות הארגון כל ההגדרות הן `null`, ולכן ההתנהגות הנוכחית נכונה עבורן —
+זו הכנה ללוחות מורה.
+
+## 8 · הערה שעוברת לסלייס 5
+‏`ChatCell.svelte:11` קורא `ctx.output.items` ב-`$derived` מעל מערך רגיל
+(`createDemoRuntimeContext.ts:10`). אם `RuntimeContext` של סלייס 5 לא יעטוף
+ב-`$state`, הפס לא יתעדכן. **אל תתקן כאן** — נכנס לבריף 5.
+
+## DoD
+`bun run check` · `bun run test:unit --run` ירוקים · קומיט בעברית · לא לדחוף ולא למזג.
