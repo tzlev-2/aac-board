@@ -680,9 +680,40 @@ describe('הפרדת התלות בסגנונות', () => {
 		`<BackColour>#00A885FF</BackColour><FontSize>18</FontSize><BackgroundShape>2</BackgroundShape>` +
 		`<TileColour>#000000FF</TileColour></Style></Content></Cell>`;
 
-	it('בלי פותר — כל תא מקבל DEFAULT_RESOLVED_STYLE', async () => {
+	// 🛑 שונה בסלייס 7 (חיווט): עד אז "בלי פותר" פירושו היה DEFAULT_RESOLVED_STYLE
+	// לכל תא — כלומר כל לוח אמיתי מרודד ללבן-על-לבן, כי הקורא אינו יכול לבנות
+	// פותר לפני הפרסור (הקטלוג יושב בתוך ה-ZIP). ברירת-המחדל היא כעת הפותר של
+	// סלייס 3 על הקטלוג שנקרא מאותו קובץ; הזרקה מפורשת ממשיכה לגבור.
+	it('בלי פותר — ברירת המחדל היא createStyleResolver על הקטלוג של הקובץ', async () => {
 		const page = await parseSinglePage(grid({ cells: cellsXml }));
-		expect(page.cells[0].style).toEqual(DEFAULT_RESOLVED_STYLE);
+		// הסגנון הנקוב אינו בקטלוג (styles.xml ריק בעזר הזה) ⇒ בסיס ברירת-מחדל,
+		// אבל עקיפות התא **כן** מוחלות — וזה כל ההבדל מול הבדל הקודם.
+		expect(page.cells[0].style).toEqual({
+			...DEFAULT_RESOLVED_STYLE,
+			backColour: '#00A885FF',
+			fontSize: 18,
+			backgroundShape: 2,
+			tileColour: '#000000FF'
+		});
+	});
+
+	it('סגנון נקוב שקיים בקטלוג נפתר בלי שהקורא יזריק דבר', async () => {
+		const set = await parseGridSet(
+			gridsetZip({
+				grids: {
+					'Page 1': grid({
+						cells: `<Cell X="0"><Content><Style><BasedOnStyle>כחול</BasedOnStyle></Style></Content></Cell>`
+					})
+				},
+				styles:
+					`<?xml version="1.0" encoding="utf-8"?><StyleData><Styles>` +
+					`<Style Key="כחול"><BackColour>#112233FF</BackColour><FontSize>31</FontSize></Style>` +
+					`</Styles></StyleData>`
+			})
+		);
+		const style = set.pages['Page 1'].cells[0].style;
+		expect(style.backColour).toBe('#112233FF');
+		expect(style.fontSize).toBe(31);
 	});
 
 	it('הפרסר מרכיב CellStyleSource ומעביר אותו לפותר — ואינו פותר ירושה בעצמו', async () => {

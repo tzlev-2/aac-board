@@ -30,7 +30,6 @@ import type {
 	Page,
 	ParamValue,
 	PredictionSource,
-	ResolvedStyle,
 	SizeName,
 	Style,
 	StyleResolver,
@@ -57,6 +56,7 @@ import {
  * לא-מאומתים, כפי ש-gridset-core-design.md §5 דורש.
  */
 import { DEFAULT_RESOLVED_STYLE } from './visualDefaults';
+import { createStyleResolver } from './resolveStyle';
 export { DEFAULT_RESOLVED_STYLE };
 
 export interface ParseGridSetOptions {
@@ -101,10 +101,14 @@ export async function parseGridSet(
 	const settingsPath = paths.find((p) => SETTINGS_RE.test(p));
 	if (!settingsPath) throw new Error('הקובץ אינו .gridset — אין בו settings.xml');
 
-	const resolve = opts.resolveStyle ?? (() => DEFAULT_RESOLVED_STYLE);
-
 	const stylesPath = paths.find((p) => STYLES_RE.test(p));
 	const styles = stylesPath ? parseStyleCatalog(decode(files[stylesPath]), stylesPath) : {};
+
+	// 🔑 בלי פותר מוזרק — הפותר של סלייס 3 על הקטלוג שנקרא כרגע. זו החוליה
+	// שהייתה חסרה: הקורא אינו יכול לבנות פותר לפני הפרסור (הקטלוג יושב בתוך
+	// ה-ZIP), ולכן ברירת-המחדל "כל תא מקבל DEFAULT_RESOLVED_STYLE" הייתה
+	// מרדדת כל לוח אמיתי ללבן-על-לבן. הזרקה מפורשת ממשיכה לגבור.
+	const resolve = opts.resolveStyle ?? createStyleResolver(styles);
 
 	const pages: Record<string, Page> = {};
 	for (const path of paths) {

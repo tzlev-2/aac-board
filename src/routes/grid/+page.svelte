@@ -1,39 +1,62 @@
 <script lang="ts">
 	/**
-	 * 🛑 פרסור .gridset אמיתי (ZIP+XML) הוא slice/gridset-parser — מחוץ להיקף
-	 * כאן. עד שהוא יתמזג, הטעינה כאן מקבלת JSON שכבר בצורת GridSet (ראו
-	 * sampleGridSet.ts ו-__fixtures__/sample-gridset.json), רק כדי שסלייס
-	 * הרינדור יהיה ניתן לבדיקה עצמאית מקצה-לקצה. GridBoard עצמו לא יודע/
-	 * אכפת לו מאיפה ה-GridSet הגיע.
+	 * המסלול של הלוח: קובץ → מודל → מריץ חי.
+	 *
+	 * 🔑 `.gridset` הוא ZIP, ולכן הוא נקרא כבייטים ולא כטקסט — הבדיקה היא
+	 * חתימת-הקובץ (`PK`) ולא הסיומת. ‏JSON שכבר בצורת `GridSet` ממשיך להיתמך
+	 * (‏`sampleGridSet.ts`, ‏`__fixtures__/sample-gridset.json`, ‏E2E).
+	 *
+	 * 🛑 `parseGridSet` משתמש ב-`unzipSync` **במכוון** (`parse.ts:96` — הגרסה
+	 * האסינכרונית של fflate פותחת Worker דרך blob URL), ולכן הפרסור חוסם את
+	 * ה-thread. מכאן מחוון-הטעינה, ומכאן גם ה-frame שממתינים לו לפניו: בלעדיו
+	 * המחוון לא נצבע כלל והמסך פשוט קופא.
 	 */
 	import type { GridSet } from '$lib/gridset/types';
-	import GridBoard from '$lib/components/gridset/GridBoard.svelte';
-	import { createDemoRuntimeContext } from './createDemoRuntimeContext';
+	import { parseGridSet } from '$lib/gridset/parse';
+	import GridSetView from '$lib/components/gridset/GridSetView.svelte';
 	import { SAMPLE_GRID_SET } from './sampleGridSet';
 
 	let gridSet = $state<GridSet>(SAMPLE_GRID_SET);
 	let error = $state('');
+	let loading = $state(false);
+	let sourceName = $state('');
 
-	const page = $derived(gridSet.pages[gridSet.startGrid]);
-	const ctx = $derived(createDemoRuntimeContext(gridSet, page));
+	const pageCount = $derived(Object.keys(gridSet.pages).length);
 
-	function loadFromText(text: string) {
-		try {
-			const parsed = JSON.parse(text);
-			if (!parsed || typeof parsed !== 'object' || !parsed.pages || !parsed.startGrid) {
-				throw new Error('חסרים pages/startGrid');
-			}
-			gridSet = parsed as GridSet;
-			error = '';
-		} catch (e) {
-			error = `קובץ לא תקין: ${e instanceof Error ? e.message : String(e)}`;
+	function parseJsonGridSet(text: string): GridSet {
+		const parsed = JSON.parse(text);
+		if (!parsed || typeof parsed !== 'object' || !parsed.pages || !parsed.startGrid) {
+			throw new Error('חסרים pages/startGrid');
 		}
+		return parsed as GridSet;
+	}
+
+	/** ‏frame אחד כדי שהמחוון ייצבע לפני הפרסור החוסם. */
+	function nextFrame(): Promise<void> {
+		return new Promise((resolve) => requestAnimationFrame(() => setTimeout(resolve, 0)));
 	}
 
 	async function handleFiles(files: FileList | null) {
 		const file = files?.[0];
 		if (!file) return;
-		loadFromText(await file.text());
+
+		loading = true;
+		error = '';
+		await nextFrame();
+
+		try {
+			const bytes = new Uint8Array(await file.arrayBuffer());
+			// חתימת ZIP: 50 4B ("PK"). כל השאר — JSON.
+			const isZip = bytes[0] === 0x50 && bytes[1] === 0x4b;
+			gridSet = isZip
+				? await parseGridSet(bytes)
+				: parseJsonGridSet(new TextDecoder().decode(bytes));
+			sourceName = file.name;
+		} catch (e) {
+			error = `קובץ לא תקין: ${e instanceof Error ? e.message : String(e)}`;
+		} finally {
+			loading = false;
+		}
 	}
 
 	function handleDrop(e: DragEvent) {
@@ -51,21 +74,26 @@
 		ondrop={handleDrop}
 	>
 		<label>
-			טעינת GridSet (JSON זמני, עד שסלייס הפרסר יתמזג)
+			טעינת לוח — גררו קובץ <code>.gridset</code> לכאן, או בחרו:
 			<input
 				type="file"
-				accept="application/json,.json"
+				accept=".gridset,application/json,.json"
 				onchange={(e) => handleFiles((e.currentTarget as HTMLInputElement).files)}
 			/>
 		</label>
+		{#if loading}
+			<p class="status" data-testid="grid-loading" role="status">טוען את הלוח…</p>
+		{:else if sourceName}
+			<p class="status" data-testid="grid-source">{sourceName} · {pageCount} דפים</p>
+		{/if}
 		{#if error}
 			<p class="error" role="alert">{error}</p>
 		{/if}
 	</div>
 
-	{#if page}
-		<GridBoard {page} {ctx} />
-	{/if}
+	{#key gridSet}
+		<GridSetView {gridSet} />
+	{/key}
 </div>
 
 <style>
@@ -81,6 +109,10 @@
 		border: 2px dashed #999;
 		border-radius: 8px;
 		padding: 8px 12px;
+	}
+	.status {
+		margin: 4px 0 0;
+		color: #555;
 	}
 	.error {
 		color: #c62828;
