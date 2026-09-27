@@ -58,16 +58,29 @@ describe('buildGridset', () => {
 		expect(captionAndImage?.children.length).toBe(0);
 	});
 
-	it('richTextShapes — שלוש הצורות p/s/r · s/r · r מיוצרות נכון', () => {
+	it('richTextShapes — ארבע הצורות (כולל d/p/s/r) תחת Parameter ישיר', () => {
 		const files = unzipSync(buildGridset(fixtures.richTextShapes));
 		const doc = parseXml(strFromU8(files['Grids/richText/grid.xml']));
 		const params = [...doc.querySelectorAll('Parameter[Key="text"]')];
-		expect(params).toHaveLength(3);
+		expect(params).toHaveLength(4);
 		expect(params[0].querySelector('p > s > r')?.textContent).toBe('שלום');
 		expect(params[1].querySelector(':scope > s > r')?.textContent).toBe('עולם');
 		expect(params[1].querySelector('p')).toBeNull();
 		expect(params[2].querySelector('r')?.textContent).toBe('!');
 		expect(params[2].querySelector('s')).toBeNull();
+		expect(params[3].querySelector('d > p > s > r')?.textContent).toBe('מוגן');
+	});
+
+	it('richTextShapes — ארבע הצורות תחת WordListItem/Text (הנשא השני)', () => {
+		const files = unzipSync(buildGridset(fixtures.richTextShapes));
+		const doc = parseXml(strFromU8(files['Grids/richText/grid.xml']));
+		const items = [...doc.querySelectorAll('WordList > Items > WordListItem')];
+		expect(items).toHaveLength(4);
+		expect(items[0].querySelector('Text > p > s > r')?.textContent).toBe('טוב');
+		expect(items[1].querySelector('Text > s > r')?.textContent).toBe('רע');
+		expect(items[1].querySelector('Text > p')).toBeNull();
+		expect(items[2].querySelector('Text > r')?.textContent).toBe('אולי');
+		expect(items[3].querySelector('Text > d > p > s > r')?.textContent).toBe('בטח');
 	});
 
 	it('styleTwoLevel — הסגנון הנקוב שטוח, בלי BasedOnStyle משלו', () => {
@@ -93,11 +106,28 @@ describe('buildGridset', () => {
 		expect(filled).toHaveLength(20);
 	});
 
-	it('guarded — Settings.RequiredFeature נמצא ראשון בשרשרת', () => {
-		const files = unzipSync(buildGridset(fixtures.guarded));
-		const doc = parseXml(strFromU8(files['Grids/guarded/grid.xml']));
+	it('guardLast — Settings.RequiredFeature נמצא אחרון בשרשרת (126/126 בפועל)', () => {
+		const files = unzipSync(buildGridset(fixtures.guardLast));
+		const doc = parseXml(strFromU8(files['Grids/guardLast/grid.xml']));
 		const ids = [...doc.querySelectorAll('Cell Command')].map((c) => c.getAttribute('ID'));
-		expect(ids[0]).toBe('Settings.RequiredFeature');
-		expect(doc.querySelector('Parameter[Key="feature"]')?.textContent).toBe('ComputerControl');
+		expect(ids.at(-1)).toBe('Settings.RequiredFeature');
+		expect(doc.querySelector('Parameter[Key="feature"]')?.textContent).toBe('EyeGazeAccess');
+	});
+
+	it('guardAfterRest — אחרי Settings.RestAll (התבנית הנפוצה ביותר, 56/126)', () => {
+		const files = unzipSync(buildGridset(fixtures.guardAfterRest));
+		const doc = parseXml(strFromU8(files['Grids/guardAfterRest/grid.xml']));
+		const ids = [...doc.querySelectorAll('Cell Command')].map((c) => c.getAttribute('ID'));
+		expect(ids).toEqual(['Settings.RestAll', 'Settings.RequiredFeature']);
+		expect(doc.querySelector('Parameter[Key="feature"]')?.textContent).toBe('TouchAccess');
+	});
+
+	it('guardNoParam — בלי <Parameter> כלל (56/126, 44%)', () => {
+		const files = unzipSync(buildGridset(fixtures.guardNoParam));
+		const doc = parseXml(strFromU8(files['Grids/guardNoParam/grid.xml']));
+		const command = doc.querySelector('Cell Command');
+		expect(command?.getAttribute('ID')).toBe('Settings.RequiredFeature');
+		expect(command?.querySelector('Parameter')).toBeNull();
+		expect(command?.children.length).toBe(0);
 	});
 });
