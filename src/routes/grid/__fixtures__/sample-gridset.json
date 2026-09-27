@@ -1,0 +1,35 @@
+{
+	"startGrid": "בדיקה",
+	"language": "he-IL",
+	"symbolSearchKeys": [],
+	"styles": {},
+	"pages": {
+		"בדיקה": {
+			"name": "בדיקה",
+			"columns": 2,
+			"rows": 2,
+			"wordList": [],
+			"predictionSource": "None",
+			"autoContentCommands": {},
+			"background": {},
+			"cells": [
+				{
+					"x": 0,
+					"y": 0,
+					"columnSpan": 1,
+					"rowSpan": 1,
+					"caption": "פריט-בדיקה",
+					"commands": [],
+					"style": {
+						"backColour": "#FFFFFFFF",
+						"fontColour": "#000000FF",
+						"borderColour": "#CCCCCCFF",
+						"fontName": "Arial",
+						"fontSize": 22,
+						"backgroundShape": 1
+					}
+				}
+			]
+		}
+	}
+}
