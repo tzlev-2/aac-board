@@ -23,6 +23,7 @@ import type {
 	Grammar,
 	ImageRef,
 	OutputItem,
+	Page,
 	ParamValue,
 	RichText,
 	RuntimeContext,
@@ -203,6 +204,68 @@ export function unmetRequirement(
 	return undefined;
 }
 
+// ── תא AutoContent — השרשרת יושבת ברמת הדף ───────────────────────────────
+// 🛑 נמדד 28.9.2026 על org-1..org-4: **166 הפעלות** תחת
+// `/Grid/AutoContentCommands/AutoContentCommandCollection/Commands/Command`,
+// מהן `AutoContent.Activate` ×158. תא `AutoContent` עצמו **ריק מפקודות**
+// (‏11 מ-11 ב-`org-1/בגדים`), ולכן כל מי שקורא רק את `cell.commands` רואה
+// שרשרת ריקה, ‏`GridCell` מסיק שהתא אינו לחיץ — ו-2,025 תאי `AutoContent`
+// בקורפוס מתים בשקט.
+
+/** דווח כשהפקודה מופעלת בלי פריט בהקשר — למשל תא `AutoContent/Prediction`. */
+export const AUTOCONTENT_WITHOUT_ITEM = 'AutoContent.Activate(no-item)';
+
+/**
+ * השרשרת **בפועל** של התא.
+ *
+ * 🛑 **אינה דורסת `cell.commands`.** תא `AutoContent` עשוי לשאת שרשרת משלו,
+ * ואז היא גוברת; רק תא ריק שואב מהדף.
+ * ⚠️ המפתח הוא ה-`AutoContentType`, ולא רק `WordList`: נמדדו גם `Prediction`
+ * (‏3 דפים ב-org-1) ו-`Photos` (‏1). סוג שאין לו אוסף בדף מחזיר ריק.
+ */
+export function cellCommands(cell: Cell, page: Page): readonly CommandInvocation[] {
+	if (cell.commands.length > 0) return cell.commands;
+	if (cell.contentType !== 'AutoContent' || !cell.contentSubType) return cell.commands;
+	return page.autoContentCommands[cell.contentSubType] ?? cell.commands;
+}
+
+/**
+ * הקשר-ריצה שנושא את **הפריט שהתא מציג כרגע**. ‏`AutoContent.Activate` היא
+ * פקודה אחת שמשרתת תא אחד לכל פריט — מה שמבדיל בין ההפעלות אינו הפרמטרים
+ * (אין לה כאלה) אלא הפריט שבמשבצת.
+ *
+ * 🔑 **האצלה מפורשת ולא `Object.create`/spread:** ‏`GridRuntime` מחזיק שדות
+ * פרטיים (`#history`, ‏`#pageName`), וקריאה למתודה שלו דרך אובייקט-נגזר
+ * הייתה זורקת. כאן כל קריאה חוזרת ל-`ctx` המקורי כמקבל.
+ */
+export function withAutoContentItem(
+	ctx: RuntimeContext,
+	item: WordListItem | undefined
+): RuntimeContext {
+	if (!item) return ctx;
+	return {
+		get gridSet() {
+			return ctx.gridSet;
+		},
+		get page() {
+			return ctx.page;
+		},
+		get features() {
+			return ctx.features;
+		},
+		get output() {
+			return ctx.output;
+		},
+		autoContentItem: item,
+		navigate: (name) => ctx.navigate(name),
+		back: () => ctx.back(),
+		home: () => ctx.home(),
+		speak: (text, opts) => ctx.speak(text, opts),
+		stopSpeaking: () => ctx.stopSpeaking(),
+		reportUnimplemented: (id) => ctx.reportUnimplemented(id)
+	};
+}
+
 // ── רג'יסטרי הפקודות ─────────────────────────────────────────────────────
 // תשע פקודות = 3,709 מתוך 4,052 ההפעלות בלוחות-הדגימה (91.5%).
 
@@ -280,6 +343,35 @@ export const commandRegistry: Partial<Record<CommandId, CommandHandler>> = {
 		const letter = paramToText(params.letter);
 		if (!letter) return;
 		ctx.output.insertLetter(letter);
+	},
+
+	/**
+	 * **158 הפעלות ברמת-הדף** (‏3,342 בקורפוס) — הפקודה שמפעילה את
+	 * ‏2,025 תאי ה-`AutoContent`. אין לה פרמטרים: מה שמבדיל בין הפעלה להפעלה
+	 * הוא `ctx.autoContentItem`, הפריט שבמשבצת.
+	 *
+	 * 🔑 מכניסה **פריט עם דקדוק**, לא מחרוזת: ‏`Number`/`Person` מגיעים
+	 * מ-`WordListItem.grammar`, ו-`PartOfSpeech` (‏12,259 מופעים) נכנס ל-`pos`.
+	 * 🛑 **אינה נוגעת בעימוד.** תא-הניווט ("עוד"/"חזור") מסונתז ומטופל
+	 * ב-`GridBoard`, ואינו עובר דרך כאן כלל.
+	 */
+	'AutoContent.Activate': (_params, ctx) => {
+		const item = ctx.autoContentItem;
+		// תא-`AutoContent` שאינו רשימת-מילים (‏`Prediction`, ‏`Photos`) מגיע
+		// לכאן בלי פריט. לא שגיאה, ולא שתיקה — נספר כדי שיהיה נראה בדוח.
+		if (!item) {
+			ctx.reportUnimplemented(AUTOCONTENT_WITHOUT_ITEM);
+			return;
+		}
+		const text = richTextToPlainText(item.text);
+		// הסמל יושב על ה-`<s>` כשאין `<Image>` על הפריט עצמו.
+		const image = item.image ?? firstImageOf(item.text);
+		if (!text && !image) return;
+
+		const out: OutputItem = { text, ...item.grammar };
+		if (!out.pos && item.partOfSpeech) out.pos = item.partOfSpeech;
+		if (image) out.image = image;
+		ctx.output.insert(out);
 	}
 };
 
@@ -318,7 +410,12 @@ export function executeCommandChain(
 	}
 }
 
-/** מריץ את שרשרת-הפקודות של תא. */
-export function executeCommands(cell: Cell, ctx: RuntimeContext): void {
-	executeCommandChain(cell.commands, ctx);
+/**
+ * מריץ את שרשרת-הפקודות של תא — כולל השרשרת שתא `AutoContent` שואב מהדף.
+ *
+ * @param item הפריט שהמשבצת מציגה (‏`WordListSlot` מסוג `item`). בלעדיו
+ *             `AutoContent.Activate` אינה יודעת מה להכניס.
+ */
+export function executeCommands(cell: Cell, ctx: RuntimeContext, item?: WordListItem): void {
+	executeCommandChain(cellCommands(cell, ctx.page), withAutoContentItem(ctx, item));
 }

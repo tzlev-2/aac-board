@@ -7,7 +7,9 @@
 
 import { describe, expect, it } from 'vitest';
 import {
+	AUTOCONTENT_WITHOUT_ITEM,
 	REQUIREMENT_WITHOUT_PARAM,
+	cellCommands,
 	commandRegistry,
 	executeCommandChain,
 	executeCommands,
@@ -27,7 +29,8 @@ import type {
 	ParamValue,
 	ResolvedStyle,
 	RichText,
-	RuntimeContext
+	RuntimeContext,
+	WordListItem
 } from './types';
 
 // ── תשתית הזיוף ──────────────────────────────────────────────────────────
@@ -434,7 +437,7 @@ describe('executeCommands', () => {
 		expect(ctx.log).toEqual([]);
 	});
 
-	it('הרג׳יסטרי מחזיק בדיוק את תשע הפקודות של הסבב', () => {
+	it('הרג׳יסטרי מחזיק בדיוק את עשר הפקודות', () => {
 		expect(Object.keys(commandRegistry).sort()).toEqual(
 			[
 				'Action.Clear',
@@ -442,6 +445,7 @@ describe('executeCommands', () => {
 				'Action.InsertText',
 				'Action.Letter',
 				'Action.Speak',
+				'AutoContent.Activate',
 				'Jump.Back',
 				'Jump.Home',
 				'Jump.To',
@@ -468,5 +472,136 @@ describe('קריאת פרמטרים', () => {
 		expect(paramToText('All')).toBe('All');
 		expect(paramToText(undefined)).toBe('');
 		expect(paramToText({ data: 'AAAA' })).toBe('');
+	});
+});
+
+// ── תא AutoContent — השרשרת ברמת הדף ─────────────────────────────────────
+
+/** תא `AutoContent` כפי שהוא יוצא מהפרסר: **ריק מפקודות**, וזה לא באג. */
+function autoCell(subType: string | undefined, ...commands: CommandInvocation[]): Cell {
+	return {
+		x: 0,
+		y: 0,
+		columnSpan: 1,
+		rowSpan: 1,
+		commands,
+		contentType: 'AutoContent',
+		contentSubType: subType,
+		style: STYLE
+	};
+}
+
+function wordItem(text: string, extras: Partial<WordListItem> = {}): WordListItem {
+	return { text: rich(text), ...extras };
+}
+
+describe('cellCommands — השרשרת בפועל', () => {
+	it('🔑 תא WordList ריק שואב את השרשרת מהדף', () => {
+		const ctx = fakeContext();
+		ctx.page.autoContentCommands = { WordList: [cmd('AutoContent.Activate')] };
+		expect(cellCommands(autoCell('WordList'), ctx.page).map((c) => c.id)).toEqual([
+			'AutoContent.Activate'
+		]);
+	});
+
+	it('🛑 שרשרת על התא **גוברת** ואינה נדרסת', () => {
+		const ctx = fakeContext();
+		ctx.page.autoContentCommands = { WordList: [cmd('AutoContent.Activate')] };
+		const own = autoCell('WordList', cmd('Jump.Home'));
+		expect(cellCommands(own, ctx.page).map((c) => c.id)).toEqual(['Jump.Home']);
+	});
+
+	it('⚠️ המפתח הוא ה-AutoContentType, לא רק WordList', () => {
+		const ctx = fakeContext();
+		ctx.page.autoContentCommands = {
+			WordList: [cmd('AutoContent.Activate')],
+			Photos: [cmd('AutoContent.Activate'), cmd('Jump.To', { grid: 'תמונות' })]
+		};
+		expect(cellCommands(autoCell('Photos'), ctx.page).map((c) => c.id)).toEqual([
+			'AutoContent.Activate',
+			'Jump.To'
+		]);
+	});
+
+	it('סוג שאין לו אוסף בדף — ריק, לא קריסה', () => {
+		const ctx = fakeContext();
+		ctx.page.autoContentCommands = { WordList: [cmd('AutoContent.Activate')] };
+		expect(cellCommands(autoCell('Prediction'), ctx.page)).toEqual([]);
+		expect(cellCommands(autoCell(undefined), ctx.page)).toEqual([]);
+	});
+
+	it('תא רגיל (בלי ContentType) אינו נוגע בטבלת הדף', () => {
+		const ctx = fakeContext();
+		ctx.page.autoContentCommands = { WordList: [cmd('AutoContent.Activate')] };
+		expect(cellCommands(cell(), ctx.page)).toEqual([]);
+		expect(cellCommands(cell(cmd('Jump.Back')), ctx.page).map((c) => c.id)).toEqual(['Jump.Back']);
+	});
+});
+
+describe('AutoContent.Activate', () => {
+	it('🔑 מכניסה את הפריט של המשבצת לפס-הפלט', () => {
+		const ctx = fakeContext();
+		ctx.page.autoContentCommands = { WordList: [cmd('AutoContent.Activate')] };
+		executeCommands(autoCell('WordList'), ctx, wordItem('שמלה'));
+		expect(ctx.buffer).toEqual([{ text: 'שמלה' }]);
+	});
+
+	it('🔑 נושאת את הדקדוק של ה-WordListItem, לא רק מחרוזת', () => {
+		const ctx = fakeContext();
+		ctx.page.autoContentCommands = { WordList: [cmd('AutoContent.Activate')] };
+		executeCommands(
+			autoCell('WordList'),
+			ctx,
+			wordItem('נעליים', {
+				partOfSpeech: 'Noun',
+				grammar: { number: 'plural', person: 'third' }
+			})
+		);
+		expect(ctx.buffer[0]).toEqual({
+			text: 'נעליים',
+			number: 'plural',
+			person: 'third',
+			pos: 'Noun'
+		});
+	});
+
+	it('הסמל של הפריט נישא לפריט-הפלט', () => {
+		const ctx = fakeContext();
+		ctx.page.autoContentCommands = { WordList: [cmd('AutoContent.Activate')] };
+		const image = { library: 'widgit', path: 'a.emf' };
+		executeCommands(autoCell('WordList'), ctx, wordItem('כובע', { image }));
+		expect(ctx.buffer[0].image).toEqual(image);
+	});
+
+	it('סמל שיושב על ה-<s> נתפס גם בלי <Image> על הפריט', () => {
+		const ctx = fakeContext();
+		ctx.page.autoContentCommands = { WordList: [cmd('AutoContent.Activate')] };
+		const image = { library: 'widgit', path: 'b.emf' };
+		executeCommands(autoCell('WordList'), ctx, { text: rich('גרב', image) });
+		expect(ctx.buffer[0].image).toEqual(image);
+	});
+
+	it('בלי פריט בהקשר — לא מכניסה, ומדווחת במקום לשתוק', () => {
+		const ctx = fakeContext();
+		ctx.page.autoContentCommands = { Prediction: [cmd('AutoContent.Activate')] };
+		executeCommands(autoCell('Prediction'), ctx);
+		expect(ctx.buffer).toEqual([]);
+		expect(ctx.unimplemented[AUTOCONTENT_WITHOUT_ITEM]).toBe(1);
+	});
+
+	it('שרשרת מעורבת מהדף רצה כולה, והפריט זמין רק ל-Activate', () => {
+		const ctx = fakeContext();
+		ctx.page.autoContentCommands = {
+			WordList: [cmd('AutoContent.Activate'), cmd('Action.Speak')]
+		};
+		executeCommands(autoCell('WordList'), ctx, wordItem('מעיל'));
+		expect(ctx.log).toEqual(['insert:מעיל', 'speak:<buffer>']);
+	});
+
+	it('🛑 ההקשר המקורי אינו נפגע — הפריט חי רק לאורך ההפעלה', () => {
+		const ctx = fakeContext();
+		ctx.page.autoContentCommands = { WordList: [cmd('AutoContent.Activate')] };
+		executeCommands(autoCell('WordList'), ctx, wordItem('חולצה'));
+		expect(ctx.autoContentItem).toBeUndefined();
 	});
 });

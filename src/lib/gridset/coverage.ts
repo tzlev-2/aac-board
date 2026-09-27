@@ -1,16 +1,40 @@
 /**
  * דוח כיסוי — מדד ההתקדמות של הקלון.
  *
- * הקטלוג מונה 353 פקודות; בלוחות שנותחו בשימוש 63. הדוח עונה על שתי שאלות:
- * כמה מה-63 ממומשות, וכמה **מההפעלות בפועל** הן מכסות — הכיסוי המשוקלל הוא
- * המספר המעניין, כי תשע פקודות מכסות 91.5% מההפעלות.
+ * הקטלוג מונה 353 פקודות. הדוח עונה על שתי שאלות: כמה מהפקודות שבשימוש
+ * ממומשות, וכמה **מההפעלות בפועל** הן מכסות — הכיסוי המשוקלל הוא המספר
+ * המעניין, כי עשר פקודות מכסות 91.8% מההפעלות.
  *
- * מקור הנתונים: grid-reference/derived/commands.tsv (העמודה `used_by_us`).
- * 🛑 טבלה מועתקת, לא מחושבת בזמן ריצה — ה-TSV אינו חלק מהריפו.
+ * 🛑 **תוקן 28.9.2026 — המכנה היה חלקי.** הגרסה הקודמת ספרה **רמה אחת**,
+ * `/Grid/Cells/Cell/Content/Commands` (‏4,052 הפעלות, ‏63 מזהים), ושתי רמות
+ * נוספות נפלו מחוץ לטווח לגמרי. המשמעות: **המדד יכול היה לטפס ל-100% בזמן
+ * ש-33.7% מהתאים מתים**, כי `AutoContent.Activate` — הפקודה שמפעילה
+ * ‏2,025 תאי `AutoContent` — לא הופיעה במכנה ולכן לא נספרה כחסרה.
+ *
+ * שלוש הרמות, כפי שנמדדו 28.9.2026 על `org-1..org-4` (הסקריפט סופר את
+ * שלושת הנתיבים ומשחזר את ‏4,052/63 של הרמה הראשונה — כך אומתה השיטה):
+ *
+ * | רמה | נתיב ב-XML | הפעלות | מזהים |
+ * |---|---|---:|---:|
+ * | `cell` | `/Grid/Cells/Cell/Content/Commands` | 4,052 | 63 |
+ * | `autoContent` | `/Grid/AutoContentCommands/…/Commands` | 166 | 4 |
+ * | `page` | `/Grid/Commands` | 4 | 2 |
+ *
+ * סך הכול **4,222 הפעלות · 66 מזהים** (איחוד — שלושה מזהים קיימים רק
+ * ברמות החדשות).
+ *
+ * מקור הנתונים: grid-reference/derived/commands.tsv (העמודה `used_by_us`)
+ * לרמת-התא, ומדידה ישירה על ארבעת הלוחות לשתי הרמות האחרות.
+ * 🛑 טבלה מועתקת, לא מחושבת בזמן ריצה — הקבצים אינם חלק מהריפו.
  */
 
 import { commandRegistry } from './commands';
 import type { CommandId } from './types';
+
+/** היכן ה-XML מחזיק את השרשרת. שלוש רמות, ולא אחת. */
+export type CommandLevel = 'cell' | 'autoContent' | 'page';
+
+export const COMMAND_LEVELS: readonly CommandLevel[] = ['cell', 'autoContent', 'page'];
 
 export interface UsedCommand {
 	id: CommandId;
@@ -21,8 +45,8 @@ export interface UsedCommand {
 /** גודל הקטלוג המלא ב-commands.tsv. */
 export const CATALOG_SIZE = 353;
 
-/** 63 הפקודות שנצפו בלוחות-הדגימה, מהנפוצה לנדירה. */
-export const USED_COMMANDS: readonly UsedCommand[] = [
+/** רמת-התא: 63 הפקודות שנצפו בלוחות-הדגימה, מהנפוצה לנדירה. */
+export const CELL_COMMANDS: readonly UsedCommand[] = [
 	{ id: 'Action.InsertText', uses: 1736 },
 	{ id: 'Jump.To', uses: 464 },
 	{ id: 'Jump.Back', uses: 375 },
@@ -88,15 +112,70 @@ export const USED_COMMANDS: readonly UsedCommand[] = [
 	{ id: 'Speech.Stop', uses: 1 }
 ];
 
-/** סך ההפעלות בלוחות-הדגימה (4,052). */
+/**
+ * רמת-הדף, `AutoContentCommands` — **166 הפעלות, ארבעה מזהים בלבד.**
+ * 🔑 `AutoContent.Activate` היא 158 מהן, והיא **הפקודה השמינית בשכיחות**
+ * כשסופרים את שלוש הרמות יחד. היא אינה מופיעה ברמת-התא אפילו פעם אחת.
+ */
+export const AUTO_CONTENT_COMMANDS: readonly UsedCommand[] = [
+	{ id: 'AutoContent.Activate', uses: 158 },
+	{ id: 'Action.InsertText', uses: 3 },
+	{ id: 'Jump.Back', uses: 3 },
+	{ id: 'Jump.To', uses: 2 }
+];
+
+/** רמת-הדף, `/Grid/Commands` — ‏4 הפעלות. זנב, אבל זנב שנספר. */
+export const PAGE_COMMANDS: readonly UsedCommand[] = [
+	{ id: 'Photos.SnapshotsFolder', uses: 2 },
+	{ id: 'Prediction.PredictConjugations', uses: 2 }
+];
+
+/** הטבלה לפי רמה — מקור-האמת; כל השאר נגזר ממנה. */
+export const USED_BY_LEVEL: Readonly<Record<CommandLevel, readonly UsedCommand[]>> = {
+	cell: CELL_COMMANDS,
+	autoContent: AUTO_CONTENT_COMMANDS,
+	page: PAGE_COMMANDS
+};
+
+/**
+ * איחוד שלוש הרמות: **66 מזהים**, מהנפוץ לנדיר. מזהה שמופיע בכמה רמות
+ * (`Action.InsertText`, `Jump.To`, `Jump.Back`) נספר פעם אחת, עם סכום
+ * ההפעלות שלו.
+ */
+export const USED_COMMANDS: readonly UsedCommand[] = mergeLevels();
+
+function mergeLevels(): UsedCommand[] {
+	const totals = new Map<CommandId, number>();
+	for (const level of COMMAND_LEVELS) {
+		for (const c of USED_BY_LEVEL[level]) {
+			totals.set(c.id, (totals.get(c.id) ?? 0) + c.uses);
+		}
+	}
+	return [...totals]
+		.map(([id, uses]) => ({ id, uses }))
+		.sort((a, b) => b.uses - a.uses || a.id.localeCompare(b.id));
+}
+
+/** סך ההפעלות בלוחות-הדגימה בשלוש הרמות (4,222). */
 export const TOTAL_ACTIVATIONS = USED_COMMANDS.reduce((sum, c) => sum + c.uses, 0);
+
+/** כיסוי של רמה אחת — הפעלות, מזהים, ומה שחסר בה. */
+export interface LevelCoverage {
+	level: CommandLevel;
+	coveredActivations: number;
+	totalActivations: number;
+	activationPct: number;
+	implementedCount: number;
+	usedCount: number;
+	missing: readonly UsedCommand[];
+}
 
 export interface CoverageReport {
 	/** פקודות שיש להן handler והן בשימוש בלוחות-הדגימה. */
 	implemented: readonly UsedCommand[];
 	/** פקודות שבשימוש ואין להן handler. */
 	missing: readonly UsedCommand[];
-	/** handlers שאינם ברשימת ה-63 (פקודה נדירה שמומשה מראש). */
+	/** handlers שאינם ברשימת ה-66 (פקודה נדירה שמומשה מראש). */
 	extra: readonly CommandId[];
 	implementedCount: number;
 	usedCount: number;
@@ -104,9 +183,14 @@ export interface CoverageReport {
 	/** הפעלות מכוסות מתוך TOTAL_ACTIVATIONS. */
 	coveredActivations: number;
 	totalActivations: number;
-	/** אחוז הפקודות (9/63) ואחוז ההפעלות (91.5%). */
+	/** אחוז הפקודות (10/66) ואחוז ההפעלות (91.8%). */
 	commandPct: number;
 	activationPct: number;
+	/**
+	 * 🔑 הפילוח שבלעדיו המדד משקר: רמת-התא יכולה לעמוד על 91.5% בזמן
+	 * שרמת-`autoContent` על 0% — וזה בדיוק מה שהיה עד הסלייס הזה.
+	 */
+	byLevel: Readonly<Record<CommandLevel, LevelCoverage>>;
 	/**
 	 * מה שדווח בריצה כלא-נתמך — מ-`ctx.reportUnimplemented`. כולל גם פקודות
 	 * בלי handler וגם הצהרות-דרישה שלא ניתן היה להכריע
@@ -131,6 +215,11 @@ export function computeCoverage(seen?: UnimplementedCounts): CoverageReport {
 	const extra = [...handled].filter((id) => !usedIds.has(id));
 
 	const coveredActivations = implemented.reduce((sum, c) => sum + c.uses, 0);
+
+	const byLevel = Object.fromEntries(
+		COMMAND_LEVELS.map((level) => [level, levelCoverage(level, handled)])
+	) as Record<CommandLevel, LevelCoverage>;
+
 	const unimplementedSeen = Object.entries(seen ?? {})
 		.map(([id, uses]) => ({ id, uses }))
 		.sort((a, b) => b.uses - a.uses || a.id.localeCompare(b.id));
@@ -146,7 +235,25 @@ export function computeCoverage(seen?: UnimplementedCounts): CoverageReport {
 		totalActivations: TOTAL_ACTIVATIONS,
 		commandPct: pct(implemented.length, USED_COMMANDS.length),
 		activationPct: pct(coveredActivations, TOTAL_ACTIVATIONS),
+		byLevel,
 		unimplementedSeen
+	};
+}
+
+function levelCoverage(level: CommandLevel, handled: ReadonlySet<CommandId>): LevelCoverage {
+	const table = USED_BY_LEVEL[level];
+	const done = table.filter((c) => handled.has(c.id));
+	const missing = table.filter((c) => !handled.has(c.id));
+	const covered = done.reduce((sum, c) => sum + c.uses, 0);
+	const total = table.reduce((sum, c) => sum + c.uses, 0);
+	return {
+		level,
+		coveredActivations: covered,
+		totalActivations: total,
+		activationPct: pct(covered, total),
+		implementedCount: done.length,
+		usedCount: table.length,
+		missing
 	};
 }
 
@@ -155,6 +262,13 @@ function pct(part: number, whole: number): number {
 	return Math.round((part / whole) * 1000) / 10;
 }
 
+/** שמות-הרמות לדוח. `cell` = השרשרת על התא · `autoContent`/`page` = על הדף. */
+const LEVEL_LABELS: Readonly<Record<CommandLevel, string>> = {
+	cell: 'תא',
+	autoContent: 'AutoContent',
+	page: 'דף'
+};
+
 /** הדוח כטקסט — שורה ראשונה מסכמת, ואחריה מה שחסר. */
 export function formatCoverageReport(report: CoverageReport): string {
 	const lines = [
@@ -162,6 +276,19 @@ export function formatCoverageReport(report: CoverageReport): string {
 			`(${report.commandPct}%) · ${report.coveredActivations}/${report.totalActivations} הפעלות ` +
 			`(${report.activationPct}%) · הקטלוג המלא: ${report.catalogSize}`
 	];
+
+	// 🛑 שורת-הרמות אינה קישוט: היא ההבדל בין "‏91.8% מכוסה" לבין לדעת
+	// ש-`page` עומד על 0/4 ושאף תא-`Prediction` לא יעבוד.
+	lines.push(
+		'לפי רמה: ' +
+			COMMAND_LEVELS.map((level) => {
+				const l = report.byLevel[level];
+				return (
+					`${LEVEL_LABELS[level]} ${l.coveredActivations}/${l.totalActivations} ` +
+					`(${l.activationPct}%) · ${l.implementedCount}/${l.usedCount} פקודות`
+				);
+			}).join(' · ')
+	);
 
 	if (report.missing.length > 0) {
 		const top = report.missing.slice(0, 10).map((c) => `${c.id} (${c.uses})`);
