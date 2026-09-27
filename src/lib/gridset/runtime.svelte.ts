@@ -104,6 +104,34 @@ export class OutputBuffer {
 		this.#letterIndex = this.#items.length - 1;
 	}
 
+	/**
+	 * ‏`Action.Punctuation` ו-`Action.Space` — **מצטרף לזרם בלי לפתוח פריט**.
+	 *
+	 * 🛑 הנימוק המלא ב-`types.ts` על `output.appendToStream`. בקצרה:
+	 * ב-Grid חלל-העבודה הוא זרם-טקסט אחד, אצלנו רשימת פריטים, ו-`ChatCell`
+	 * מחבר ברווח — ולכן פיסוק חייב להידבק, ורווח אינו שבב.
+	 *
+	 * ⚠️ **רווח מאפס את `#letterIndex` במפורש:** מילה שנבנתה אות-אחר-אות
+	 * נסגרת, והאות הבאה פותחת פריט חדש. תו שאינו רווח משאיר את מצב-הבנייה
+	 * כשהיה, כך ש-"ש·ל·ו·ם·!" נשאר פריט אחד.
+	 */
+	appendToStream(text: string): void {
+		if (!text) return;
+		const last = this.#items[this.#items.length - 1];
+		// חוצץ ריק: רווח אינו פותח שבב (הוא היה נראה ריק); פיסוק כן.
+		if (!last) {
+			if (text.trim()) {
+				this.#items = [{ text }];
+				this.#letterIndex = -1;
+			}
+			return;
+		}
+		const items = [...this.#items];
+		items[items.length - 1] = { ...last, text: last.text + text };
+		this.#items = items;
+		if (!text.trim()) this.#letterIndex = -1;
+	}
+
 	clear(): void {
 		this.#items = [];
 		this.#letterIndex = -1;
@@ -253,9 +281,12 @@ export class GridRuntime implements RuntimeContext {
 	/**
 	 * מריץ את שרשרת-הפקודות של התא בהקשר הזה.
 	 * 🔑 נקרא **רק על תא זמין** — הזמינות נבדקת ברינדור, לא כאן.
+	 *
+	 * מחזיר `Promise` בגלל `CommandExecution.Wait` בלבד. שרשרת שאין בה השהיה
+	 * מסתיימת **סינכרונית**, לפני שהקריאה חוזרת — ראו `executeCommandChain`.
 	 */
-	activate(cell: Cell): void {
-		executeCommands(cell, this);
+	activate(cell: Cell): Promise<void> {
+		return executeCommands(cell, this);
 	}
 
 	/**

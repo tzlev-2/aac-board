@@ -58,8 +58,32 @@ export interface CommandInvocation {
 	params: Record<string, ParamValue>;
 }
 
-/** void = המשך לפקודה הבאה · 'halt' = עצור את השרשרת (פקודת-שומר) */
-export type CommandResult = void | 'halt';
+/**
+ * בקשת-השהיה של `CommandExecution.Wait` — ‏**הפקודה עוצרת את המשך השרשרת,
+ * לא את עצמה.** ‏ה-handler עצמו נשאר סינכרוני וטהור (בלי טיימר בתוכו), וכל
+ * ההמתנה נעשית במריץ. כך `commands.ts` נשאר נבדק בלי DOM ובלי טיימרים מזויפים.
+ *
+ * 🛑 **הכרעת-ארכיטקטורה (סלייס 11).** האפשרות השנייה הייתה handler
+ * אסינכרוני שמחזיר `Promise`; היא נפסלה כי אז **כל** שרשרת הופכת
+ * אסינכרונית — גם זו שאין בה `Wait` — ומאבדת את הסינכרוניות שעליה נשענים
+ * ‏30 טסטים קיימים ולחיצה בלי השהיית-frame.
+ */
+export interface CommandPause {
+	/** מילישניות. ‏0 או פחות = אין השהיה. */
+	pauseMs: number;
+	/**
+	 * ‏`cancellable` כפי שהוא ב-XML (‏`1` בכל 44 המופעים ב-org-1..org-4).
+	 * 🛑 **לא-מאומת מול Grid** — מה מבטל את ההמתנה (לחיצה? פקודה? סריקה?)
+	 * לא נמדד, ולכן הערך נשמר ואינו נצרך. אין להמציא מנגנון ביטול.
+	 */
+	cancellable: boolean;
+}
+
+/**
+ * ‏`void` = המשך לפקודה הבאה · ‏`'halt'` = עצור את השרשרת (פקודת-שומר) ·
+ * ‏`CommandPause` = השהה את **המשך** השרשרת ואז המשך.
+ */
+export type CommandResult = void | 'halt' | CommandPause;
 
 export type CommandHandler = (
 	params: Record<string, ParamValue>,
@@ -263,6 +287,22 @@ export interface RuntimeContext {
 	output: {
 		insert(item: OutputItem): void;
 		insertLetter(letter: string): void;
+		/**
+		 * 🔑 **מצטרפת לזרם-הטקסט בלי לפתוח פריט חדש** — ‏`Action.Punctuation`
+		 * ו-`Action.Space`.
+		 *
+		 * הוסף בסלייס 11. הנימוק: ב-Grid חלל-העבודה הוא **זרם טקסט אחד**,
+		 * ואצלנו הוא רשימת פריטים עם דקדוק (‏§4 במסמך התכנון). ‏`insert`
+		 * הייתה מייצרת שבב נפרד, ו-`ChatCell` מחבר פריטים ברווח — כלומר
+		 * ‏`Action.Punctuation{letter=!}` אחרי "עוגה" הייתה מפיקה
+		 * ‏**"עוגה !"** במקום "עוגה!". ‏`insertLetter` לא מספיקה: כשאין מילה
+		 * בבנייה היא פותחת פריט חדש, ואז הפיסוק מרחף לבד.
+		 *
+		 * הסמנטיקה: מצטרף לטקסט של הפריט האחרון. חוצץ ריק + רווח = אין
+		 * פעולה (לא פותחים שבב-רווח). רווח סוגר את המילה שבבנייה, כך
+		 * שהאות הבאה תפתח פריט חדש; תו שאינו רווח אינו משנה את מצב הבנייה.
+		 */
+		appendToStream(text: string): void;
 		clear(): void;
 		deleteWord(): void;
 		deleteLetter(): void;

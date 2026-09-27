@@ -47,22 +47,23 @@ describe('טבלת השימוש — שלוש רמות', () => {
 });
 
 describe('computeCoverage', () => {
-	it('עשר פקודות מתוך 66', () => {
+	it('חמש-עשרה פקודות מתוך 66', () => {
 		const report = computeCoverage();
-		expect(report.implementedCount).toBe(10);
+		expect(report.implementedCount).toBe(15);
 		expect(report.usedCount).toBe(66);
 	});
 
-	it('עשר הפקודות מכסות 91.8% מההפעלות', () => {
+	it('חמש-עשרה הפקודות מכסות 95.3% מההפעלות', () => {
 		const report = computeCoverage();
-		expect(report.coveredActivations).toBe(3875);
-		expect(report.activationPct).toBe(91.8);
+		// 3,875 לפני סלייס 11 · +150 מחמש הפקודות (44+33+30+30+13).
+		expect(report.coveredActivations).toBe(4025);
+		expect(report.activationPct).toBe(95.3);
 	});
 
 	it('🔑 הפילוח לפי רמה — autoContent מלא, page ריק', () => {
 		const { byLevel } = computeCoverage();
-		expect(byLevel.cell.coveredActivations).toBe(3709);
-		expect(byLevel.cell.activationPct).toBe(91.5);
+		expect(byLevel.cell.coveredActivations).toBe(3859);
+		expect(byLevel.cell.activationPct).toBe(95.2);
 		expect(byLevel.autoContent).toMatchObject({
 			coveredActivations: 166,
 			totalActivations: 166,
@@ -84,7 +85,21 @@ describe('computeCoverage', () => {
 	it('החסרות ממוינות מהנפוצה לנדירה', () => {
 		const report = computeCoverage();
 		expect(report.missing[0].id).toBe('Settings.RestAll');
-		expect(report.missing).toHaveLength(56);
+		expect(report.missing).toHaveLength(51);
+	});
+
+	it('🔑 חמש הפקודות של סלייס 11 יצאו מרשימת החסרות', () => {
+		const report = computeCoverage();
+		const missing = new Set(report.missing.map((c) => c.id));
+		for (const id of [
+			'Action.Punctuation',
+			'Action.Number',
+			'Action.Space',
+			'Action.DeleteLetter',
+			'CommandExecution.Wait'
+		]) {
+			expect(missing.has(id)).toBe(false);
+		}
 	});
 
 	it('מונה הריצה נכנס לדוח', () => {
@@ -97,15 +112,15 @@ describe('computeCoverage', () => {
 });
 
 describe('formatCoverageReport', () => {
-	it('מדפיס 10/66 ואת אחוז ההפעלות', () => {
+	it('מדפיס 15/66 ואת אחוז ההפעלות', () => {
 		const text = coverageSummary();
-		expect(text).toContain('10/66');
-		expect(text).toContain('91.8%');
+		expect(text).toContain('15/66');
+		expect(text).toContain('95.3%');
 	});
 
 	it('מדפיס שורת-רמות שבה רואים את ה-0/4 של רמת-הדף', () => {
 		const text = coverageSummary();
-		expect(text).toContain('תא 3709/4052');
+		expect(text).toContain('תא 3859/4052');
 		expect(text).toContain('AutoContent 166/166');
 		expect(text).toContain('דף 0/4');
 	});

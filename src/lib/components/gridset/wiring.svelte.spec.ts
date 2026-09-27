@@ -229,3 +229,86 @@ describe('הפרוסה האנכית — קובץ → מסך → לחיצה', () 
 		expect(screen.getByTestId('unsupported-cell-type').elements()).toHaveLength(0);
 	});
 });
+
+/**
+ * 🛑 סלייס 11 — המחשבון האמיתי של `org-1`, ולא ספק שהומצא.
+ *
+ * בדף "מקלדת פשוטה - ספרות וסימנים" כל תא-סימן נושא שרשרת של **שלוש**
+ * פקודות: ‏`Action.Space → Action.Punctuation → Action.Space` (‏5 תאים כאלה,
+ * נמדד). זה המקרה שחשף שכיווץ-הרווחים ב-`ChatCell` אינו קוסמטיקה: בלעדיו
+ * התוצאה היא ‏"1 +  2 =  3" עם רווח כפול, כי `Action.Space` מצרפת רווח
+ * **לתוך** הפריט וה-`join` מוסיף רווח **בין** פריטים.
+ */
+const calcSpec: GridsetSpec = {
+	startGrid: 'מחשבון',
+	language: 'he-IL',
+	pages: [
+		{
+			name: 'מחשבון',
+			columns: 4,
+			rows: 2,
+			cells: [
+				{ x: 0, y: 0, columnSpan: 4, contentType: 'Workspace', contentSubType: 'Chat' },
+				{
+					x: 0,
+					y: 1,
+					caption: 'אחת',
+					commands: [{ id: 'Action.Number', params: { letter: '1' } }]
+				},
+				{
+					x: 1,
+					y: 1,
+					caption: 'ועוד',
+					commands: [
+						{ id: 'Action.Space', params: {} },
+						{ id: 'Action.Punctuation', params: { letter: '+' } },
+						{ id: 'Action.Space', params: {} }
+					]
+				},
+				{
+					x: 2,
+					y: 1,
+					caption: 'שתיים',
+					commands: [{ id: 'Action.Number', params: { letter: '2' } }]
+				},
+				{
+					x: 3,
+					y: 1,
+					caption: 'מחק אות',
+					commands: [{ id: 'Action.DeleteLetter', params: {} }]
+				}
+			]
+		}
+	]
+};
+
+describe('סלייס 11 — השרשרת Space→Punctuation→Space על המסך', () => {
+	async function mountCalc() {
+		const gridSet = await parseGridSet(buildGridset(calcSpec));
+		return render(GridSetView, {
+			gridSet,
+			symbols: null,
+			runtimeOptions: { speech: recordingSpeech }
+		});
+	}
+
+	it('🛑 `textContent` מדויק — רווח **בודד** סביב הסימן, בלי כפל', async () => {
+		const screen = await mountCalc();
+		await screen.getByRole('button', { name: 'אחת' }).click();
+		await screen.getByRole('button', { name: 'ועוד' }).click();
+		await screen.getByRole('button', { name: 'שתיים' }).click();
+
+		// 🔑 `toHaveTextContent` מנרמל רווחים ולכן **לא היה תופס** את הבאג.
+		expect(screen.getByTestId('chat-cell').element().textContent).toBe('1 + 2');
+	});
+
+	it('Action.DeleteLetter מוחקת תו אחד מהמסך', async () => {
+		const screen = await mountCalc();
+		await screen.getByRole('button', { name: 'אחת' }).click();
+		await screen.getByRole('button', { name: 'ועוד' }).click();
+		await screen.getByRole('button', { name: 'שתיים' }).click();
+		await screen.getByRole('button', { name: 'מחק אות' }).click();
+
+		expect(screen.getByTestId('chat-cell').element().textContent).toBe('1 +');
+	});
+});

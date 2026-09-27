@@ -68,6 +68,7 @@ function makeCtx(textAtTop = true): RuntimeContext {
 		output: {
 			insert: () => {},
 			insertLetter: () => {},
+			appendToStream: () => {},
 			clear: () => {},
 			deleteWord: () => {},
 			deleteLetter: () => {},
@@ -141,7 +142,10 @@ describe('נאמנות חזותית — סמל וגופן', () => {
 		const symbol = el.querySelector('.symbol') as HTMLElement;
 		const cs = getComputedStyle(el);
 		const innerW =
-			el.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight) - parseFloat(cs.borderLeftWidth) * 2;
+			el.clientWidth -
+			parseFloat(cs.paddingLeft) -
+			parseFloat(cs.paddingRight) -
+			parseFloat(cs.borderLeftWidth) * 2;
 		const box = symbol.getBoundingClientRect();
 		expect(box.width / innerW).toBeCloseTo(VISUAL_DEFAULTS.iconBoxWidthRatio, 1);
 		expect(box.height / box.width).toBeCloseTo(1, 2);

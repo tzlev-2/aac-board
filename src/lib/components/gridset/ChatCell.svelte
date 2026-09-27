@@ -9,7 +9,22 @@
 
 	let { ctx }: CellRendererProps = $props();
 
-	const text = $derived(ctx.output.items.map((item) => item.text).join(' '));
+	/**
+	 * 🛑 **רצף-רווחים מתכווץ, בדיוק כמו ב-`OutputBuffer.text`** — כלומר מה
+	 * שנראה זהה למה שנאמר.
+	 *
+	 * נצרב בסלייס 11: ‏`Action.Space` מצרפת רווח **לתוך** הפריט
+	 * (‏`appendToStream`), והחיבור כאן מוסיף רווח **בין** פריטים. בשרשרת
+	 * האמיתית ‏`Space → Punctuation → Space` (דף "מקלדת פשוטה - ספרות
+	 * וסימנים" ב-`org-1`, ‏5 תאים) זה הפיק ‏"1 +  2 =  3" עם רווח כפול.
+	 */
+	const text = $derived(
+		ctx.output.items
+			.map((item) => item.text)
+			.join(' ')
+			.replace(/\s+/g, ' ')
+			.trim()
+	);
 </script>
 
 <div

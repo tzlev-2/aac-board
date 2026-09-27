@@ -14,12 +14,12 @@
 > (`parse_gridsets.py:24`) — כלומר לא נשלח עם Grid — והיא הובנה כ"של הארגון".
 > בפועל אלה **מוצרים מדף של Grid בעברית**. הראיות, מתוך הקבצים עצמם:
 >
-> - ‏`Description` הוא קופי-שיווקי בגוף שלישי (*"דיבור בסמלים א' **היא** מערכת
->   תקשורת מלאה **המיועדת למשתמשים**"*).
+> - ‏`Description` הוא קופי-שיווקי בגוף שלישי (_"דיבור בסמלים א' **היא** מערכת
+>   תקשורת מלאה **המיועדת למשתמשים**"_).
 > - ‏`b034` — חבילה **מובנית** — הוא "דיבור בסמלים ד'", מאותה סדרת-מוצר.
 > - ‏`org-4` נושא `DocumentationSlug=/hakol-kalul`, באותו מרחב-שמות כמו
 >   `/netflix` ו-`/spotify`; ‏35 מ-116 הקבצים נושאים slug כזה.
-> - דפי-האנשים נושאים טקסט-מציין מהמפעל (*"רשום כאן את שמות אנשי הצוות"*) —
+> - דפי-האנשים נושאים טקסט-מציין מהמפעל (_"רשום כאן את שמות אנשי הצוות"_) —
 >   אף שם לא מולא מעולם.
 > - ‏`org-3` ו-`org-4` זהים בייטים ב-53 מ-54 הרשומות.
 > - כל קובצי התוכן נושאים חותמת `1980-00-00` (אריזה תוכנתית); רק
@@ -55,12 +55,12 @@
 (`src/lib/types/board.ts`, `Tile.type: 'button' | 'folder'`) הוא מודל אחר,
 פשוט יותר, והוא **ממשיך לשרת את הלוחות שנבנים באפליקציה**. הקלון יושב לצידו:
 
-| | מודל האפליקציה הקיים | ליבת `gridset` |
-|---|---|---|
-| קבצים | `src/lib/types/board.ts` · `components/Board.svelte` · `Tile.svelte` | `src/lib/gridset/` · `components/gridset/` |
-| מסלול | `/s/[setId]/b/[boardId]` | `/grid` |
-| "תיקייה" | שדה `type: 'folder'` | תא שנושא `Jump.To` |
-| פלט | קומפוננטת `OutputBar` קבועה | **תא** עם `ContentType=Workspace` |
+|          | מודל האפליקציה הקיים                                                 | ליבת `gridset`                             |
+| -------- | -------------------------------------------------------------------- | ------------------------------------------ |
+| קבצים    | `src/lib/types/board.ts` · `components/Board.svelte` · `Tile.svelte` | `src/lib/gridset/` · `components/gridset/` |
+| מסלול    | `/s/[setId]/b/[boardId]`                                             | `/grid`                                    |
+| "תיקייה" | שדה `type: 'folder'`                                                 | תא שנושא `Jump.To`                         |
+| פלט      | קומפוננטת `OutputBar` קבועה                                          | **תא** עם `ContentType=Workspace`          |
 
 **אין adapter בכיוון הזה בסבב הזה.** גשר בין שני המודלים הוא החלטת-מוצר
 נפרדת, והיא תילקח אחרי שהפרוסה האנכית רצה. מי שמנסה "להתאים את Grid ללוח
@@ -73,17 +73,17 @@
 `grid-reference/derived/commands.tsv` מונה **353 פקודות**. בלוחות שנותחו
 בשימוש **63**, ומהן **9 מכסות 91.5% מכלל ההפעלות**:
 
-| # | פקודה | הפעלות | מצטבר |
-|---|---|---:|---:|
-| 1 | `Action.InsertText` | 1,736 | 42.8% |
-| 2 | `Jump.To` | 464 | 54.3% |
-| 3 | `Jump.Back` | 375 | 63.5% |
-| 4 | `Jump.Home` | 262 | 70.0% |
-| 5 | `Action.Clear` | 212 | 75.2% |
-| 6 | `Action.Speak` | 212 | 80.5% |
-| 7 | `Action.DeleteWord` | 204 | 85.5% |
-| 8 | `Settings.RequiredFeature` | 126 | 88.6% |
-| 9 | `Action.Letter` | 118 | 91.5% |
+| #   | פקודה                      | הפעלות | מצטבר |
+| --- | -------------------------- | -----: | ----: |
+| 1   | `Action.InsertText`        |  1,736 | 42.8% |
+| 2   | `Jump.To`                  |    464 | 54.3% |
+| 3   | `Jump.Back`                |    375 | 63.5% |
+| 4   | `Jump.Home`                |    262 | 70.0% |
+| 5   | `Action.Clear`             |    212 | 75.2% |
+| 6   | `Action.Speak`             |    212 | 80.5% |
+| 7   | `Action.DeleteWord`        |    204 | 85.5% |
+| 8   | `Settings.RequiredFeature` |    126 | 88.6% |
+| 9   | `Action.Letter`            |    118 | 91.5% |
 
 🔑 **לכן המבנה הוא רג'יסטרי ולא `switch`.** הוספת פקודה = ערך במפה, לא ענף
 בקוד. היעד של הסבב הוא תשע הפקודות האלה; ‏54 הנותרות חייבות להיכנס אחר כך
@@ -100,12 +100,12 @@ export const commandRegistry: Partial<Record<CommandId, CommandHandler>> = { …
 **הגרסה הראשונה של הסעיף הזה הייתה שגויה.** היא קבעה שזו פקודה בראש השרשרת
 שעוצרת אותה. **נמדד ישירות מ-116 קובצי `.gridset`** ב-`~/work/grid-mapping/raw/`:
 
-| מיקום בשרשרת | מופעים | % |
-|---|---:|---:|
-| **אחרונה** | **4,014** | **96.6%** |
-| אחת לפני האחרונה | 78 | 1.9% |
-| **ראשונה** | 57 | 1.4% |
-| באמצע | 6 | 0.1% |
+| מיקום בשרשרת     |    מופעים |         % |
+| ---------------- | --------: | --------: |
+| **אחרונה**       | **4,014** | **96.6%** |
+| אחת לפני האחרונה |        78 |      1.9% |
+| **ראשונה**       |        57 |      1.4% |
+| באמצע            |         6 |      0.1% |
 
 השרשרת הנפוצה ביותר (‏2,529 מופעים) היא
 `Settings.RestEyeGaze · Settings.RestPointer · Settings.RestSwitch · Settings.RequiredFeature`.
@@ -116,7 +116,7 @@ export const commandRegistry: Partial<Record<CommandId, CommandHandler>> = { …
 
 ```ts
 // המנגנון האמיתי — שער רינדור, לא עצירת-הרצה
-export function isCellAvailable(cell: Cell, features: ReadonlySet<FeatureId>): boolean
+export function isCellAvailable(cell: Cell, features: ReadonlySet<FeatureId>): boolean;
 ```
 
 ### 🛑 חודד 27.9.2026 אחרי אימות — ובלוחות-הדגימה זה 126 מתוך 126
@@ -155,22 +155,83 @@ commandRegistry['Settings.RequiredFeature'] = () => {}   ← no-op בזמן הר
 ‏`CommandResult = 'halt'` **נשאר בחוזה** — פקודות אחרות עשויות להזדקק לו —
 אבל `Settings.RequiredFeature` אינה משתמשת בו.
 
+### 🛑 הורחב 28.9.2026 (סלייס 11) — `CommandResult` נושא גם השהיה
+
+**המריץ היה סינכרוני, ולכן `CommandExecution.Wait` (‏44 הפעלות) לא הייתה
+"עוד ערך במפה".** השרשרת השכיחה בקורפוס היא
+`Action.InsertText → CommandExecution.Wait → Jump.To` — ‏40 תאים ב-`org-3/4`,
+למשל ‏(‏4,0) ב-"עמוד ראשי" = "מה" — ובלי מימוש **הקפיצה מתבצעת מיָד**, כלומר
+המשתמש אינו רואה את המילה שבחר נכנסת לפס-הפלט. זה **באג התנהגותי**, לא
+פקודה חסרה.
+
+**ההכרעה:** ‏`CommandResult` קיבל ענף שלישי, ו-**המריץ הפך ל-`async`**:
+
+```ts
+export type CommandResult = void | 'halt' | CommandPause;
+export interface CommandPause {
+	pauseMs: number;
+	cancellable: boolean;
+}
+```
+
+ה-handler **נשאר סינכרוני וטהור** — הוא מחזיר בקשת-השהיה, ואינו מחזיק טיימר.
+כל ההמתנה נעשית במריץ, עם `delay` מוזרק, ולכן `commands.ts` נשאר נבדק בלי
+DOM ובלי טיימרים מזויפים.
+
+**מה שנשקל ונפסל:** handler שמחזיר `Promise`. אז **כל** שרשרת הופכת
+אסינכרונית — גם זו שאין בה `Wait` — ומאבדת את הסינכרוניות שעליה נשענים
+‏30 טסטים קיימים, ומוסיפה השהיית-frame לכל לחיצה על תא.
+
+🔑 **הפרט שמחזיק את זה:** ב-`async function` כל מה שלפני ה-`await` הראשון
+מתבצע בקריאה עצמה. ה-`await` היחיד במריץ יושב בתוך `if (isCommandPause(…))`,
+ולכן **שרשרת בלי `Wait` אינה נוגעת בתור-המיקרו כלל**. אל להפוך את הלולאה
+ל-`for await` ואל להוסיף `await` בראשה.
+
+⚠️ **‏`cancellable` — לא-מאומת מול Grid.** ‏`1` ב-44 מ-44 המופעים, ‏`0` לא
+נמדד מעולם, ו**מה מבטל את ההמתנה לא נמדד** (לחיצה? פקודה? סריקה?). הערך
+נקרא, נמסר ב-`CommandPause`, ו**אינו נצרך**. אין להמציא מנגנון ביטול.
+
+**‏`waittime`** הוא `TimeSpan` של .NET. נמדד: ‏`00:00:02` ×36 · ‏`00:00:03` ×6 ·
+‏**`00:00:01.5000000` ×2** — הצורה השלישית היא הראיה ש-`parseInt` על
+מקטע-השניות היה מחזיר 1,000 במקום 1,500.
+
+### 🛑 הורחב 28.9.2026 (סלייס 11) — `output.appendToStream`
+
+‏`Action.Punctuation` (‏33) ו-`Action.Space` (‏30) חייבו שיטה שלישית בחוצץ,
+לצד `insert` ו-`insertLetter`.
+
+**הסיבה היא §4:** ב-Grid חלל-העבודה הוא **זרם-טקסט אחד**, ואצלנו הוא
+**רשימת פריטים עם דקדוק**. ‏`ChatCell` מחבר פריטים ברווח, ולכן:
+
+| מימוש שנשקל               | התוצאה עבור "עוגה" + `!`                    |
+| ------------------------- | ------------------------------------------- |
+| `insert({ text: '!' })`   | ‏"עוגה !" — הפיסוק מרחף כשבב נפרד           |
+| `insertLetter('!')`       | ‏"עוגה !" — אין מילה בבנייה, ולכן נפתח פריט |
+| **`appendToStream('!')`** | **"עוגה!"**                                 |
+
+הסמנטיקה: מצטרף לטקסט של הפריט האחרון. חוצץ ריק + רווח = **אין פעולה**
+(שבב-רווח נראה כשבב ריק). רווח **סוגר** את המילה שבבנייה; תו שאינו רווח
+אינו משנה את מצב-הבנייה, כך ש-"ש·ל·ו·ם·!·?" נשאר פריט אחד.
+
+🔑 **‏`Action.Number` דווקא _אינה_ משתמשת בזה** אלא ב-`insertLetter`: ספרות
+בונות **מילה** (‏`1`·`2`·`3` ⇒ "123") ואינן נדבקות למילה שלפניהן.
+
 🛑 **וזה אינו `Visibility`.** ‏`Cell/Visibility` הוא אלמנט נפרד (1,555 מופעים,
 `Hidden|Disabled|PointerAndTouchOnly`). שני מנגנונים, לא אחד.
 
 ### שנים-עשר ערכי `feature` — רשימה סגורה שנמדדה
 
-| `feature` | מופעים | % |
-|---|---:|---:|
-| **`Dwell`** | **3,581** | **92.4%** |
-| `SecondScreen` | 77 | 2.0% |
-| `ComputerControl` | 65 | 1.7% |
-| `EyeGazeAccess` | 59 | 1.5% |
-| `TouchAccess` | 27 | 0.7% |
-| `PointerAccess` | 23 | 0.6% |
-| `SwitchAccess` | 21 | 0.5% |
-| `MusicVideo` | 17 | 0.4% |
-| `EnvironmentControl` · `ShareCommand` · `WebBrowser` · `Email` | 5 | 0.1% |
+| `feature`                                                      |    מופעים |         % |
+| -------------------------------------------------------------- | --------: | --------: |
+| **`Dwell`**                                                    | **3,581** | **92.4%** |
+| `SecondScreen`                                                 |        77 |      2.0% |
+| `ComputerControl`                                              |        65 |      1.7% |
+| `EyeGazeAccess`                                                |        59 |      1.5% |
+| `TouchAccess`                                                  |        27 |      0.7% |
+| `PointerAccess`                                                |        23 |      0.6% |
+| `SwitchAccess`                                                 |        21 |      0.5% |
+| `MusicVideo`                                                   |        17 |      0.4% |
+| `EnvironmentControl` · `ShareCommand` · `WebBrowser` · `Email` |         5 |      0.1% |
 
 🛑 **שלושה שמות שניחשתי כאן אינם קיימים בנתונים:** ‏`EyeGaze` (השם הוא
 `EyeGazeAccess`) · ‏`Environment` (`EnvironmentControl`) · ‏**`Phone`** (אינו
@@ -225,10 +286,10 @@ commandRegistry['Settings.RequiredFeature'] = () => {}   ← no-op בזמן הר
 ```ts
 type CellRenderer = Component<{ cell: Cell; ctx: RuntimeContext }>;
 export const cellRenderers: Record<string, CellRenderer> = {
-  'default':             ButtonCell,      // אין ContentType
-  'Workspace/Chat':      ChatCell,        // ← פס-הפלט. תא, לא chrome
-  'AutoContent/WordList': WordListCell,   // placeholder בסבב הזה
-  'AutoContent/Prediction': PredictionCell,
+	default: ButtonCell, // אין ContentType
+	'Workspace/Chat': ChatCell, // ← פס-הפלט. תא, לא chrome
+	'AutoContent/WordList': WordListCell, // placeholder בסבב הזה
+	'AutoContent/Prediction': PredictionCell
 };
 // miss ⇒ UnsupportedCell — מציג caption + תג-סוג, לא קורס, נספר בדוח
 ```
@@ -280,11 +341,11 @@ readonly autoContentItem?: WordListItem;   // נקבע ב-withAutoContentItem ל
 
 ### הכיסוי נמדד בשלוש רמות, לא באחת
 
-| רמה | נתיב ב-XML | הפעלות | מזהים |
-|---|---|---:|---:|
-| `cell` | `/Grid/Cells/Cell/Content/Commands` | 4,052 | 63 |
-| `autoContent` | `/Grid/AutoContentCommands/…/Commands` | 166 | 4 |
-| `page` | `/Grid/Commands` | 4 | 2 |
+| רמה           | נתיב ב-XML                             | הפעלות | מזהים |
+| ------------- | -------------------------------------- | -----: | ----: |
+| `cell`        | `/Grid/Cells/Cell/Content/Commands`    |  4,052 |    63 |
+| `autoContent` | `/Grid/AutoContentCommands/…/Commands` |    166 |     4 |
+| `page`        | `/Grid/Commands`                       |      4 |     2 |
 
 **סך הכול 4,222 הפעלות · 66 מזהים.** ‏🛑 עד כאן המכנה היה 4,052 בלבד, ולכן
 **המדד היה יכול לטפס ל-100% בזמן ש-33.7% מהתאים מתים** — ‏`AutoContent.Activate`
@@ -310,16 +371,19 @@ readonly autoContentItem?: WordListItem;   // נקבע ב-withAutoContentItem ל
 
 ```ts
 interface Page {
-  name: string; guid?: string;
-  columns: number; rows: number;
-  cells: Cell[];
-  wordList: WordListItem[];                 // (א)
-  predictionSource: PredictionSource;       // (א)
-  autoContentCommands: Record<string, CommandInvocation[]>;  // (ב)
-  commands?: CommandInvocation[];           // /Grid/Commands — פקודות דף (419)
-  background: { style?: 'Image'|'SolidColor'; colour?: string; image?: string };
-  horizontalAlignment?: 'Left'|'Right'; verticalAlignment?: 'Centre'|'Top';
-  selfClosing?: boolean;
+	name: string;
+	guid?: string;
+	columns: number;
+	rows: number;
+	cells: Cell[];
+	wordList: WordListItem[]; // (א)
+	predictionSource: PredictionSource; // (א)
+	autoContentCommands: Record<string, CommandInvocation[]>; // (ב)
+	commands?: CommandInvocation[]; // /Grid/Commands — פקודות דף (419)
+	background: { style?: 'Image' | 'SolidColor'; colour?: string; image?: string };
+	horizontalAlignment?: 'Left' | 'Right';
+	verticalAlignment?: 'Centre' | 'Top';
+	selfClosing?: boolean;
 }
 ```
 
@@ -331,12 +395,12 @@ interface Page {
 "‏`Text/p/s/r` ‏28,078 · `Text/s/r` ‏27,927 · `Text/r` ‏206" כהתפלגות הכללית.
 אלה המספרים של **`WordListItem/Text`** בלבד. טקסט עשיר חי בשני מקומות:
 
-| צורה | `Command/Parameter` ישיר | `WordListItem/Text` |
-|---|---:|---:|
-| `p/s/r` | **137,448** | 28,078 |
-| `s/r` | 1,516 | **27,927** |
-| `r` ישיר | 9,072 | 206 |
-| `d/p/s/r` | 2,125 | 2,060 |
+| צורה      | `Command/Parameter` ישיר | `WordListItem/Text` |
+| --------- | -----------------------: | ------------------: |
+| `p/s/r`   |              **137,448** |              28,078 |
+| `s/r`     |                    1,516 |          **27,927** |
+| `r` ישיר  |                    9,072 |                 206 |
+| `d/p/s/r` |                    2,125 |               2,060 |
 
 **ההתפלגות הפוכה בין השניים:** בפרמטר-פקודה `p/s/r` דומיננטי (‏137,448 מול
 1,516), ובפריט רשימת-מילים `p/s/r` ו-`s/r` כמעט שקולים. מי שמכייל את הפרסר
@@ -360,8 +424,14 @@ interface Page {
 לכן **חוצץ-הפלט הוא רשימת פריטים עם דקדוק, לא מחרוזת**:
 
 ```ts
-interface OutputItem { text: string; image?: ImageRef;
-                       gender?: string; number?: string; person?: string; pos?: string; }
+interface OutputItem {
+	text: string;
+	image?: ImageRef;
+	gender?: string;
+	number?: string;
+	person?: string;
+	pos?: string;
+}
 ```
 
 חוקי הנטייה עצמם הם `plan.md` שלב E ואינם בסבב הזה — אבל **המודל נושא אותם
@@ -382,11 +452,11 @@ interface OutputItem { text: string; image?: ImageRef;
 
 הראיה, מתוך `grid-reference/derived/gridset-schema.tsv`:
 
-| שורה | נתיב | מופעים |
-|---|---|---:|
-| 96 | `/Grid/Cells/Cell/Content/Style/BasedOnStyle` | **252,974** |
-| 191 | `/StyleData/Styles/Style` | 3,282 |
-| 193–200 | `…/Style/{BackColour,BackgroundShape,BorderColour,FontColour,FontName,FontSize,Name,TileColour}` | — |
+| שורה    | נתיב                                                                                             |      מופעים |
+| ------- | ------------------------------------------------------------------------------------------------ | ----------: |
+| 96      | `/Grid/Cells/Cell/Content/Style/BasedOnStyle`                                                    | **252,974** |
+| 191     | `/StyleData/Styles/Style`                                                                        |       3,282 |
+| 193–200 | `…/Style/{BackColour,BackgroundShape,BorderColour,FontColour,FontName,FontSize,Name,TileColour}` |           — |
 
 הסכמה **כן** מכסה את `styles.xml` במלואו, וכל שדות-הבן של `Style` מפורטים
 בה — ‏`BasedOnStyle` **אינו** ביניהם. הוא מופיע במקום אחד בלבד: על התא,
@@ -406,17 +476,19 @@ DEFAULT_RESOLVED_STYLE → הסגנון הנקוב (רשומה שטוחה) → �
 הוא מכונה מתה שמשדרת שהמנגנון קיים, וזה בדיוק הסוג של דבר שמכוון עבודה
 עתידית לכיוון לא נכון.
 
-**מקור הטעות, לתיעוד:** ‏`board-model.md` הארגוני כותב *"‏`styles.xml` מגדיר
-את `Jump cell 1`, ש**אולי** בעצמו `BasedOnStyle` של אחר, עד `Default`"* —
+**מקור הטעות, לתיעוד:** ‏`board-model.md` הארגוני כותב _"‏`styles.xml` מגדיר
+את `Jump cell 1`, ש**אולי** בעצמו `BasedOnStyle` של אחר, עד `Default`"_ —
 השערה, בלשון השערה. היא הוקשחה כאן למנגנון, ומשם לשני בריפים ולמימוש.
 צריך למשוך אותה גם שם.
 
 ### שני שדות שהיו חסרים במודל
+
 `Style` נושא **גם `Key` וגם `Name`** (3,282 מול 2,587): ‏`Key` הוא המזהה
 שאליו `BasedOnStyle` מפנה, ‏`Name` הוא שם-תצוגה ואינו על כל סגנון. בנוסף
 `TileColour` (228).
 
 ### ומה שכן נשאר
+
 צבעים `#RRGGBBAA` (**אלפא בסוף**) · ‏`FontSize` מרשימה סגורה של 20 ·
 `BackgroundShape` enum 1–10.
 
@@ -447,11 +519,11 @@ studio (`plan.md` שלב C). בסבב הזה — ערכי-ברירת-מחדל **
 
 🛑 **שני מספרי-כיסוי, ולא אחד. ההפרש הוא ההבדל בין מדד לבין מה שרואים:**
 
-| | ייחודיים | **משוקלל (כל התאים)** |
-|---|---:|---:|
-| `org-1` | 292/358 = 82% | **549/903 = 61%** |
+|         |      ייחודיים | **משוקלל (כל התאים)** |
+| ------- | ------------: | --------------------: |
+| `org-1` | 292/358 = 82% |     **549/903 = 61%** |
 | `org-2` | 517/629 = 82% | **1,251/1,780 = 70%** |
-| `org-3` | 92/147 = 63% | 223/345 = 65% |
+| `org-3` |  92/147 = 63% |         223/345 = 65% |
 
 הפער נובע מ-`grid3x` (אייקוני-הממשק של Grid): הוא 478 מ-903 התאים ב-`org-1`
 ונפתר ב-**41%** בלבד, מול `widgit` ‏84%. אייקונים חוזרים הרבה ונפתרים רע,

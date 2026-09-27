@@ -14,6 +14,8 @@ import {
 	executeCommandChain,
 	executeCommands,
 	isCellAvailable,
+	isCommandPause,
+	parseWaitTimeMs,
 	paramToText,
 	richTextToPlainText,
 	unmetRequirement
@@ -92,6 +94,17 @@ function fakeContext(features: FeatureId[] = []): FakeContext {
 			insertLetter: (letter) => {
 				buffer.push({ text: letter });
 				log.push(`letter:${letter}`);
+			},
+			// 🔑 מחקה את `OutputBuffer.appendToStream`: מצטרף לפריט האחרון,
+			// ורווח על חוצץ ריק אינו פותח שבב.
+			appendToStream: (text) => {
+				log.push(`append:${text}`);
+				const last = buffer[buffer.length - 1];
+				if (!last) {
+					if (text.trim()) buffer.push({ text });
+					return;
+				}
+				buffer[buffer.length - 1] = { ...last, text: last.text + text };
 			},
 			clear: () => {
 				buffer.length = 0;
@@ -399,6 +412,233 @@ describe('isCellAvailable', () => {
 	});
 });
 
+// ── חמש הפקודות של סלייס 11 ───────────────────────────────────────────────
+// כל הערכים כאן **נמדדו** מ-org-1..org-4, לא הומצאו: ערכי `letter`, היעדר
+// הפרמטרים ב-Space/DeleteLetter, וצורות ה-`waittime`.
+
+describe('Action.Punctuation', () => {
+	it('🛑 הפיסוק נדבק למילה שלפניו ואינו שבב נפרד', () => {
+		const ctx = fakeContext();
+		executeCommands(cell(cmd('Action.InsertText', { text: rich('עוגה') })), ctx);
+		executeCommands(cell(cmd('Action.Punctuation', { letter: '!' })), ctx);
+		expect(ctx.buffer).toEqual([{ text: 'עוגה!' }]);
+	});
+
+	it('כל 19 תווי-הפיסוק שנמדדו עוברים כמו שהם', () => {
+		const measured = [
+			'.',
+			'?',
+			'-',
+			'=',
+			':',
+			',',
+			"'",
+			'!',
+			'×',
+			'÷',
+			';',
+			'#',
+			'₪',
+			')',
+			'(',
+			'@',
+			'&',
+			'"',
+			'+'
+		];
+		expect(measured).toHaveLength(19);
+		for (const mark of measured) {
+			const ctx = fakeContext();
+			executeCommands(cell(cmd('Action.InsertText', { text: rich('מילה') })), ctx);
+			executeCommands(cell(cmd('Action.Punctuation', { letter: mark })), ctx);
+			expect(ctx.buffer).toEqual([{ text: `מילה${mark}` }]);
+		}
+	});
+
+	it('חוצץ ריק — הפיסוק פותח פריט, ואינו נעלם', () => {
+		const ctx = fakeContext();
+		executeCommands(cell(cmd('Action.Punctuation', { letter: '?' })), ctx);
+		expect(ctx.buffer).toEqual([{ text: '?' }]);
+	});
+
+	it('בלי `letter` — אין פעולה', () => {
+		const ctx = fakeContext();
+		executeCommands(cell(cmd('Action.Punctuation')), ctx);
+		expect(ctx.log).toEqual([]);
+	});
+});
+
+describe('Action.Number', () => {
+	it('🔑 הערוץ הוא insertLetter — ספרות בונות מילה, כמו Action.Letter', () => {
+		const ctx = fakeContext();
+		for (const d of ['1', '2', '3']) {
+			executeCommands(cell(cmd('Action.Number', { letter: d })), ctx);
+		}
+		expect(ctx.log).toEqual(['letter:1', 'letter:2', 'letter:3']);
+	});
+
+	it('כל עשר הספרות שנמדדו עוברות', () => {
+		const ctx = fakeContext();
+		for (const d of ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9']) {
+			executeCommands(cell(cmd('Action.Number', { letter: d })), ctx);
+		}
+		expect(ctx.log).toHaveLength(10);
+	});
+
+	it('בלי `letter` — אין פעולה', () => {
+		const ctx = fakeContext();
+		executeCommands(cell(cmd('Action.Number', { letter: '' })), ctx);
+		expect(ctx.log).toEqual([]);
+	});
+});
+
+describe('Action.Space', () => {
+	it('🛑 אינה מוסיפה שבב־רווח — היא נדבקת למילה וסוגרת אותה', () => {
+		const ctx = fakeContext();
+		executeCommands(cell(cmd('Action.InsertText', { text: rich('אני') })), ctx);
+		executeCommands(cell(cmd('Action.Space')), ctx);
+		expect(ctx.buffer).toEqual([{ text: 'אני ' }]);
+	});
+
+	it('חוצץ ריק — רווח בלבד אינו פותח שבב', () => {
+		const ctx = fakeContext();
+		executeCommands(cell(cmd('Action.Space')), ctx);
+		expect(ctx.buffer).toEqual([]);
+	});
+
+	it('אינה נושאת פרמטרים — נמדד ב-30 מ-30, ופרמטר תועה נבלע', () => {
+		const ctx = fakeContext();
+		executeCommands(cell(cmd('Action.Space', { letter: 'מתעלמים' })), ctx);
+		expect(ctx.log).toEqual(['append: ']);
+	});
+});
+
+describe('Action.DeleteLetter', () => {
+	it('מוחקת אות מהחוצץ', () => {
+		const ctx = fakeContext();
+		executeCommands(cell(cmd('Action.DeleteLetter')), ctx);
+		expect(ctx.log).toEqual(['deleteLetter']);
+	});
+
+	it('השרשרת שנמדדה ב-org-1: DeleteLetter → DeleteWord, בסדר הזה', () => {
+		const ctx = fakeContext();
+		executeCommands(cell(cmd('Action.DeleteLetter'), cmd('Action.DeleteWord')), ctx);
+		expect(ctx.log).toEqual(['deleteLetter', 'deleteWord']);
+	});
+});
+
+describe('CommandExecution.Wait — השהיית המשך השרשרת', () => {
+	/** מרגל-השהיה: רושם כל בקשה, ופותר רק כשמשחררים במפורש. */
+	function delaySpy() {
+		const calls: number[] = [];
+		let release: (() => void) | undefined;
+		return {
+			calls,
+			delay: (ms: number) =>
+				new Promise<void>((resolve) => {
+					calls.push(ms);
+					release = resolve;
+				}),
+			releaseAll: async () => {
+				release?.();
+				// שני סבבי-microtask: אחד לשחרור ההמתנה, אחד להמשך הלולאה.
+				await Promise.resolve();
+				await Promise.resolve();
+			}
+		};
+	}
+
+	it('🛑 הפקודה שאחריה **אינה** רצה מיָד — השרשרת שנמדדה ב-org-3 (4,0)', async () => {
+		const ctx = fakeContext();
+		const spy = delaySpy();
+		const chain = executeCommands(
+			cell(
+				cmd('Action.InsertText', { text: rich('מה') }),
+				cmd('CommandExecution.Wait', { waittime: '00:00:02', cancellable: '1' }),
+				cmd('Jump.To', { grid: 'מה אני רוצה לעשות' })
+			),
+			ctx,
+			undefined,
+			{ delay: spy.delay }
+		);
+
+		// 🔑 הלב של הבדיקה: ההכנסה כבר קרתה, הקפיצה **עוד לא**.
+		expect(ctx.log).toEqual(['insert:מה']);
+		expect(spy.calls).toEqual([2000]);
+
+		await spy.releaseAll();
+		await chain;
+		expect(ctx.log).toEqual(['insert:מה', 'navigate:מה אני רוצה לעשות']);
+	});
+
+	it('Wait בראש השרשרת משהה את הכל — השרשרת שנמדדה ב-org-1/מצלמה', async () => {
+		const ctx = fakeContext();
+		const spy = delaySpy();
+		const chain = executeCommands(
+			cell(
+				cmd('CommandExecution.Wait', { waittime: '00:00:02', cancellable: '1' }),
+				cmd('Photos.Snapshot'),
+				cmd('SpeechPlaySound')
+			),
+			ctx,
+			undefined,
+			{ delay: spy.delay }
+		);
+		expect(ctx.log).toEqual([]);
+		await spy.releaseAll();
+		await chain;
+		expect(ctx.unimplemented).toEqual({ 'Photos.Snapshot': 1, SpeechPlaySound: 1 });
+	});
+
+	it('🔑 שרשרת בלי Wait נשארת סינכרונית לחלוטין', () => {
+		const ctx = fakeContext();
+		// בלי `await` כלל — אם המריץ היה דוחה לתור-המיקרו, הלוג היה ריק כאן.
+		executeCommands(cell(cmd('Action.InsertText', { text: rich('אני') }), cmd('Jump.Home')), ctx);
+		expect(ctx.log).toEqual(['insert:אני', 'home']);
+	});
+
+	it('`waittime` חסר — בלי השהיה בכלל, ובלי קריאה ל-delay', async () => {
+		const ctx = fakeContext();
+		const spy = delaySpy();
+		await executeCommands(cell(cmd('CommandExecution.Wait'), cmd('Jump.Home')), ctx, undefined, {
+			delay: spy.delay
+		});
+		expect(spy.calls).toEqual([]);
+		expect(ctx.log).toEqual(['home']);
+	});
+
+	it('מחזירה CommandPause ולא void — כולל `cancellable` כפי שנמדד', () => {
+		const handler = commandRegistry['CommandExecution.Wait'];
+		const result = handler?.({ waittime: '00:00:02', cancellable: '1' }, fakeContext());
+		expect(isCommandPause(result)).toBe(true);
+		expect(result).toEqual({ pauseMs: 2000, cancellable: true });
+	});
+});
+
+describe('parseWaitTimeMs — שלוש הצורות שנמדדו', () => {
+	it('‏00:00:02 ×36 · 00:00:03 ×6 · 00:00:01.5000000 ×2', () => {
+		expect(parseWaitTimeMs('00:00:02')).toBe(2000);
+		expect(parseWaitTimeMs('00:00:03')).toBe(3000);
+		// 🛑 הראיה ש-parseInt על מקטע-השניות היה מחזיר 1000 במקום 1500.
+		expect(parseWaitTimeMs('00:00:01.5000000')).toBe(1500);
+	});
+
+	it('שעות ודקות נצברות', () => {
+		expect(parseWaitTimeMs('00:01:30')).toBe(90_000);
+		expect(parseWaitTimeMs('01:00:00')).toBe(3_600_000);
+	});
+
+	it('יום מוביל — לא-מאומת מול Grid, אבל נתמך', () => {
+		expect(parseWaitTimeMs('1.00:00:00')).toBe(86_400_000);
+	});
+
+	it('חסר או פגום ⇒ 0, ולא NaN', () => {
+		for (const raw of ['', '   ', 'abc', '00:aa:02', '1:2:3:4', '-00:00:02']) {
+			expect(parseWaitTimeMs(raw)).toBe(0);
+		}
+	});
+});
+
 // ── המריץ ────────────────────────────────────────────────────────────────
 
 describe('executeCommands', () => {
@@ -423,11 +663,9 @@ describe('executeCommands', () => {
 			...commandRegistry,
 			'Test.Halt': () => 'halt'
 		};
-		executeCommandChain(
-			[cmd('Action.DeleteWord'), cmd('Test.Halt'), cmd('Jump.Home')],
-			ctx,
+		void executeCommandChain([cmd('Action.DeleteWord'), cmd('Test.Halt'), cmd('Jump.Home')], ctx, {
 			registry
-		);
+		});
 		expect(ctx.log).toEqual(['deleteWord']);
 	});
 
@@ -437,15 +675,20 @@ describe('executeCommands', () => {
 		expect(ctx.log).toEqual([]);
 	});
 
-	it('הרג׳יסטרי מחזיק בדיוק את עשר הפקודות', () => {
+	it('הרג׳יסטרי מחזיק בדיוק את חמש-עשרה הפקודות', () => {
 		expect(Object.keys(commandRegistry).sort()).toEqual(
 			[
 				'Action.Clear',
+				'Action.DeleteLetter',
 				'Action.DeleteWord',
 				'Action.InsertText',
 				'Action.Letter',
+				'Action.Number',
+				'Action.Punctuation',
+				'Action.Space',
 				'Action.Speak',
 				'AutoContent.Activate',
+				'CommandExecution.Wait',
 				'Jump.Back',
 				'Jump.Home',
 				'Jump.To',
