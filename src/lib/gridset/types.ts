@@ -104,6 +104,22 @@ export interface ResolvedStyle {
 	backgroundShape: number;
 }
 
+/**
+ * מה שהפרסר קורא מה-XML של התא לפני פתירת הירושה:
+ * שם הסגנון הנקוב (<BasedOnStyle>) + העקיפות המקומיות של התא.
+ */
+export interface CellStyleSource {
+	basedOnStyle?: string;
+	overrides: Partial<Style>;
+}
+
+/**
+ * 🔑 הפרדת-תלות בין הפרסר לפותר-הסגנונות: הפרסר אינו יודע לפתור ירושה,
+ * הוא מקבל פותר בהזרקה. כך שני הסלייסים נכתבים במקביל.
+ * ברירת-מחדל (בלי פותר) — DEFAULT_RESOLVED_STYLE.
+ */
+export type StyleResolver = (source: CellStyleSource) => ResolvedStyle;
+
 // ── תא ───────────────────────────────────────────────────────────────────
 
 export type ContentType = 'AutoContent' | 'Workspace' | 'LiveCell';
