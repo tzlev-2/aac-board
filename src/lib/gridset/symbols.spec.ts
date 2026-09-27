@@ -197,6 +197,13 @@ describe('pickPictogram', () => {
 		expect(picked).toMatchObject({ exact: null, loose: 7, looseKeyword: 'אפשר לעזור לך?' });
 	});
 
+	it('🛑 שאילתה חד-מילתית אינה זכאית ל-loose — אחרת זה "מופיע איפשהו"', () => {
+		// בלי המינימום: art ⊆ {rock, art, cave} — ציור-מערות במקום יצירה.
+		expect(pickPictogram([result(5, 'rock art cave')], 'art').loose).toBeNull();
+		// ושתי מילים כן — הגבול הוא מספר המילים, לא השפה.
+		expect(pickPictogram([result(6, 'rock art cave')], 'rock art').loose).toBe(6);
+	});
+
 	it('מתעלם מניקוד בהשוואה', () => {
 		expect(pickPictogram([result(9, 'רגל')], 'רֶגֶל').exact).toBe(9);
 	});

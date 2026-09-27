@@ -20,8 +20,18 @@ import { execFileSync } from 'node:child_process';
 import { mkdtempSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { searchPictograms } from '$lib/services/arasaac';
 import { createSymbolCache } from './symbol-cache';
-import { createSymbolResolver, type MatchQuality } from './symbols';
+import {
+	collectImageRefs,
+	createSymbolResolver,
+	normalizeSearchTerm,
+	pickPictogram,
+	primaryLanguage,
+	rankImageRefs,
+	symbolBaseName,
+	type MatchQuality
+} from './symbols';
 import type { Cell, GridSet, ImageRef, ResolvedStyle } from './types';
 
 const DUMMY_STYLE: ResolvedStyle = {
@@ -143,6 +153,11 @@ interface RunResult {
 	byMatch: Record<MatchQuality, number>;
 }
 
+function pctOf(result: RunResult): string {
+	const pct = result.total ? Math.round((result.resolved / result.total) * 100) : 0;
+	return `${result.resolved}/${result.total} = ${pct}%`;
+}
+
 async function run(
 	label: string,
 	gridSet: GridSet,
@@ -165,6 +180,76 @@ function withoutCaptions(cells: Cell[]): Cell[] {
 
 function withoutImages(cells: Cell[]): Cell[] {
 	return cells.map((cell) => ({ ...cell, image: undefined, commands: [] }));
+}
+
+// ── מעבר ב: הרעש של `results[0]` ─────────────────────────────────────────
+
+/**
+ * כמה מהחיפושים שהחזירו תוצאות **אינן נושאות אף מילת-מפתח זהה למפתח-החיפוש**.
+ * אלה בדיוק המקרים שבהם מימוש תמים (`results[0].imageUrl`) היה מציג סמל
+ * שאינו המושג שחיפשנו.
+ *
+ * 🛑 זה **אינו** מדד-נכונות: הוא אינו יודע מה הסמל הנכון, ואינו שולל שדווקא
+ * `results[0]` מתאים במקרה. מה שהוא מודד הוא **חוסר-עיגון** — שה-API החזיר
+ * תוצאה על סמך התאמה-חלקית, ולא על סמך המושג.
+ */
+async function measureNaiveNoise(queries: { query: string; lang: string }[]) {
+	const perLang = new Map<string, { nonEmpty: number; withoutExact: number; worst: number }>();
+	for (const { query, lang } of queries) {
+		const results = await searchPictograms(query, lang);
+		if (results.length === 0) continue;
+		const bucket = perLang.get(lang) ?? { nonEmpty: 0, withoutExact: 0, worst: 0 };
+		bucket.nonEmpty += 1;
+		if (pickPictogram(results, query).exact === null) {
+			bucket.withoutExact += 1;
+			bucket.worst = Math.max(bucket.worst, results.length);
+		}
+		perLang.set(lang, bucket);
+	}
+
+	console.log('-- הרעש של results[0] — חיפושים שהחזירו תוצאות בלי אף מילת-מפתח זהה');
+	console.log('   (מדד חוסר-עיגון, לא מדד נכונות)');
+	for (const [lang, b] of [...perLang].sort()) {
+		const pct = Math.round((b.withoutExact / b.nonEmpty) * 100);
+		console.log(
+			`   ${lang}   ${b.withoutExact}/${b.nonEmpty} = ${pct}%` +
+				`   · הגדול שבהם החזיר ${b.worst} תוצאות`
+		);
+	}
+	console.log('');
+}
+
+// ── מעבר ג: מה קורה כששני המפתחות חולקים ─────────────────────────────────
+
+/**
+ * בכמה תאים **שני** המפתחות מחזירים התאמה מדויקת, ובכמה מהם הם מצביעים על
+ * פיקטוגרם **שונה**. שם ההכרעה של הפותר (שם-בסיס קודם) היא הכרעה שרירותית.
+ *
+ * 🛑 גם זה אינו מדד-נכונות — הוא מודד **סתירה**. לדעת מי צדק צריך שיפוט אנושי
+ * על כל מקרה, ואין לזה מדידה אוטומטית. מה שהמספר כן אומר: על כמה תאים
+ * ההכרעה השרירותית בכלל משנה משהו.
+ */
+async function measureKeyDivergence(cells: Cell[], captionLang: string) {
+	let both = 0;
+	let differ = 0;
+	for (const cell of cells) {
+		const base = symbolBaseName(rankImageRefs(collectImageRefs(cell), [])[0]);
+		const caption = normalizeSearchTerm(cell.caption ?? '');
+		if (!base || caption.length < 2) continue;
+
+		const [fromBase, fromCaption] = await Promise.all([
+			searchPictograms(base, 'en').then((r) => pickPictogram(r, base).exact),
+			searchPictograms(caption, captionLang).then((r) => pickPictogram(r, caption).exact)
+		]);
+		if (fromBase === null || fromCaption === null) continue;
+		both += 1;
+		if (fromBase !== fromCaption) differ += 1;
+	}
+
+	const pct = both ? Math.round((differ / both) * 100) : 0;
+	console.log('-- שני המפתחות מול זה: חפיפה וסתירה (מדד סתירה, לא נכונות)');
+	console.log(`   שניהם exact: ${both} תאים · מצביעים על פיקטוגרם שונה: ${differ} = ${pct}%`);
+	console.log('');
 }
 
 async function main() {
@@ -202,18 +287,27 @@ async function main() {
 	// קאש אחד לכל ההרצות — חיפוש שכבר רץ אינו חוזר לרשת.
 	const cache = createSymbolCache({ persist: false });
 
-	console.log('-- מפתח אחד בכל פעם (exact בלבד)');
+	console.log('-- כיסוי, בסיס: תאים ייחודיים (מדד להשוואה בין מפתחות)');
 	await run('(1) שם-בסיס מ-ImageRef (en)', gridSet, withoutCaptions(cells), 'exact', cache);
 	await run(`(2) כתובית (${language})`, gridSet, withoutImages(cells), 'exact', cache);
+	const strict = await run('(3) שניהם, exact — ברירת המחדל', gridSet, cells, 'exact', cache);
+	const loose = await run('(3b) שניהם, exact + loose', gridSet, cells, 'loose', cache);
 	console.log('');
-	console.log('-- שני המפתחות יחד');
-	const strict = await run('(3) exact — ברירת המחדל', gridSet, cells, 'exact', cache);
-	const loose = await run('(3b) exact + loose', gridSet, cells, 'loose', cache);
+	// 🛑 זהו הבסיס שקובע מה המורה תראה, והוא נמוך מהייחודיים: אייקון חוזר
+	// בעשרות תאים נספר פעם אחת בייחודיים, ודווקא הוא נפתר רע. דה-דופליקציה
+	// מייפה את החלק הגרוע, ולכן שני המספרים יוצאים תמיד יחד.
+	console.log('-- כיסוי, בסיס: כל התאים (מה שבאמת על המסך)');
+	const weighted = await run('exact — ברירת המחדל', gridSet, all, 'exact', cache);
+	const weightedLoose = await run('exact + loose', gridSet, all, 'loose', cache);
 	console.log('');
-	// מה שמשתמש באמת רואה: כל התאים, לא רק הייחודיים. סמל נפוץ חוזר בהרבה תאים.
-	console.log('-- משוקלל לפי כל התאים (מה שנראה על הלוח)');
-	const weighted = await run('exact', gridSet, all, 'exact', cache);
-	await run('exact + loose', gridSet, all, 'loose', cache);
+	console.log(
+		`🔑 שני המספרים יחד: exact ${pctOf(strict)} מהתאים הייחודיים · ` +
+			`${pctOf(weighted)} מכל התאים.`
+	);
+	console.log(
+		`   ‏loose מוסיף כיסוי (${pctOf(loose)} ייחודיים · ${pctOf(weightedLoose)} כל התאים) ` +
+			`— 🛑 כיסוי, לא דיוק. נכונות ההתאמות הרופפות לא נמדדה.`
+	);
 	console.log('');
 
 	for (const [label, result] of [
@@ -233,6 +327,24 @@ async function main() {
 		console.log(`   דרגות: ${JSON.stringify(result.byMatch)}`);
 		console.log('');
 	}
+
+	// שני המעברים שמודדים את מה שהכיסוי אינו מודד.
+	const queries = new Map<string, { query: string; lang: string }>();
+	for (const cell of cells) {
+		for (const ref of collectImageRefs(cell)) {
+			const base = symbolBaseName(ref);
+			if (base) queries.set(`en:${normalizeSearchTerm(base)}`, { query: base, lang: 'en' });
+		}
+		const caption = normalizeSearchTerm(cell.caption ?? '');
+		if (caption.length >= 2) {
+			queries.set(`${primaryLanguage(language)}:${caption}`, {
+				query: caption,
+				lang: primaryLanguage(language)
+			});
+		}
+	}
+	await measureNaiveNoise([...queries.values()]);
+	await measureKeyDivergence(cells, primaryLanguage(language));
 }
 
 main();
