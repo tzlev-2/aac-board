@@ -120,11 +120,14 @@ export const sparseCoords: GridsetSpec = {
 	]
 };
 
+// 🛑 טקסט עשיר חי בשני נשאים, וההתפלגות ביניהם הפוכה (design §4): כאן —
+// ארבע הצורות תחת Parameter ישיר (בלי עטיפת <Text>), וגם תחת WordListItem/Text
+// (עם העטיפה). `d/p/s/r` הוא עטיפת <d> שקופה — קיימת בשני הנשאים.
 export const richTextShapes: GridsetSpec = {
 	pages: [
 		{
 			name: 'richText',
-			columns: 3,
+			columns: 4,
 			rows: 1,
 			cells: [
 				{
@@ -159,7 +162,24 @@ export const richTextShapes: GridsetSpec = {
 							params: { text: { shape: 'r', runs: ['!'] } }
 						}
 					]
+				},
+				{
+					x: 3,
+					y: 0,
+					caption: 'd/p/s/r',
+					commands: [
+						{
+							id: 'Action.InsertText',
+							params: { text: { shape: 'd/p/s/r', sentences: [{ runs: ['מוגן'] }] } }
+						}
+					]
 				}
+			],
+			wordList: [
+				{ text: { shape: 'p/s/r', sentences: [{ runs: ['טוב'] }] }, partOfSpeech: 'Noun' },
+				{ text: { shape: 's/r', sentences: [{ runs: ['רע'] }] }, partOfSpeech: 'Noun' },
+				{ text: { shape: 'r', runs: ['אולי'] } },
+				{ text: { shape: 'd/p/s/r', sentences: [{ runs: ['בטח'] }] } }
 			]
 		}
 	]
@@ -242,21 +262,68 @@ export const contentTypes: GridsetSpec = {
 	]
 };
 
-export const guarded: GridsetSpec = {
+// 🛑 Settings.RequiredFeature: 126/126 בלוחות-הדגימה היא **אחרונה** בשרשרת —
+// היא הצהרת-דרישה של התא (שער-רינדור), לא שומר-הרצה שעוצר לפניה (design §1).
+// שלושה fixtures, לא אחד — כל אחד תבנית אמיתית שנמדדה, לא דמיון:
+
+/** 126/126 — הצורה האמיתית: השומר תמיד אחרון. */
+export const guardLast: GridsetSpec = {
 	pages: [
 		{
-			name: 'guarded',
+			name: 'guardLast',
 			columns: 1,
 			rows: 1,
 			cells: [
 				{
 					x: 0,
 					y: 0,
-					caption: 'שליטה במחשב',
+					caption: 'מבט',
 					commands: [
-						{ id: 'Settings.RequiredFeature', params: { feature: 'ComputerControl' } },
-						{ id: 'Action.Speak' }
+						{ id: 'Action.InsertText', params: { text: 'מבט' } },
+						{ id: 'Settings.RequiredFeature', params: { feature: 'EyeGazeAccess' } }
 					]
+				}
+			]
+		}
+	]
+};
+
+/** 56 מ-126 — התבנית הנפוצה ביותר: אחרי Settings.RestAll. */
+export const guardAfterRest: GridsetSpec = {
+	pages: [
+		{
+			name: 'guardAfterRest',
+			columns: 1,
+			rows: 1,
+			cells: [
+				{
+					x: 0,
+					y: 0,
+					caption: 'מגע',
+					commands: [
+						{ id: 'Settings.RestAll' },
+						{ id: 'Settings.RequiredFeature', params: { feature: 'TouchAccess' } }
+					]
+				}
+			]
+		}
+	]
+};
+
+/** 56 מ-126 (44%) — בלי <Parameter> כלל. הוכרע במפורש (design §1): "אין
+ * דרישה" (התא זמין) + reportUnimplemented, לא false ולא זריקה. */
+export const guardNoParam: GridsetSpec = {
+	pages: [
+		{
+			name: 'guardNoParam',
+			columns: 1,
+			rows: 1,
+			cells: [
+				{
+					x: 0,
+					y: 0,
+					caption: 'בלי דרישה',
+					commands: [{ id: 'Settings.RequiredFeature' }]
 				}
 			]
 		}
@@ -338,7 +405,9 @@ export const fixtures = {
 	richTextShapes,
 	styleTwoLevel,
 	contentTypes,
-	guarded,
+	guardLast,
+	guardAfterRest,
+	guardNoParam,
 	visibility,
 	nilCaption,
 	pageEngines,

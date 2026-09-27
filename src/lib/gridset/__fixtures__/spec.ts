@@ -4,9 +4,11 @@
  * (src/lib/gridset/types.ts). זהו קובץ פנימי ל-__fixtures__ בלבד.
  */
 
-// ── טקסט עשיר בפרמטר-פקודה ──────────────────────────────────────────────
-// שלוש הצורות שמופיעות בפועל ב-<Parameter> של פקודה (לא ב-Caption, שהוא
-// טקסט פשוט): p/s/r (28,078) · s/r בלי p (27,927) · r ישיר (206).
+// ── טקסט עשיר — שני נשאים, ארבע צורות בכל אחד ────────────────────────────
+// 🛑 אין להסתמך על ההתפלגות: היא הפוכה בין Command/Parameter ל-WordListItem/Text
+// (gridset-core-design.md §4). ארבע הצורות קיימות בשני הנשאים: p/s/r · s/r
+// (בלי p) · r ישיר · d/p/s/r (עטיפה שקופה של <d>). <Text> עוטף רק תחת
+// WordListItem — תחת Parameter הבנים יושבים ישירות עליו.
 
 export interface FixtureSentence {
 	image?: string;
@@ -16,7 +18,8 @@ export interface FixtureSentence {
 export type FixtureRichText =
 	| { shape: 'p/s/r'; sentences: FixtureSentence[] }
 	| { shape: 's/r'; sentences: FixtureSentence[] }
-	| { shape: 'r'; runs: string[] };
+	| { shape: 'r'; runs: string[] }
+	| { shape: 'd/p/s/r'; sentences: FixtureSentence[] };
 
 export type FixtureParamValue = string | FixtureRichText;
 
@@ -72,7 +75,9 @@ export interface FixtureNamedStyle {
 }
 
 export interface FixtureWordListItem {
-	text: string;
+	/** string = צורת s/r פשוטה (הנפוצה ביותר בנשא הזה). ל-p/s/r · r · d/p/s/r
+	 * העבירו FixtureRichText מפורש. */
+	text: string | FixtureRichText;
 	image?: string;
 	partOfSpeech?: string;
 }

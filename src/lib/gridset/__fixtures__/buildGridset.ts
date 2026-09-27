@@ -11,6 +11,7 @@ import type {
 	FixtureCell,
 	FixtureCommand,
 	FixtureParamValue,
+	FixtureRichText,
 	FixtureNamedStyle,
 	FixtureWordListItem,
 	FixtureSentence
@@ -35,17 +36,25 @@ function sentenceXml(sentence: FixtureSentence): string {
 	return `<s${attrs}>${runs}</s>`;
 }
 
-function paramValueXml(value: FixtureParamValue): string {
-	if (typeof value === 'string') return escapeXml(value);
-
+/** ארבע הצורות המשותפות לשני הנשאים (Parameter ישיר, ו-WordListItem/Text
+ * שעוטף את זה ב-<Text>). `d/p/s/r` הוא `<d>` שקוף סביב צורת p/s/r. */
+function richTextXml(value: FixtureRichText): string {
 	if (value.shape === 'p/s/r') {
 		return `<p>${value.sentences.map(sentenceXml).join('')}</p>`;
 	}
 	if (value.shape === 's/r') {
 		return value.sentences.map(sentenceXml).join('');
 	}
-	// shape === 'r'
-	return value.runs.map((r) => `<r>${escapeXml(r)}</r>`).join('');
+	if (value.shape === 'r') {
+		return value.runs.map((r) => `<r>${escapeXml(r)}</r>`).join('');
+	}
+	// shape === 'd/p/s/r'
+	return `<d><p>${value.sentences.map(sentenceXml).join('')}</p></d>`;
+}
+
+function paramValueXml(value: FixtureParamValue): string {
+	if (typeof value === 'string') return escapeXml(value);
+	return richTextXml(value);
 }
 
 function commandXml(command: FixtureCommand): string {
@@ -119,7 +128,12 @@ function cellXml(cell: FixtureCell): string {
 }
 
 function wordListItemXml(item: FixtureWordListItem): string {
-	const parts = [`<Text><s><r>${escapeXml(item.text)}</r></s></Text>`];
+	// 🛑 <Text> עוטף רק כאן — תחת Parameter הבנים יושבים ישירות עליו (§4).
+	const textInner =
+		typeof item.text === 'string'
+			? `<s><r>${escapeXml(item.text)}</r></s>`
+			: richTextXml(item.text);
+	const parts = [`<Text>${textInner}</Text>`];
 	if (item.image) parts.push(`<Image>${escapeXml(item.image)}</Image>`);
 	if (item.partOfSpeech) parts.push(`<PartOfSpeech>${escapeXml(item.partOfSpeech)}</PartOfSpeech>`);
 	return `<WordListItem>${parts.join('')}</WordListItem>`;
