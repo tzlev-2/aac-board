@@ -100,10 +100,14 @@ export function normalizeRichText(container: Element | undefined): RichText {
 				flushLoose();
 				paragraphs.push(...normalizeRichText(child).paragraphs);
 				break;
-			case 'p':
+			case 'p': {
 				flushLoose();
-				paragraphs.push({ sentences: looseSentences(elementChildren(child)) });
+				// ‏`<p/>` ריק אינו מייצר פסקה — סימטרי ל-flushLoose, ובלי זה
+				// ‏richTextToString היה מחזיר שורה ריקה מובילה.
+				const sentences = looseSentences(elementChildren(child));
+				if (sentences.length > 0) paragraphs.push({ sentences });
 				break;
+			}
 			default:
 				loose.push(child);
 		}

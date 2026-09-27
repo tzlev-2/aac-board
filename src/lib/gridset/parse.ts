@@ -31,6 +31,7 @@ import type {
 	ParamValue,
 	PredictionSource,
 	ResolvedStyle,
+	SizeName,
 	Style,
 	StyleResolver,
 	WordListItem
@@ -77,6 +78,8 @@ const PREDICTION_SOURCES: readonly PredictionSource[] = [
 ];
 
 const CONTENT_TYPES: readonly ContentType[] = ['AutoContent', 'Workspace', 'LiveCell'];
+
+const SIZE_NAMES: readonly SizeName[] = ['ExtraSmall', 'Small', 'Large', 'ExtraLarge'];
 
 const VISIBILITIES: readonly CellVisibility[] = ['Hidden', 'Disabled', 'PointerAndTouchOnly'];
 
@@ -172,9 +175,15 @@ export function parseStyleCatalog(stylesXml: string, label = 'styles.xml'): Reco
 	return out;
 }
 
-/** שמות ה-XML של תכונות-סגנון → שמות השדות בחוזה. */
+/**
+ * שמות ה-XML של תכונות-סגנון → שמות השדות בחוזה.
+ *
+ * 🛑 `BasedOnStyle` **אינו כאן במכוון.** הוא קיים רק על `<Style>` של תא
+ * (252,974 מופעים) ולא על סגנון-קטלוג — `/StyleData/Styles/Style` אינו מונה
+ * אותו כלל בסכמה. הוא נקרא בנפרד ב-readCellStyleSource, ומדולג כאן כדי
+ * שלא ייפול לענף "טרם מופה" וייכנס ל-overrides. ראו design §5.
+ */
 const STYLE_TEXT_FIELDS: Record<string, keyof Style & string> = {
-	BasedOnStyle: 'basedOnStyle',
 	BackColour: 'backColour',
 	FontColour: 'fontColour',
 	BorderColour: 'borderColour',
@@ -195,6 +204,7 @@ function readStyleProps(el: Element | undefined): Partial<Style> {
 	const props: Partial<Style> = {};
 	if (!el) return props;
 	for (const child of elementChildren(el)) {
+		if (child.localName === 'BasedOnStyle') continue;
 		const text = (child.textContent ?? '').trim();
 		const textField = STYLE_TEXT_FIELDS[child.localName];
 		if (textField) {
@@ -203,7 +213,11 @@ function readStyleProps(el: Element | undefined): Partial<Style> {
 		}
 		const numField = STYLE_NUMERIC_FIELDS[child.localName];
 		if (numField) {
-			const n = Number.parseInt(text, 10);
+			// 🛑 parseFloat ולא parseInt: 132 מ-2,221 הסגנונות נושאים FontSize
+			// שברי (18.666666666666668 — המרת pt→px). קיטוע אינו רק אובדן
+			// דיוק אלא **התנגשות**: 14.666… היה הופך ל-14 ובלתי-מובחן ממנו.
+			// אותו readStyleProps משרת גם <FontSize> ברמת התא (17,325 מופעים).
+			const n = Number.parseFloat(text);
 			if (!Number.isNaN(n)) props[numField] = n;
 			continue;
 		}
@@ -216,13 +230,17 @@ function readStyleProps(el: Element | undefined): Partial<Style> {
 
 function parsePage(name: string, root: Element, resolve: StyleResolver): Page {
 	// 🛑 מלכודת 3: columns/rows הם **ספירת אלמנטים**, לא מאפיין.
-	const columns = childrenByName(childByName(root, 'ColumnDefinitions'), 'ColumnDefinition').length;
-	const rows = childrenByName(childByName(root, 'RowDefinitions'), 'RowDefinition').length;
+	const columnDefs = childrenByName(childByName(root, 'ColumnDefinitions'), 'ColumnDefinition');
+	const rowDefs = childrenByName(childByName(root, 'RowDefinitions'), 'RowDefinition');
 
 	const page: Page = {
 		name,
-		columns,
-		rows,
+		columns: columnDefs.length,
+		rows: rowDefs.length,
+		// המידה יושבת על ההגדרה ולא על הדף: Width ב-11,400 מ-58,701 ההגדרות,
+		// Height ב-4,575 מ-44,667. חסר = רגיל, ולכן null ולא undefined.
+		columnWidths: columnDefs.map((el) => readSizeName(el, 'Width')),
+		rowHeights: rowDefs.map((el) => readSizeName(el, 'Height')),
 		cells: childrenByName(childByName(root, 'Cells'), 'Cell').map((el) => parseCell(el, resolve)),
 		// 🔑 מלכודת 6: המנועים הם של הדף. /Grid/WordList קיים בכל אחד מ-7,057 הדפים.
 		wordList: parseWordListItems(childByName(root, 'WordList')),
@@ -249,6 +267,11 @@ function parsePage(name: string, root: Element, resolve: StyleResolver): Page {
 	if (selfClosing !== undefined) page.selfClosing = selfClosing === '1' || selfClosing === 'true';
 
 	return page;
+}
+
+function readSizeName(el: Element, name: 'Width' | 'Height'): SizeName | null {
+	const raw = attr(el, name);
+	return SIZE_NAMES.find((v) => v === raw) ?? null;
 }
 
 function readPredictionSource(root: Element): PredictionSource {
@@ -299,8 +322,10 @@ function parseCell(el: Element, resolve: StyleResolver): Cell {
 	// 🛑 מלכודת 5: <CaptionAndImage nil="true"/> — 30,251 מופעים. תא ריק.
 	const captionAndImage = childByName(content, 'CaptionAndImage');
 	if (captionAndImage && !isNil(captionAndImage)) {
-		const caption = textOfChild(captionAndImage, 'Caption');
-		if (caption !== undefined) cell.caption = caption;
+		// 🛑 כתובית נקראת **בלי קיצוץ**: במקלדת AAC מקש-הרווח הוא תא שכתובתו
+		// רווח בודד, וקיצוץ היה הופך אותו ל-'' — מוגדר אך ריק.
+		const captionEl = childByName(captionAndImage, 'Caption');
+		if (captionEl) cell.caption = rawText(captionEl);
 		const image = parseImageRef(textOfChild(captionAndImage, 'Image'));
 		if (image) cell.image = image;
 	}
@@ -325,7 +350,11 @@ function parseCell(el: Element, resolve: StyleResolver): Cell {
 }
 
 function readCellStyleSource(content: Element | undefined): CellStyleSource {
-	const { basedOnStyle, ...overrides } = readStyleProps(childByName(content, 'Style'));
+	const styleEl = childByName(content, 'Style');
+	// ‏BasedOnStyle נקרא במפורש, ולא דרך readStyleProps שמדלג עליו — אחרת הוא
+	// היה נשפך ל-overrides ומתחזה לעקיפה מקומית.
+	const basedOnStyle = textOfChild(styleEl, 'BasedOnStyle');
+	const overrides = readStyleProps(styleEl);
 	return basedOnStyle ? { basedOnStyle, overrides } : { overrides };
 }
 
@@ -399,9 +428,11 @@ function parseCommand(el: Element): CommandInvocation {
  * | `<data>` | `{ data }` (SpeechPlaySound `Key="filedata"`) | 752 |
  * | `<WordList>` | `WordListItem[]` (Prediction.ChangeWordList) | 5,726 |
  *
- * ⚠️ `<CommandCollectionParameterValue>` (195 מופעים — שרשרת פקודות
- * מקוננת) **אינו נתמך ב-`ParamValue`** ולכן הפרמטר מושמט. מדווח לעדכון
- * החוזה; לא הומצא כאן טיפוס חדש.
+ * ⚠️ **צורה שאינה אחת מהארבע — הפרמטר מושמט מהמפתחות**, ולא מקבל `''`.
+ * מחרוזת ריקה הייתה אומרת שקר: הצרכן אינו יכול להבחין בה בין "צורה לא
+ * נתמכת" ל"ערך ריק". שני המקרים בנתונים:
+ * `<CommandCollectionParameterValue>` (195 — שרשרת פקודות מקוננת, אינה
+ * נתמכת ב-`ParamValue`) ו-`<gridimageref>` (10). לא הומצא כאן טיפוס חדש.
  */
 function parseParameterValue(param: Element): ParamValue | undefined {
 	const wordList = childByName(param, 'WordList');
@@ -410,9 +441,10 @@ function parseParameterValue(param: Element): ParamValue | undefined {
 	const data = childByName(param, 'data');
 	if (data) return { data: (data.textContent ?? '').trim() };
 
-	if (childByName(param, 'CommandCollectionParameterValue')) return undefined;
-
 	if (hasRichTextChildren(param)) return normalizeRichText(param);
+
+	// כל צורה אחרת שמגיעה כאלמנט — מושמטת במקום להשתטח למחרוזת ריקה
+	if (elementChildren(param).length > 0) return undefined;
 
 	return plainParamText(param);
 }

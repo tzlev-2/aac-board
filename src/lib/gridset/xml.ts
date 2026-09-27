@@ -71,7 +71,7 @@ export function attr(el: Element, name: string): string | undefined {
 
 /**
  * מאפיין מספרי עם ברירת-מחדל.
- * 🛑 מלכודת 2: `X`/`Y` חסרים ב-38,287 תאים מתוך 252,974 — חסר פירושו 0,
+ * 🛑 מלכודת 2: `X` חסר ב-38,287 תאים ו-`Y` ב-35,431, מתוך 252,974 — חסר פירושו 0,
  * ו-`ColumnSpan`/`RowSpan` חסרים פירושם 1. ההכרעה היא של הקורא, לא של הפרסר.
  */
 export function intAttr(el: Element, name: string, fallback: number): number {

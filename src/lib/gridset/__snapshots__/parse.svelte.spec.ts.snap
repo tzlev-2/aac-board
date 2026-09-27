@@ -981,10 +981,24 @@ exports[`snapshot > parseGridSet על דף בגודל orgHome — 6×4, 21 תא�
           "y": 3,
         },
       ],
+      "columnWidths": [
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+      ],
       "columns": 6,
       "guid": "000563b5-579f-4924-8991-917cfe7e0414",
       "name": "דף ראשי",
       "predictionSource": "WordList",
+      "rowHeights": [
+        null,
+        null,
+        null,
+        null,
+      ],
       "rows": 4,
       "wordList": [
         {

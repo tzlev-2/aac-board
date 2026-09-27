@@ -11,7 +11,13 @@ import { describe, expect, it, vi } from 'vitest';
 import { strToU8, zipSync } from 'fflate';
 import { DEFAULT_RESOLVED_STYLE, parseGridSet } from './parse';
 import { richTextToString } from './richText';
-import type { CellStyleSource, ResolvedStyle, StyleResolver, WordListItem } from './types';
+import type {
+	CellStyleSource,
+	ResolvedStyle,
+	RichText,
+	StyleResolver,
+	WordListItem
+} from './types';
 
 // ── בוני XML ─────────────────────────────────────────────────────────────
 
@@ -89,7 +95,7 @@ describe('מלכודת 1 — X=0 הוא הימני, והקואורדינטה נ�
 // ── מלכודת 2 ─────────────────────────────────────────────────────────────
 
 describe('מלכודת 2 — מאפיין חסר', () => {
-	it('X או Y חסרים = 0 (38,287 תאים בנתונים האמיתיים)', async () => {
+	it('X או Y חסרים = 0 (X חסר ב-38,287 תאים, Y ב-35,431)', async () => {
 		const page = await parseSinglePage(
 			grid({ columns: 3, rows: 3, cells: cell('') + cell('X="2"') + cell('Y="1"') })
 		);
@@ -129,9 +135,31 @@ describe('מלכודת 3 — columns/rows הם ספירת אלמנטים', () =>
 		expect([page.columns, page.rows]).toEqual([3, 1]);
 	});
 
+	it('🛑 המאפיין Width/Height נשמר ב-columnWidths/rowHeights, null = רגיל', async () => {
+		const gridXml =
+			`<?xml version="1.0" encoding="utf-8"?><Grid>` +
+			`<ColumnDefinitions><ColumnDefinition Width="Large" /><ColumnDefinition /><ColumnDefinition Width="ExtraSmall" /></ColumnDefinitions>` +
+			`<RowDefinitions><RowDefinition Height="ExtraLarge" /><RowDefinition /></RowDefinitions>` +
+			`<Cells /></Grid>`;
+		const page = await parseSinglePage(gridXml);
+		expect(page.columnWidths).toEqual(['Large', null, 'ExtraSmall']);
+		expect(page.rowHeights).toEqual(['ExtraLarge', null]);
+	});
+
+	it('מידה לא מוכרת נופלת ל-null, ורשת אחידה מקבלת מערך null-ים באורך הנכון', async () => {
+		const gridXml =
+			`<?xml version="1.0" encoding="utf-8"?><Grid>` +
+			`<ColumnDefinitions><ColumnDefinition Width="Gigantic" /><ColumnDefinition /></ColumnDefinitions>` +
+			`<RowDefinitions><RowDefinition /></RowDefinitions><Cells /></Grid>`;
+		const page = await parseSinglePage(gridXml);
+		expect(page.columnWidths).toEqual([null, null]);
+		expect(page.rowHeights).toEqual([null]);
+	});
+
 	it('דף בלי הגדרות בכלל מחזיר 0 ולא קורס', async () => {
 		const page = await parseSinglePage(`<?xml version="1.0"?><Grid><Cells /></Grid>`);
 		expect([page.columns, page.rows]).toEqual([0, 0]);
+		expect([page.columnWidths, page.rowHeights]).toEqual([[], []]);
 	});
 });
 
@@ -185,6 +213,22 @@ describe('מלכודת 4 — טקסט עשיר בשלוש צורות, מנורמ
 		expect(richTextToString(fourth.text)).toBe('שורה\nשנייה');
 	});
 
+	it('🛑 <p/> ריק אינו מייצר פסקה ריקה — בלי שורה ריקה מובילה', async () => {
+		const page = await parseSinglePage(
+			grid({
+				cells: cell(
+					'X="0"',
+					`<Commands><Command ID="Action.InsertText">` +
+						`<Parameter Key="text"><p /><p><s><r>א</r></s></p></Parameter>` +
+						`</Command></Commands>`
+				)
+			})
+		);
+		const value = page.cells[0].commands[0].params.text as RichText;
+		expect(value.paragraphs).toHaveLength(1);
+		expect(richTextToString(value)).toBe('א');
+	});
+
 	it('🔑 הסמל יושב על ה-<s>, ולא על התא ולא על הפריט', async () => {
 		const [first, second, third] = await items();
 		expect(first.text.paragraphs[0].sentences[0].image?.library).toBe('widgit');
@@ -226,6 +270,15 @@ describe('מלכודת 5 — <CaptionAndImage nil="true"/>', () => {
 		expect(page.cells).toHaveLength(2);
 		expect(page.cells[0].caption).toBeUndefined();
 		expect(page.cells[1].caption).toBe('אני רוצה');
+	});
+
+	it('🛑 כתובית של רווח בודד נשמרת — מקש-הרווח במקלדת AAC', async () => {
+		const page = await parseSinglePage(
+			grid({
+				cells: cell('X="0"', '<CaptionAndImage><Caption> </Caption></CaptionAndImage>')
+			})
+		);
+		expect(page.cells[0].caption).toBe(' ');
 	});
 
 	it('גם בצורה המוסמכת xsi:nil — ולכן ההשוואה על localName ולא על השם המלא', async () => {
@@ -385,6 +438,23 @@ describe('פקודות ופרמטרים', () => {
 		);
 		expect(page.cells[0].commands[0].params.filedata).toEqual({ data: 'SUQzBAA=' });
 		expect(page.cells[0].commands[0].params.wait).toBe('0');
+	});
+
+	it('🛑 צורת-ערך שאינה נתמכת מושמטת מהמפתחות ואינה הופכת למחרוזת ריקה', async () => {
+		const page = await parseSinglePage(
+			grid({
+				cells: cell(
+					'X="0"',
+					`<Commands><Command ID="Jump.To">` +
+						`<Parameter Key="gridimageref"><gridimageref /></Parameter>` +
+						`<Parameter Key="nested"><CommandCollectionParameterValue><Items><Command ID="ComputerControl.Keyboard" /></Items></CommandCollectionParameterValue></Parameter>` +
+						`<Parameter Key="grid">דף ראשי</Parameter>` +
+						`</Command></Commands>`
+				)
+			})
+		);
+		// '' היה אומר שקר — הצרכן לא יכול להבחין בו בין "לא נתמך" ל"ריק"
+		expect(Object.keys(page.cells[0].commands[0].params)).toEqual(['grid']);
 	});
 
 	it('xml:space="preserve" שומר רווחים; בלעדיו הרווח מקוצץ', async () => {
@@ -642,7 +712,7 @@ describe('הפרדת התלות בסגנונות', () => {
 				styles:
 					`<?xml version="1.0" encoding="utf-8"?><StyleData><Styles>` +
 					`<Style Key="Access category style"><BackColour>#A38F84FF</BackColour><BorderColour>#A38F84FF</BorderColour><FontColour>#FFFFFFFF</FontColour><FontSize>12</FontSize><Name>ACTIONS</Name></Style>` +
-					`<Style Key="Action cell 1"><BasedOnStyle>Access category style</BasedOnStyle><FontName>Arial</FontName></Style>` +
+					`<Style Key="Action cell 1"><FontName>Arial</FontName></Style>` +
 					`</Styles></StyleData>`
 			})
 		);
@@ -655,7 +725,64 @@ describe('הפרדת התלות בסגנונות', () => {
 			fontSize: 12,
 			Name: 'ACTIONS'
 		});
-		expect(set.styles['Action cell 1'].basedOnStyle).toBe('Access category style');
+	});
+
+	it('🛑 FontSize שברי נשמר, ו-14.666 אינו מתמזג עם 14', async () => {
+		const set = await parseGridSet(
+			gridsetZip({
+				grids: {
+					'Page 1': grid({
+						cells: `<Cell X="0"><Content><Style><FontSize>18.666666666666668</FontSize></Style></Content></Cell>`
+					})
+				},
+				styles:
+					`<?xml version="1.0" encoding="utf-8"?><StyleData><Styles>` +
+					`<Style Key="שברי"><FontSize>14.666666666666666</FontSize></Style>` +
+					`<Style Key="שלם"><FontSize>14</FontSize></Style>` +
+					`</Styles></StyleData>`
+			}),
+			{ resolveStyle: (source) => ({ ...DEFAULT_RESOLVED_STYLE, ...source.overrides }) }
+		);
+		// 132 מ-2,221 הסגנונות שבריים — המרות pt→px
+		expect(set.styles['שברי'].fontSize).toBeCloseTo(14.666666666666666, 12);
+		expect(set.styles['שברי'].fontSize).not.toBe(set.styles['שלם'].fontSize);
+		// אותו readStyleProps משרת גם את רמת התא — 17,325 מופעים
+		expect(set.pages['Page 1'].cells[0].style.fontSize).toBeCloseTo(18.666666666666668, 12);
+	});
+
+	it('🛑 BasedOnStyle אינו נקרא לסגנון-קטלוג — הוא קיים רק על סגנון של תא', async () => {
+		const set = await parseGridSet(
+			gridsetZip({
+				grids: { 'Page 1': grid({}) },
+				styles:
+					`<?xml version="1.0" encoding="utf-8"?><StyleData><Styles>` +
+					`<Style Key="ק"><BasedOnStyle>אחר</BasedOnStyle><FontName>Arial</FontName></Style>` +
+					`</Styles></StyleData>`
+			})
+		);
+		// לא כשדה ממופה, וגם לא כאלמנט "טרם מופה" שנשמר בשמו
+		expect(set.styles['ק'].basedOnStyle).toBeUndefined();
+		expect(set.styles['ק'].BasedOnStyle).toBeUndefined();
+		expect(set.styles['ק']).toEqual({ name: 'ק', fontName: 'Arial' });
+	});
+
+	it('BasedOnStyle של תא אינו נשפך ל-overrides', async () => {
+		const seen: CellStyleSource[] = [];
+		await parseSinglePage(
+			grid({
+				cells: `<Cell X="0"><Content><Style><BasedOnStyle>Navigation category style</BasedOnStyle><FontName>Arial</FontName></Style></Content></Cell>`
+			}),
+			{
+				resolveStyle: (source) => {
+					seen.push(source);
+					return DEFAULT_RESOLVED_STYLE;
+				}
+			}
+		);
+		expect(seen[0]).toEqual({
+			basedOnStyle: 'Navigation category style',
+			overrides: { fontName: 'Arial' }
+		});
 	});
 
 	it('בלי styles.xml — קטלוג ריק, בלי שגיאה', async () => {
@@ -740,5 +867,67 @@ describe('snapshot', () => {
 		expect([page.columns, page.rows, page.cells.length]).toEqual([6, 4, 21]);
 		expect(page.cells.filter((c) => c.caption !== undefined)).toHaveLength(20);
 		expect(set).toMatchSnapshot();
+	});
+});
+
+// ── קובץ .gridset אמיתי ──────────────────────────────────────────────────
+
+/**
+ * 🛑 תוכן Smartbox מורשה — הקובץ **אינו** בריפו (`*.gridset` ב-.gitignore),
+ * ולכן הבדיקה מדלגת בעדינות כשהוא חסר, כמו ב-CI.
+ *
+ * להפעלה מקומית: ‏`cp <משהו>.gridset src/lib/gridset/__local__/real.gridset`
+ * (ראו `__local__/README.md`).
+ *
+ * 🔑 ‏`import.meta.glob` ולא `fetch`: בלי התאמה זה `{}` בזמן-טרנספורם, ואין
+ * בקשת-רשת תלויה. ‏`fetch` על נתיב שאינו קיים תחת `/src` השאיר חיבור פתוח
+ * ועיכב את סגירת vitest ב-10 שניות.
+ */
+const LOCAL_GRIDSETS = import.meta.glob('./__local__/*.gridset', {
+	query: '?url',
+	import: 'default',
+	eager: true
+}) as Record<string, string>;
+
+describe('קובץ .gridset אמיתי', () => {
+	// timeout נדיב: הלוח המובנה הגדול (b098, 6.6MB) נפרס ב-~3.8 שניות בכרומיום
+	it('נפרס בשלמותו, וכל השדות המספריים תקינים', { timeout: 30_000 }, async (ctx) => {
+		const url = Object.values(LOCAL_GRIDSETS)[0];
+		if (!url) {
+			ctx.skip('אין קובץ ב-src/lib/gridset/__local__/*.gridset — ראו __local__/README.md');
+			return;
+		}
+
+		const set = await parseGridSet(await (await fetch(url)).arrayBuffer());
+		const pages = Object.values(set.pages);
+		expect(pages.length).toBeGreaterThan(0);
+
+		// 🔑 יעד Jump.To הוא **מפתח** ב-pages, ולכן זה גם מאמת את פענוח שמות
+		// התיקיות בעברית מתוך ה-ZIP: שם שנקרא שגוי היה מפיל את ההתאמה.
+		expect(set.startGrid in set.pages).toBe(true);
+
+		// 🛑 הפרות נאספות ונבדקות **פעם אחת**. expect לכל תא הוא מאות אלפי
+		// קריאות על לוח גדול (b098: 6.6MB) וחורג מ-timeout הבדיקה.
+		const problems: string[] = [];
+		let cells = 0;
+		for (const page of pages) {
+			if (page.columnWidths.length !== page.columns) problems.push(`${page.name}: columnWidths`);
+			if (page.rowHeights.length !== page.rows) problems.push(`${page.name}: rowHeights`);
+			for (const cell of page.cells) {
+				cells++;
+				const numbers = [cell.x, cell.y, cell.columnSpan, cell.rowSpan, cell.style.fontSize];
+				if (!numbers.every(Number.isFinite)) {
+					problems.push(`${page.name} (${cell.x},${cell.y}): ${numbers.join()}`);
+				}
+				for (const inv of cell.commands) {
+					if (inv.id === '') problems.push(`${page.name} (${cell.x},${cell.y}): פקודה בלי ID`);
+					for (const [key, value] of Object.entries(inv.params)) {
+						if (value === undefined) problems.push(`${page.name}: ${inv.id}.${key} undefined`);
+					}
+				}
+			}
+		}
+		expect(problems.slice(0, 5)).toEqual([]);
+		expect(cells).toBeGreaterThan(0);
 	});
 });
