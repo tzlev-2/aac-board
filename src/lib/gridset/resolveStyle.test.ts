@@ -30,13 +30,32 @@ describe('parseStyles', () => {
 		});
 	});
 
-	it('פורס BasedOnStyle כתג-ילד', () => {
-		const xml = `<Styles><Style Key="Jump cell 1"><BasedOnStyle>Default</BasedOnStyle><FontSize>24</FontSize></Style></Styles>`;
+	it('Key מול Name: השם שאליו מפנה BasedOnStyle הוא Key, לא Name — ואינו על כל סגנון', () => {
+		const xml = `<Styles>
+			<Style Key="Access category style">
+				<Name>Access category style</Name>
+				<BackColour>#A38F84FF</BackColour>
+			</Style>
+			<Style Key="Default">
+				<BackColour>#FFFFFFFF</BackColour>
+			</Style>
+		</Styles>`;
 
 		const styles = parseStyles(xml);
 
-		expect(styles['Jump cell 1'].basedOnStyle).toBe('Default');
-		expect(styles['Jump cell 1'].fontSize).toBe(24);
+		expect(styles['Access category style'].name).toBe('Access category style');
+		expect(styles['Access category style'].Name).toBe('Access category style');
+		// b002/Default בנתונים האמיתיים: לסגנון אין <Name> כלל — 2,587/3,282 בלבד נושאים אותו.
+		expect(styles['Default'].name).toBe('Default');
+		expect(styles['Default'].Name).toBeUndefined();
+	});
+
+	it('פורס TileColour כשדה לא-ממופה (נשמר, לא נזרק)', () => {
+		const xml = `<Styles><Style Key="Spotify Keyboard"><TileColour>#0078D4FF</TileColour></Style></Styles>`;
+
+		const styles = parseStyles(xml);
+
+		expect(styles['Spotify Keyboard'].TileColour).toBe('#0078D4FF');
 	});
 
 	it('סגנון ריק לגמרי (כמו b002 Default בנתונים האמיתיים) לא נזרק', () => {
@@ -64,23 +83,21 @@ describe('toCssColor', () => {
 });
 
 describe('createStyleResolver', () => {
-	it('שרשרת בעומק 3: A מבוסס על B מבוסס על C — C נפתר ראשון, A אחרון', () => {
+	it('הסגנון הנקוב גובר על ברירת-המחדל', () => {
 		const styles: Record<string, Style> = {
-			C: { name: 'C', backColour: '#111111FF', fontName: 'Arial' },
-			B: { name: 'B', basedOnStyle: 'C', fontColour: '#222222FF' },
-			A: { name: 'A', basedOnStyle: 'B', fontSize: 40 }
+			'Jump cell 1': { name: 'Jump cell 1', backColour: '#475577FF', fontSize: 32 }
 		};
 		const resolve = createStyleResolver(styles);
 
-		const resolved = resolve({ basedOnStyle: 'A', overrides: {} });
+		const resolved = resolve({ basedOnStyle: 'Jump cell 1', overrides: {} });
 
-		expect(resolved.backColour).toBe('#111111FF'); // מ-C
-		expect(resolved.fontColour).toBe('#222222FF'); // מ-B
-		expect(resolved.fontSize).toBe(40); // מ-A (הסגנון הנקוב)
-		expect(resolved.fontName).toBe('Arial'); // ירש מ-C, לא נדרס
+		expect(resolved.backColour).toBe('#475577FF');
+		expect(resolved.fontSize).toBe(32);
+		// שדה שהסגנון הנקוב לא הגדיר — ממשיך מברירת-המחדל.
+		expect(resolved.fontName).toBe(DEFAULT_RESOLVED_STYLE.fontName);
 	});
 
-	it('עקיפה מקומית של התא גוברת על כל שרשרת המורשת', () => {
+	it('עקיפה מקומית של התא גוברת על הסגנון הנקוב', () => {
 		const styles: Record<string, Style> = {
 			X: { name: 'X', backColour: '#000000FF' }
 		};
@@ -89,22 +106,6 @@ describe('createStyleResolver', () => {
 		const resolved = resolve({ basedOnStyle: 'X', overrides: { backColour: '#00000000' } });
 
 		expect(resolved.backColour).toBe('#00000000');
-	});
-
-	it('מעגל ב-BasedOnStyle אינו תולה — נעצר עם אזהרה ומחזיר תוצאה', () => {
-		const styles: Record<string, Style> = {
-			A: { name: 'A', basedOnStyle: 'B', fontSize: 10 },
-			B: { name: 'B', basedOnStyle: 'A', fontSize: 20 }
-		};
-		const resolve = createStyleResolver(styles);
-		const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-
-		const resolved = resolve({ basedOnStyle: 'A', overrides: {} });
-
-		expect(resolved).toBeDefined();
-		expect(warn).toHaveBeenCalled();
-
-		warn.mockRestore();
 	});
 
 	it('שם סגנון שאינו קיים נופל לברירת המחדל ומדווח, לא זורק', () => {

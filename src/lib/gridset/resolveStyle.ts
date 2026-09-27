@@ -1,9 +1,14 @@
 /**
- * פרסור סגנונות (`Settings0/Styles/styles.xml`) ופתירת ירושת BasedOnStyle.
+ * פרסור סגנונות (`Settings0/Styles/styles.xml`) ופתירת סגנון-תא.
  *
- * סדר הפתירה (docs/plans/gridset-core-design.md §5):
- *   DEFAULT_RESOLVED_STYLE → שרשרת BasedOnStyle מהשורש כלפי מטה
- *                          → הסגנון הנקוב → עקיפות מקומיות של התא.
+ * סדר הפתירה — שתי רמות, לא שרשרת (docs/plans/gridset-core-design.md §5,
+ * תוקן 27.9.2026 אחרי שהתברר שאין ירושת-סגנון-מתוך-סגנון בנתונים):
+ *   DEFAULT_RESOLVED_STYLE → הסגנון הנקוב (רשומה שטוחה תחת Style[Key])
+ *                          → עקיפות מקומיות של התא.
+ *
+ * `BasedOnStyle` מופיע פעם אחת בסכמה בלבד — על התא (252,974 מופעים =
+ * מספר התאים) — ומעולם לא כשדה של `Style` עצמו. סגנון נקוב אינו יורש
+ * מסגנון אחר; לכן אין כאן `while`, אין `visited`, ואין הגנה ממעגל.
  *
  * 🔑 אין תלות ב-DOMParser: styles.xml הוא מבנה שטוח בלבד (`<Style Key="…">`
  * עם ילדים-עלה, ללא קינון — אומת מול gridset-schema.tsv), ולכן פרסר-regex
@@ -18,16 +23,18 @@ const STYLE_ELEMENT_RE = /<Style\b([^>]*?)(?:\/>|>([\s\S]*?)<\/Style>)/g;
 const KEY_ATTR_RE = /\bKey\s*=\s*"([^"]*)"|\bKey\s*=\s*'([^']*)'/;
 const CHILD_ELEMENT_RE = /<(\w+)>([\s\S]*?)<\/\1>/g;
 
-/** תגי-XML של Style שיש להם מקום ייעודי ב-Style — שאר התגים נשמרים כמו שהם. */
+/**
+ * תגי-XML של Style שיש להם מקום ייעודי ב-Style — שאר התגים (למשל `Name`,
+ * `TileColour`) נשמרים כמות שהם דרך ה-catch-all, כי אין להם שדה טיפוסי.
+ * ‏`Key` (המזהה, 3,282 מופעים) נקרא בנפרד כתכונה — ראו KEY_ATTR_RE.
+ */
 const FIELD_MAP: Partial<Record<string, keyof Style>> = {
 	BackColour: 'backColour',
 	FontColour: 'fontColour',
 	BorderColour: 'borderColour',
 	FontName: 'fontName',
 	FontSize: 'fontSize',
-	BackgroundShape: 'backgroundShape',
-	BasedOnStyle: 'basedOnStyle',
-	TileGap: 'tileGap'
+	BackgroundShape: 'backgroundShape'
 };
 
 const NUMERIC_FIELDS = new Set<keyof Style>(['fontSize', 'backgroundShape']);
@@ -112,50 +119,25 @@ function applyStyleOverrides(base: ResolvedStyle, overrides: Partial<Style>): Re
 }
 
 /**
- * שרשרת ה-BasedOnStyle, מהשורש כלפי מטה (הסגנון הנקוב אחרון).
- * 🛑 הגנה ממעגל: `Set` של שמות שכבר נראו — עוצר עם אזהרה, לא זורק.
- * שם-סגנון שלא נמצא במילון — עוצר את השרשרת באותה נקודה (מה שנפתר עד כה נשמר).
- */
-function resolveInheritanceChain(startName: string, styles: Record<string, Style>): Style[] {
-	const chain: Style[] = [];
-	const visited = new Set<string>();
-	let currentName: string | undefined = startName;
-
-	while (currentName) {
-		if (visited.has(currentName)) {
-			console.warn(
-				`[gridset:resolveStyle] מעגל בשרשרת BasedOnStyle: ${[...visited, currentName].join(' → ')} — נעצר`
-			);
-			break;
-		}
-
-		const style: Style | undefined = styles[currentName];
-		if (!style) {
-			console.warn(`[gridset:resolveStyle] שם סגנון לא קיים: "${currentName}" — נופל לברירת מחדל`);
-			break;
-		}
-
-		visited.add(currentName);
-		chain.push(style);
-		currentName = style.basedOnStyle;
-	}
-
-	return chain.reverse();
-}
-
-/**
  * בונה פותר-סגנונות מוזרק (StyleResolver) מתוך מילון הסגנונות שנפרס.
- * הפרסר הראשי (parse.ts, סלייס אחר) אינו יודע לפתור ירושה — הוא רק מזריק
+ * הפרסר הראשי (parse.ts, סלייס אחר) אינו יודע לפתור סגנון — הוא רק מזריק
  * את הפותר הזה, כדי ששני הסלייסים ייכתבו במקביל בלי תלות ישירה.
+ *
+ * שתי רמות בלבד: הסגנון הנקוב (חיפוש יחיד לפי `Key`, בלי ירושה בין סגנונות)
+ * ואז עקיפות מקומיות של התא. שם-סגנון שלא נמצא — נופל לברירת-המחדל ומדווח.
  */
 export function createStyleResolver(styles: Record<string, Style>): StyleResolver {
 	return (source: CellStyleSource): ResolvedStyle => {
 		let resolved = DEFAULT_RESOLVED_STYLE;
 
 		if (source.basedOnStyle) {
-			const chain = resolveInheritanceChain(source.basedOnStyle, styles);
-			for (const style of chain) {
-				resolved = applyStyleOverrides(resolved, style);
+			const namedStyle = styles[source.basedOnStyle];
+			if (namedStyle) {
+				resolved = applyStyleOverrides(resolved, namedStyle);
+			} else {
+				console.warn(
+					`[gridset:resolveStyle] שם סגנון לא קיים: "${source.basedOnStyle}" — נופל לברירת מחדל`
+				);
 			}
 		}
 
