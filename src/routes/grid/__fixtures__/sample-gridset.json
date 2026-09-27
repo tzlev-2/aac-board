@@ -8,6 +8,8 @@
 			"name": "בדיקה",
 			"columns": 2,
 			"rows": 2,
+			"columnWidths": [null, null],
+			"rowHeights": [null, null],
 			"wordList": [],
 			"predictionSource": "None",
 			"autoContentCommands": {},

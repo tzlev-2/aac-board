@@ -1,17 +1,32 @@
 <script lang="ts">
 	import type { CellRendererProps } from './cellRenderers';
 	import { cellRendererKey } from './cellRenderers';
+	import { VISUAL_DEFAULTS } from '$lib/gridset/visualDefaults';
 
 	let { cell }: CellRendererProps = $props();
 
 	const key = $derived(cellRendererKey(cell));
 </script>
 
-<div class="unsupported-cell" data-testid="unsupported-cell">
+<div
+	class="unsupported-cell"
+	data-testid="unsupported-cell"
+	style="gap: {VISUAL_DEFAULTS.unsupportedBadgeGap}"
+>
 	{#if cell.caption}
 		<span class="caption">{cell.caption}</span>
 	{/if}
-	<span class="type-badge" data-testid="unsupported-cell-type">{key}</span>
+	<span
+		class="type-badge"
+		data-testid="unsupported-cell-type"
+		style="
+			font-size: {VISUAL_DEFAULTS.unsupportedBadgeFontSize};
+			opacity: {VISUAL_DEFAULTS.unsupportedBadgeOpacity};
+			border-radius: {VISUAL_DEFAULTS.unsupportedBadgeRadius};
+		"
+	>
+		{key}
+	</span>
 </div>
 
 <style>
@@ -20,7 +35,6 @@
 		flex-direction: column;
 		align-items: center;
 		justify-content: center;
-		gap: 2px;
 		width: 100%;
 		height: 100%;
 		overflow: hidden;
@@ -35,10 +49,7 @@
 		max-width: 100%;
 	}
 	.type-badge {
-		font-size: 0.7em;
-		opacity: 0.7;
 		border: 1px dashed currentColor;
-		border-radius: 4px;
 		padding: 0 4px;
 	}
 </style>

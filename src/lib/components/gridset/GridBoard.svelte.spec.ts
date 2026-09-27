@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { render } from 'vitest-browser-svelte';
-import type { Cell, Page, ResolvedStyle, RuntimeContext } from '$lib/gridset/types';
+import type { Cell, Page, ResolvedStyle, RuntimeContext, SizeName } from '$lib/gridset/types';
 import GridBoard from './GridBoard.svelte';
 import { cellRendererKey, resolveCellRenderer } from './cellRenderers';
 import ButtonCell from './ButtonCell.svelte';
@@ -29,10 +29,14 @@ function makeCell(overrides: Partial<Cell> = {}): Cell {
 }
 
 function makePage(overrides: Partial<Page> = {}): Page {
+	const columns = overrides.columns ?? 6;
+	const rows = overrides.rows ?? 4;
 	return {
 		name: 'test',
-		columns: 6,
-		rows: 4,
+		columns,
+		rows,
+		columnWidths: Array.from({ length: columns }, () => null as SizeName | null),
+		rowHeights: Array.from({ length: rows }, () => null as SizeName | null),
 		cells: [],
 		wordList: [],
 		predictionSource: 'None',
@@ -122,6 +126,18 @@ describe('GridBoard', () => {
 
 		expect(el.getAttribute('aria-disabled')).toBe('true');
 		expect(getComputedStyle(el).pointerEvents).toBe('none');
+		expect(getComputedStyle(el).opacity).toBe(String(0.4));
+	});
+
+	it('PointerAndTouchOnly מרונדר רגיל — לא מעומעם ולא לא-לחיץ', () => {
+		const cell = makeCell({ x: 0, y: 0, visibility: 'PointerAndTouchOnly', caption: 'מגע' });
+		const p = makePage({ cells: [cell] });
+		const screen = render(GridBoard, { page: p, ctx: makeCtx(p) });
+		const el = screen.getByTestId('grid-cell').element();
+
+		expect(el.getAttribute('aria-disabled')).toBeNull();
+		expect(getComputedStyle(el).opacity).toBe('1');
+		expect(getComputedStyle(el).pointerEvents).not.toBe('none');
 	});
 
 	it('סוג לא-מוכר נותן UnsupportedCell', async () => {
@@ -130,6 +146,65 @@ describe('GridBoard', () => {
 		const screen = render(GridBoard, { page: p, ctx: makeCtx(p) });
 
 		await expect.element(screen.getByTestId('unsupported-cell')).toBeInTheDocument();
+	});
+
+	it('cell.style.fontName מוחל כ-font-family (לא נזרק בשקט)', () => {
+		const cell = makeCell({ style: { ...style, fontName: 'Booster' } });
+		const p = makePage({ cells: [cell] });
+		const screen = render(GridBoard, { page: p, ctx: makeCtx(p) });
+		const el = screen.getByTestId('grid-cell').element();
+
+		expect(getComputedStyle(el).fontFamily).toContain('Booster');
+	});
+
+	it('🔑 Workspace/Chat יושב בפועל בתוך הרשת — לא רצועה נפרדת', () => {
+		const chat = makeCell({
+			x: 0,
+			y: 0,
+			columnSpan: 4,
+			rowSpan: 1,
+			contentType: 'Workspace',
+			contentSubType: 'Chat'
+		});
+		const p = makePage({ columns: 4, rows: 1, cells: [chat] });
+		const screen = render(GridBoard, { page: p, ctx: makeCtx(p) });
+
+		const board = screen.getByTestId('grid-board').element();
+		const chatContent = screen.getByTestId('chat-cell').element();
+		const cellWrapper = screen.getByTestId('grid-cell').element();
+
+		// ChatCell הוא צאצא של הרשת, וה-GridCell שעוטף אותו הוא ילד ישיר שלה.
+		expect(board.contains(chatContent)).toBe(true);
+		expect(cellWrapper.parentElement).toBe(board);
+		expect(chatContent.closest('[data-testid="grid-cell"]')).toBe(cellWrapper);
+
+		const computed = getComputedStyle(cellWrapper);
+		expect(computed.gridColumnStart).toBe('1');
+		expect(computed.gridColumnEnd).toBe('span 4');
+	});
+
+	it('columnWidths/rowHeights לא-רגילים משנים את גודל המסלולים היחסי', () => {
+		const p = makePage({
+			columns: 3,
+			rows: 1,
+			columnWidths: ['Large', null, 'ExtraSmall']
+		});
+		const screen = render(GridBoard, { page: p, ctx: makeCtx(p) });
+		const tracks = getComputedStyle(screen.getByTestId('grid-board').element())
+			.gridTemplateColumns.trim()
+			.split(/\s+/)
+			.map(parseFloat);
+
+		expect(tracks[0]).toBeGreaterThan(tracks[1]); // Large > רגיל
+		expect(tracks[1]).toBeGreaterThan(tracks[2]); // רגיל > ExtraSmall
+	});
+
+	it('הרשת מוגדרת להתמתח לגובה הזמין (flex:1) ולא רק לתוכן', () => {
+		const p = makePage();
+		const screen = render(GridBoard, { page: p, ctx: makeCtx(p) });
+		const computed = getComputedStyle(screen.getByTestId('grid-board').element());
+
+		expect(computed.flexGrow).toBe('1');
 	});
 });
 

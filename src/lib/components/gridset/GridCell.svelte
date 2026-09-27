@@ -5,6 +5,7 @@
 	 * ולא לחיץ). Hidden מסונן קודם ב-GridBoard ולא מגיע לכאן בכלל.
 	 */
 	import type { Cell, RuntimeContext } from '$lib/gridset/types';
+	import { VISUAL_DEFAULTS } from '$lib/gridset/visualDefaults';
 	import { resolveCellRenderer } from './cellRenderers';
 
 	let { cell, ctx }: { cell: Cell; ctx: RuntimeContext } = $props();
@@ -25,7 +26,12 @@
 		background-color: {cell.style.backColour};
 		color: {cell.style.fontColour};
 		border-color: {cell.style.borderColour};
+		font-family: {cell.style.fontName};
 		font-size: {cell.style.fontSize}px;
+		border-width: {VISUAL_DEFAULTS.tileBorderWidth};
+		border-radius: {VISUAL_DEFAULTS.tileBorderRadius};
+		padding: {VISUAL_DEFAULTS.tilePadding};
+		opacity: {disabled ? VISUAL_DEFAULTS.disabledOpacity : 1};
 	"
 >
 	<Renderer {cell} {ctx} />
@@ -37,13 +43,10 @@
 		grid-row: calc(var(--y) + 1) / span var(--rspan);
 		display: flex;
 		box-sizing: border-box;
-		border: 2px solid;
-		border-radius: var(--tile-radius);
-		padding: var(--tile-padding);
+		border-style: solid;
 		overflow: hidden;
 	}
 	.cell.disabled {
-		opacity: var(--disabled-opacity);
 		pointer-events: none;
 	}
 </style>

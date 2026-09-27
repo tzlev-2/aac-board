@@ -5,13 +5,19 @@
 	 * ברשת לפי span, ומקבל את הסגנון שלו כמו כל תא (מ-GridCell).
 	 */
 	import type { CellRendererProps } from './cellRenderers';
+	import { VISUAL_DEFAULTS } from '$lib/gridset/visualDefaults';
 
 	let { ctx }: CellRendererProps = $props();
 
 	const text = $derived(ctx.output.items.map((item) => item.text).join(' '));
 </script>
 
-<div class="chat-cell" role="status">
+<div
+	class="chat-cell"
+	data-testid="chat-cell"
+	role="status"
+	style="padding-inline: {VISUAL_DEFAULTS.tilePadding}"
+>
 	<span class="output-text">{text}</span>
 </div>
 
@@ -22,7 +28,6 @@
 		width: 100%;
 		height: 100%;
 		overflow: hidden;
-		padding-inline: var(--tile-padding);
 	}
 	.output-text {
 		font: inherit;

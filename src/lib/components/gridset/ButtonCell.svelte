@@ -5,7 +5,7 @@
 	let { cell }: CellRendererProps = $props();
 </script>
 
-<div class="button-cell">
+<div class="button-cell" style="gap: {VISUAL_DEFAULTS.tileGap}">
 	{#if cell.image}
 		<!-- פתירת קבצי סמל אמיתיים (arasaac.ts) מחוץ להיקף הסלייס הזה -->
 		<div
@@ -14,7 +14,7 @@
 			title={cell.image.path}
 			aria-hidden="true"
 		>
-			<span class="symbol-placeholder">🖼</span>
+			<span class="symbol-placeholder" style="font-size: {VISUAL_DEFAULTS.symbolFontSize}">🖼</span>
 		</div>
 	{/if}
 	{#if cell.caption}
@@ -28,7 +28,6 @@
 		flex-direction: column;
 		align-items: center;
 		justify-content: center;
-		gap: var(--tile-gap);
 		width: 100%;
 		height: 100%;
 		overflow: hidden;
@@ -40,7 +39,6 @@
 		min-height: 0;
 	}
 	.symbol-placeholder {
-		font-size: 1.5em;
 		line-height: 1;
 	}
 	.caption {

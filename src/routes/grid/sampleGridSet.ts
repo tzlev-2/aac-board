@@ -90,6 +90,8 @@ const page: Page = {
 	name: 'ראשי',
 	columns: 4,
 	rows: 3,
+	columnWidths: [null, null, null, null],
+	rowHeights: [null, null, null],
 	cells,
 	wordList: [],
 	predictionSource: 'None',
