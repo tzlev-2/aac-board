@@ -15,7 +15,11 @@
 	import { parseGridSet } from '$lib/gridset/parse';
 	import GridSetView from '$lib/components/gridset/GridSetView.svelte';
 	import { SAMPLE_GRID_SET } from './sampleGridSet';
+	import { onMount } from 'svelte';
 
+	// ‏`SAMPLE_GRID_SET` הוא לוח-הדגמה מוטבע בן 9 תאים. הוא נשאר כ**מצב
+	// פתיחה** כדי שהדף יצייר משהו מיָד וב-SSR, אבל הוא **אינו מה שרוצים
+	// לראות** — הלוח האמיתי נטען ב-`onMount` מיד אחריו.
 	let gridSet = $state<GridSet>(SAMPLE_GRID_SET);
 	let error = $state('');
 	let loading = $state(false);
@@ -59,6 +63,45 @@
 		}
 	}
 
+	/**
+	 * ‏🛑 **תוכן Smartbox מורשה.** הלוחות תחת `static/` אינם בגיט
+	 * (‏`*.gridset` ב-`.gitignore`) ואינם נשלחים עם הקוד — הם נכנסים
+	 * **לתיקיית הבילד בלבד**, ולכן כל פריסה שמכילה אותם **חייבת לשבת
+	 * מאחורי Cloudflare Access.**
+	 *
+	 * נפרס כך ⟨28.9.2026⟩: ‏`aac-board` בחשבון הארגוני, ‏Access הועמד על
+	 * ‏`*.aac-board-bzq.pages.dev` **לפני** ההעלאה הראשונה. אומת שגם
+	 * ‏`/org-1.gridset` עצמו חסום, ולא רק הדף.
+	 */
+	async function loadFromUrl(url: string, name: string) {
+		loading = true;
+		error = '';
+		await nextFrame();
+		try {
+			const res = await fetch(url);
+			if (!res.ok) throw new Error(`${res.status}`);
+			gridSet = await parseGridSet(new Uint8Array(await res.arrayBuffer()));
+			sourceName = name;
+		} catch (e) {
+			error = `טעינה נכשלה: ${e instanceof Error ? e.message : String(e)}`;
+		} finally {
+			loading = false;
+		}
+	}
+
+	/**
+	 * 🔑 טעינה אוטומטית של הלוח האמיתי.
+	 *
+	 * בלי זה הדף נפתח על לוח-ההדגמה בן ה-9 תאים, ומי שנכנס לכתובת רואה
+	 * "לוח ישן" ומסיק שהפריסה לא עודכנה. ⟨נצרב 28.9.2026 — בדיוק זה קרה.⟩
+	 *
+	 * ‏`onMount` ולא בזמן-בנייה: הפרסור הוא של ZIP בצד-הלקוח.
+	 * כישלון אינו מפיל את הדף — נשארים על לוח-ההדגמה ומודיעים.
+	 */
+	onMount(() => {
+		void loadFromUrl('/org-1.gridset', 'org-1.gridset');
+	});
+
 	function handleDrop(e: DragEvent) {
 		e.preventDefault();
 		handleFiles(e.dataTransfer?.files ?? null);
@@ -81,6 +124,22 @@
 				onchange={(e) => handleFiles((e.currentTarget as HTMLInputElement).files)}
 			/>
 		</label>
+		<div class="samples">
+			<button type="button" onclick={() => loadFromUrl('/org-1.gridset', 'org-1.gridset')}>
+				טען לוח לדוגמה — ‏96 דפים
+			</button>
+			<button type="button" onclick={() => loadFromUrl('/org-2.gridset', 'org-2.gridset')}>
+				לוח גדול יותר — ‏132 דפים
+			</button>
+			<!--
+				🔑 הלוח היחיד עם סמלי PCS. ‏`org-1` ו-`org-2` הם **אפס** הפניות
+				‏`[MJPCS#]` — ‏415 מתוך 415 יושבות כאן (‏76% מהפניות-הספרייה שלו).
+				בלי הכפתור הזה אי אפשר לראות את שכבת ה-PCS בכלל.
+			-->
+			<button type="button" onclick={() => loadFromUrl('/org-3.gridset', 'org-3.gridset')}>
+				לוח עם סמלי PCS — ‏34 דפים
+			</button>
+		</div>
 		{#if loading}
 			<p class="status" data-testid="grid-loading" role="status">טוען את הלוח…</p>
 		{:else if sourceName}
@@ -116,5 +175,22 @@
 	}
 	.error {
 		color: #c62828;
+	}
+	.samples {
+		display: flex;
+		gap: 0.5rem;
+		margin-top: 0.6rem;
+		flex-wrap: wrap;
+	}
+	.samples button {
+		padding: 0.45rem 0.9rem;
+		border: 1px solid #9bb;
+		border-radius: 6px;
+		background: #eef6f8;
+		cursor: pointer;
+		font: inherit;
+	}
+	.samples button:hover {
+		background: #dceef3;
 	}
 </style>

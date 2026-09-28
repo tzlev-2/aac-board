@@ -365,11 +365,25 @@ export function createSymbolResolver(
 	const cache = options.cache === null ? null : (options.cache ?? createSymbolCache());
 	const size = options.size ?? 300;
 	const minMatch = options.minMatch ?? 'exact';
-	// ‏אותו מקור של `proxy-client.ts` — הוורקר שמגיש את הדלי הפרטי. ריק ⇒ כבוי.
-	const pcsBaseUrl = (
-		options.pcsBaseUrl ??
-		((typeof import.meta !== 'undefined' && import.meta.env?.VITE_PROXY_URL) || '')
-	).replace(/\/+$/, '');
+	/**
+	 * ‏🔑 **‏PCS מוגש מאותו origin.** ‏`/img/pcs/<id>` הוא נתיב-שרת שקורא
+	 * מדלי R2 דרך binding — ראו `src/routes/img/pcs/README.md`.
+	 *
+	 * הסמל נצרך ב-`<img src>`, ולכן דומיין נפרד מאחורי Access היה הופך
+	 * את הבקשה ל-subresource חוצה-אתר והקוקי היה נחסם ב-Safari וב-Firefox.
+	 *
+	 * 🛑 **אין כאן "מתג הפעלה", והבטיחות לא נפגעה:** בלי ה-binding הנתיב
+	 * מחזיר 404 והפותר נופל ל-ARASAAC. בילד בלי גישה לדלי אינו מתחיל
+	 * להגיש תוכן מורשה — בדיוק כמו קודם, רק בלי משתנה-סביבה שאפשר לשכוח.
+	 *
+	 * ‏`options.pcsBaseUrl` נשאר לבדיקות: `''` מכבה, מחרוזת מפנה החוצה.
+	 */
+	// 🛑 **שלושה מצבים, ושניים מהם נראו זהים.** ‏`''` הוא **כיבוי מפורש**
+	// (כך הבדיקות מכבות), ולכן אי אפשר לייצג "אותו origin" גם הוא כמחרוזת
+	// ריקה — ניסיתי `'/'` וה-`replace` שמסיר סלאש-סופי החזיר אותו ל-`''`,
+	// והשכבה כובתה בשקט. ⟨נצרב 28.9.2026 — הסמלים פשוט לא הופיעו.⟩
+	const pcsEnabled = options.pcsBaseUrl !== '';
+	const pcsBaseUrl = (options.pcsBaseUrl ?? '').replace(/\/+$/, '');
 	const captionLang = primaryLanguage(gridSet.language);
 
 	const stats: SymbolResolverStats = {
@@ -511,12 +525,12 @@ export function createSymbolResolver(
 		//
 		// ‏`library` המדווח נשאר זה של ה-ref הראשון, כדי ש-`byLibrary` ישמור
 		// על אותה סמנטיקה שנמדדה עד כה. ההפרדה בין המקורות היא ב-`resolvedBySource`.
-		if (pcsBaseUrl) {
+		if (pcsEnabled) {
 			for (const ref of refs) {
 				const pcsId = pcsSymbolId(ref);
 				if (pcsId !== null && PCS_AVAILABLE_IDS.has(pcsId)) {
 					return {
-						url: `${pcsBaseUrl}/v1/img/pcs/${pcsId}`,
+						url: `${pcsBaseUrl}/img/pcs/${pcsId}`,
 						source: 'pcs',
 						query: pcsId,
 						library

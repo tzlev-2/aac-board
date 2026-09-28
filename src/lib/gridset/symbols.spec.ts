@@ -305,8 +305,13 @@ describe('createSymbolResolver', () => {
 			cell({ image: ref('MJPCS#', '10078.wmf'), caption: 'פירות' })
 		);
 
+		// ‏🛑 התבנית השתנתה מ-`/v1/img/pcs/` ל-`/img/pcs/` ⟨28.9.2026⟩.
+		// ‏`/v1/...` הייתה צורת ה-Worker הנפרד (`proxy/`). ההגשה עברה
+		// לנתיב-שרת **באותו origin** — ‏`src/routes/img/pcs/[id]/+server.ts` —
+		// כדי שהסמל, שנצרך ב-`<img src>`, לא יהיה subresource חוצה-אתר
+		// שהקוקי של Access נחסם עליו. ‏`proxy/` נשאר, כבוי.
 		expect(resolution).toMatchObject({
-			url: 'https://proxy.example/v1/img/pcs/10078',
+			url: 'https://proxy.example/img/pcs/10078',
 			source: 'pcs',
 			query: '10078',
 			library: 'mjpcs#'

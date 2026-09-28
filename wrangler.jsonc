@@ -8,6 +8,20 @@
 		"binding": "ASSETS",
 		"directory": ".svelte-kit/cloudflare"
 	},
+	// 🛑 **מקור-האמת ל-bindings, גם כשהפריסה היא Pages.**
+	// ‏Pages **אינו קורא את הקובץ הזה** — שם ה-binding הוא הגדרת-פרויקט.
+	// ‏`tools/apply-pages-bindings.sh` קורא מכאן ומחיל דרך ה-API.
+	// אחרי כל שינוי כאן — להריץ אותו.
+	//
+	// ‏`PCS_ASSETS`: סמלי Mayer-Johnson מורשים. ראו
+	// ‏`src/routes/img/pcs/README.md` — כולל התנאי שכל פריסה שמחילה את
+	// ה-binding הזה **חייבת לשבת מאחורי Cloudflare Access.**
+	"r2_buckets": [
+		{
+			"binding": "PCS_ASSETS",
+			"bucket_name": "aac-assets"
+		}
+	],
 	"workers_dev": true,
 	"preview_urls": true
 }
