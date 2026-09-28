@@ -123,6 +123,16 @@
 		max-width: 100%;
 		box-sizing: border-box;
 	}
+	/**
+	 * כתובית לבדה נשברת לשורות וממלאת את התא; כתובית **מתחת לסמל** נשארת שורה
+	 * אחת — וזו ההבחנה ש-`captionOnly` כבר עושה (GRID-GAPS §2).
+	 * `overflow-wrap` — לא-מאומת מול Grid: שבירה **בתוך מילה** לא נמדדה, והיא
+	 * כאן רק כדי שמילה בודדת ארוכה מ-התא לא תגלוש אופקית.
+	 */
+	.caption.caption-only {
+		white-space: normal;
+		overflow-wrap: break-word;
+	}
 	.bottom-gap {
 		width: 100%;
 		flex: 0 0 auto;

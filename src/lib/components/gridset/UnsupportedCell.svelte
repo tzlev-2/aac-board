@@ -38,7 +38,8 @@
 		text-align: center;
 		overflow: hidden;
 		text-overflow: ellipsis;
-		white-space: nowrap;
+		white-space: normal;
+		overflow-wrap: break-word;
 		max-width: 100%;
 	}
 </style>

@@ -164,3 +164,66 @@ describe('נאמנות חזותית — סמל וגופן', () => {
 		expect(applied.split(',').length).toBe(resolveFontFamily('Booster').split(',').length);
 	});
 });
+
+/** ~60 תווים — דפוס הנחיה ארוכה בלוח org-3. */
+const LONG =
+	'לפני שמתחילים את הפעילות, ודאו שכל התלמידים יושבים במקומם ושומעים את ההוראה עד הסוף';
+
+function captionLineHeightPx(caption: HTMLElement): number {
+	const cs = getComputedStyle(caption);
+	const fromStyle = parseFloat(cs.lineHeight);
+	if (cs.lineHeight !== 'normal' && !Number.isNaN(fromStyle)) {
+		return fromStyle;
+	}
+	/** ‏`UnsupportedCell` לא מגדיר line-height על הכתובית — אותו יחס כמו ButtonCell. */
+	const fontSizePx = parseFloat(cs.fontSize);
+	if (Number.isNaN(fontSizePx)) {
+		throw new Error(`caption font-size unusable: ${cs.fontSize}`);
+	}
+	return fontSizePx * VISUAL_DEFAULTS.captionLineHeight;
+}
+
+function captionWrappedLineCount(caption: HTMLElement): number {
+	return Math.round(caption.getBoundingClientRect().height / captionLineHeightPx(caption));
+}
+
+function expectNoHorizontalOverflow(caption: HTMLElement) {
+	expect(caption.scrollWidth).toBeLessThanOrEqual(caption.clientWidth + 1);
+}
+
+describe('נאמנות חזותית — כתובית לבדה (§2)', () => {
+	it('🔑 כתובית לבדה נשברת לשורות וממלאת את התא', async () => {
+		const { screen, el } = renderCell(makeCell({ caption: LONG }), 309, 509);
+		await expect.element(screen.getByTestId('cell-caption')).toBeInTheDocument();
+
+		const caption = el.querySelector('[data-testid=cell-caption]') as HTMLElement;
+		expect(captionWrappedLineCount(caption)).toBeGreaterThanOrEqual(2);
+		expectNoHorizontalOverflow(caption);
+	});
+
+	it('תא עם סמל נשאר שורה אחת — ההבחנה של captionOnly', async () => {
+		const { screen, el } = renderCell(
+			makeCell({ caption: LONG, image: { library: 'widgit', path: 'food.emf' } }),
+			309,
+			509
+		);
+		await expect.element(screen.getByTestId('cell-caption')).toBeInTheDocument();
+
+		const caption = el.querySelector('[data-testid=cell-caption]') as HTMLElement;
+		expect(getComputedStyle(caption).whiteSpace).toBe('nowrap');
+		expect(captionWrappedLineCount(caption)).toBe(1);
+	});
+
+	it('UnsupportedCell — כתובית ארוכה נשברת', async () => {
+		const { screen, el } = renderCell(
+			makeCell({ caption: LONG, contentType: 'LiveCell', contentSubType: 'Camera' }),
+			309,
+			509
+		);
+		await expect.element(screen.getByTestId('unsupported-cell')).toBeInTheDocument();
+
+		const caption = el.querySelector('[data-testid=unsupported-cell] .caption') as HTMLElement;
+		expect(captionWrappedLineCount(caption)).toBeGreaterThanOrEqual(2);
+		expectNoHorizontalOverflow(caption);
+	});
+});
