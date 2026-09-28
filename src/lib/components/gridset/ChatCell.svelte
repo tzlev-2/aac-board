@@ -6,8 +6,11 @@
 	 */
 	import type { CellRendererProps } from './cellRenderers';
 	import { VISUAL_DEFAULTS } from '$lib/gridset/visualDefaults';
+	import ChatChip from './ChatChip.svelte';
 
-	let { ctx }: CellRendererProps = $props();
+	let { cell, ctx, symbols = null }: CellRendererProps = $props();
+
+	const SPACE = ' ';
 
 	/**
 	 * 🛑 **רצף-רווחים מתכווץ, בדיוק כמו ב-`OutputBuffer.text`** — כלומר מה
@@ -17,14 +20,19 @@
 	 * (‏`appendToStream`), והחיבור כאן מוסיף רווח **בין** פריטים. בשרשרת
 	 * האמיתית ‏`Space → Punctuation → Space` (דף "מקלדת פשוטה - ספרות
 	 * וסימנים" ב-`org-1`, ‏5 תאים) זה הפיק ‏"1 +  2 =  3" עם רווח כפול.
+	 *
+	 * בסלייס 15 הכיווץ עבר ל-`parts` (trim לכל פריט + `lead` + `{SPACE}` בין
+	 * שבבים) — שקול ל-`join(' ').replace(/\s+/g, ' ').trim()` על הפריטים (§4).
 	 */
-	const text = $derived(
-		ctx.output.items
-			.map((item) => item.text)
-			.join(' ')
-			.replace(/\s+/g, ' ')
-			.trim()
-	);
+	const parts = $derived.by(() => {
+		let emitted = false;
+		return ctx.output.items.map((item) => {
+			const text = item.text.replace(/\s+/g, ' ').trim();
+			const lead = Boolean(text) && emitted;
+			if (text) emitted = true;
+			return { text, lead, image: item.image };
+		});
+	});
 </script>
 
 <div
@@ -33,7 +41,7 @@
 	role="status"
 	style="padding-inline: {VISUAL_DEFAULTS.tilePadding}"
 >
-	<span class="output-text">{text}</span>
+	<span class="output-text">{#each parts as part}{#if part.lead}{SPACE}{/if}<ChatChip text={part.text} image={part.image} {cell} {symbols} />{/each}</span>
 </div>
 
 <style>
