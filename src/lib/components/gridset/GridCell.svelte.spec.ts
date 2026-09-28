@@ -1,10 +1,8 @@
 /**
- * היזון חזותי ללחיצה/ריחוף — טבעת `outline` על `.cell.interactive` בלבד.
- *
- * 🔑 `:hover` ב-getComputedStyle אחרי synthetic events אינו אמין; האימות
- * האמיתי הוא צילום (§6 בבריף). כאן נבדקים שהכלל קיים ב-CSS ושהעובי נגזר
- * מ-`--gutter`, ושתא לא-לחיץ אינו `.interactive`.
+ * היזון חזותי — טבעת `outline` על `.cell.interactive`.
+ * שער חזותי: צילום DoD; כאן hover אמיתי + getComputedStyle.
  */
+import { page } from 'vitest/browser';
 import { describe, expect, it } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import type { Cell, ResolvedStyle, RuntimeContext } from '$lib/gridset/types';
@@ -24,8 +22,8 @@ function makeCell(overrides: Partial<Cell> = {}): Cell {
 	return { x: 0, y: 0, columnSpan: 1, rowSpan: 1, commands: [], style, ...overrides };
 }
 
-function makeCtx(): RuntimeContext {
-	const page = {
+function makeCtx(theme?: string): RuntimeContext {
+	const pageDef = {
 		name: 'test',
 		columns: 4,
 		rows: 4,
@@ -42,10 +40,11 @@ function makeCtx(): RuntimeContext {
 			startGrid: 'test',
 			language: 'he-IL',
 			symbolSearchKeys: [],
-			pages: { test: page },
-			styles: {}
+			pages: { test: pageDef },
+			styles: {},
+			theme
 		},
-		page,
+		page: pageDef,
 		features: new Set(),
 		navigate: () => {},
 		back: () => {},
@@ -66,43 +65,48 @@ function makeCtx(): RuntimeContext {
 	};
 }
 
-/** כללי ה-scope של Svelte — חיפוש לפי `.cell.interactive` + pseudo. */
-function styleRulesMatching(substring: string): CSSStyleRule[] {
-	const out: CSSStyleRule[] = [];
-	for (const sheet of document.styleSheets) {
-		try {
-			for (const rule of sheet.cssRules) {
-				if (rule instanceof CSSStyleRule && rule.selectorText.includes(substring)) {
-					out.push(rule);
-				}
-			}
-		} catch {
-			// גיליון חסום — לא רלוונטי לקומפוננטה
-		}
-	}
-	return out;
-}
+const speakCmd = [{ id: 'Action.Speak' as const, params: { unit: 'All' as const } }];
 
 describe('GridCell — טבעת press/hover', () => {
-	it('ל-.cell.interactive יש :hover עם outline-width מ-0.71×--gutter', () => {
+	it('hover — outline-width מחושב > 0 ו≈ 0.71×--gutter (squircle, בלי clip-path)', async () => {
 		render(GridCell, {
-			cell: makeCell({ commands: [{ id: 'Action.Speak', params: { unit: 'All' } }] }),
-			ctx: makeCtx()
+			cell: makeCell({ commands: speakCmd, style: { ...style, backgroundShape: 1 } }),
+			ctx: makeCtx('Kids')
 		});
+		const loc = page.getByTestId('grid-cell');
+		const cellEl = loc.element() as HTMLElement;
+		cellEl.style.setProperty('--gutter', '38px');
+		cellEl.style.width = '277px';
+		cellEl.style.height = '217px';
 
-		const hoverRules = styleRulesMatching('.cell.interactive').filter((r) =>
-			r.selectorText.includes(':hover')
-		);
-		expect(hoverRules.length).toBeGreaterThan(0);
+		await loc.hover();
+		const s = getComputedStyle(cellEl);
+		const outlineWidth = parseFloat(s.outlineWidth);
 
-		const widths = hoverRules.map((r) => r.style.outlineWidth || r.style.getPropertyValue('outline-width'));
-		const hasGutterOutline = widths.some(
-			(w) => w.includes('0.71') && w.includes('--gutter')
-		);
-		expect(hasGutterOutline).toBe(true);
+		const gutterPx = parseFloat(s.getPropertyValue('--gutter'));
+		expect(outlineWidth).toBeGreaterThan(0);
+		expect(Math.abs(outlineWidth - 0.71 * gutterPx)).toBeLessThan(2);
 	});
 
-	it('תא בלי פקודות אינו interactive ולא מקבל את כללי הטבעת', () => {
+	it('cut-top-left (Kids, shape 2) — clip-path פעיל; outline-width מחושב > 0 (נחתך בציור)', async () => {
+		render(GridCell, {
+			cell: makeCell({ commands: speakCmd, style: { ...style, backgroundShape: 2 } }),
+			ctx: makeCtx('Kids')
+		});
+		const loc = page.getByTestId('grid-cell');
+		const cellEl = loc.element() as HTMLElement;
+		cellEl.style.setProperty('--gutter', '38px');
+		cellEl.style.width = '277px';
+		cellEl.style.height = '217px';
+
+		await loc.hover();
+		const s = getComputedStyle(cellEl);
+
+		expect(parseFloat(s.outlineWidth)).toBeGreaterThan(0);
+		expect(s.clipPath).not.toBe('none');
+	});
+
+	it('תא בלי פקודות אינו interactive', () => {
 		const screen = render(GridCell, { cell: makeCell({ commands: [] }), ctx: makeCtx() });
 		const el = screen.getByTestId('grid-cell').element();
 
