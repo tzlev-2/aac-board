@@ -41,7 +41,7 @@
 	role="status"
 	style="padding-inline: {VISUAL_DEFAULTS.tilePadding}"
 >
-	<span class="output-text">{#each parts as part}{#if part.lead}{SPACE}{/if}<ChatChip text={part.text} image={part.image} {cell} {symbols} />{/each}</span>
+	<span class="output-text">{#each parts as part}{#if part.lead}{SPACE}{/if}<ChatChip text={part.text} image={part.image} {cell} {symbols} />{/each}<span class="caret" aria-hidden="true"></span></span>
 </div>
 
 <style>
@@ -59,5 +59,13 @@
 		overflow: hidden;
 		text-overflow: ellipsis;
 		width: 100%;
+	}
+	.caret {
+		display: inline-block;
+		width: 1px;
+		/* 🛑 לא-מאומת מול Grid — ~1.24× גובה הדיו (§17 §4.3) */
+		height: 1.24em;
+		vertical-align: text-bottom;
+		background-color: currentColor;
 	}
 </style>

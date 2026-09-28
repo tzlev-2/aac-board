@@ -126,6 +126,18 @@
 	}
 	.cell.interactive {
 		cursor: pointer;
+		outline: none;
+	}
+	/* #F28F53 — לא-מאומת מול Grid — נמדד מ-eng-02 בלבד; חסום‹studio› */
+	.cell.interactive:hover {
+		outline-width: calc(0.71 * var(--gutter));
+		outline-style: solid;
+		outline-color: #f28f53;
+	}
+	.cell.interactive:active {
+		outline-width: calc(0.82 * var(--gutter));
+		outline-style: solid;
+		outline-color: #e07a3a;
 	}
 	.cell.disabled {
 		pointer-events: none;

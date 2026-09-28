@@ -4,11 +4,15 @@
 	 * 🛑 X=0 הוא התא הימני: direction:rtl על המכולה, בלי היפוך אינדקסים בקוד
 	 * (ראו docs/plans/gridset-core-design.md §7 — נשבר על ColumnSpan).
 	 */
-	import type { Page, RuntimeContext } from '$lib/gridset/types';
+	import type { Cell, Page, RuntimeContext } from '$lib/gridset/types';
 	import { isCellAvailable } from '$lib/gridset/commands';
 	import type { SymbolResolver } from '$lib/gridset/symbols';
 	import { sizeNameToFr } from '$lib/gridset/visualDefaults';
-	import { gutterRatioForCellSpacing, verticalFillGradient } from '$lib/gridset/visualMeasured';
+	import {
+		gridColourToRgb,
+		gutterRatioForCellSpacing,
+		verticalFillGradient
+	} from '$lib/gridset/visualMeasured';
 	import { pageWordList } from '$lib/gridset/wordListPager';
 	import GridCell from './GridCell.svelte';
 
@@ -76,6 +80,32 @@
 	const drawnCells = $derived(
 		visibleCells.filter((cell) => paged.slots.get(cell)?.kind !== 'empty')
 	);
+
+	function tileVisible(cell: Cell): boolean {
+		return gridColourToRgb(cell.style.tileColour).a > 0;
+	}
+
+	function tileBackground(cell: Cell): string {
+		const { r, g, b, a } = gridColourToRgb(cell.style.tileColour);
+		return a >= 1 ? `rgb(${r}, ${g}, ${b})` : `rgba(${r}, ${g}, ${b}, ${a})`;
+	}
+
+	/** משבצת = שטח הרשת + חצי-מרזב לשכן, מרזב מלא לקצה (tilecolour-measured §3.2). */
+	function tileMarginStyle(cell: Cell): string {
+		const inlineStartEdge = cell.x === 0;
+		const inlineEndEdge = cell.x + cell.columnSpan === page.columns;
+		const blockStartEdge = cell.y === 0;
+		const blockEndEdge = cell.y + cell.rowSpan === page.rows;
+		// 🛑 לא-מאומת מול Grid — פיצול מרזב בין שכנות בצבע TileColour שונה
+		const half = 'calc(-1 * var(--gutter) / 2)';
+		const full = 'calc(-1 * var(--gutter))';
+		return `
+			margin-inline-start: ${inlineStartEdge ? full : half};
+			margin-inline-end: ${inlineEndEdge ? full : half};
+			margin-block-start: ${blockStartEdge ? full : half};
+			margin-block-end: ${blockEndEdge ? full : half};
+		`;
+	}
 </script>
 
 <div
@@ -92,6 +122,18 @@
 		"
 	>
 		{#each drawnCells as cell, i (i)}
+			{#if tileVisible(cell)}
+				<div
+					class="tile"
+					data-testid="grid-tile"
+					aria-hidden="true"
+					style="
+						--x: {cell.x}; --y: {cell.y}; --cspan: {cell.columnSpan}; --rspan: {cell.rowSpan};
+						background: {tileBackground(cell)};
+						{tileMarginStyle(cell)}
+					"
+				></div>
+			{/if}
 			<GridCell {cell} {ctx} {symbols} slot={paged.slots.get(cell)} onNavigate={navigate} />
 		{/each}
 	</div>
@@ -118,5 +160,16 @@
 		);
 		padding: var(--gutter);
 		gap: var(--gutter);
+	}
+	.tile {
+		grid-column: calc(var(--x) + 1) / span var(--cspan);
+		grid-row: calc(var(--y) + 1) / span var(--rspan);
+		box-sizing: border-box;
+		z-index: 0;
+		pointer-events: none;
+	}
+	.grid :global(.cell) {
+		position: relative;
+		z-index: 1;
 	}
 </style>
