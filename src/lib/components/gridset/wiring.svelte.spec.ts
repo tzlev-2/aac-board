@@ -161,6 +161,18 @@ describe('הפרוסה האנכית — קובץ → מסך → לחיצה', () 
 		expect(spoken).toEqual(['שלום']);
 	});
 
+	it('🔑 מה שנראה בפס-הפלט זהה למה שנאמר', async () => {
+		spoken.length = 0;
+		const screen = await mount();
+
+		await screen.getByRole('button', { name: 'שלום' }).click();
+		await screen.getByRole('button', { name: 'שלום' }).click();
+		await screen.getByRole('button', { name: 'דבר' }).click();
+
+		const chat = screen.getByTestId('chat-cell').element();
+		expect(chat.textContent).toBe(spoken.at(-1));
+	});
+
 	it('הפלט נצבר בין דפים — המריץ חי לאורך הניווט', async () => {
 		const screen = await mount();
 
