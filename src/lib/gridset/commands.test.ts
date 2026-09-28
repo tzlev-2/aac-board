@@ -610,7 +610,9 @@ describe('CommandExecution.Wait — השהיית המשך השרשרת', () => {
 				cmd('CommandExecution.Wait', { waittime: '00:00:02', cancellable: '1' }),
 				cmd('Photos.Snapshot'),
 				cmd('SpeechPlaySound', {
-					filedata: { embeddedPath: 'Grids/מצלמה/5-1-2-filedata.mp3' }
+					// הצורה שנמדדה: ‏`<data>` נושא **סיומת** ולא שם-קובץ, ו-
+					// ‏`embeddedPath` מוזרק במעבר שאחרי הפרסור.
+					filedata: { data: '.mp3', embeddedPath: 'Grids/מצלמה/5-1-2-filedata.mp3' }
 				})
 			),
 			ctx,
