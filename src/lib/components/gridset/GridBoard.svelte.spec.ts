@@ -267,9 +267,8 @@ describe('GridBoard', () => {
 		const screen = render(GridBoard, { page: p, ctx: makeCtx(p) });
 		const [edgeTile, innerTile] = screen.getByTestId('grid-tile').elements();
 
-		const edgeMargin = getComputedStyle(edgeTile).marginInlineStart;
-		const innerMargin = getComputedStyle(innerTile).marginInlineStart;
-		expect(edgeMargin).not.toBe(innerMargin);
+		expect(edgeTile.getAttribute('style')).toContain('margin-inline-start: calc(-1 * var(--gutter))');
+		expect(innerTile.getAttribute('style')).toContain('margin-inline-start: calc(-1 * var(--gutter) / 2)');
 	});
 });
 
