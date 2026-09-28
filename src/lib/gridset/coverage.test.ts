@@ -47,23 +47,28 @@ describe('טבלת השימוש — שלוש רמות', () => {
 });
 
 describe('computeCoverage', () => {
-	it('חמש-עשרה פקודות מתוך 66', () => {
+	it('שמונה-עשרה פקודות מתוך 66', () => {
 		const report = computeCoverage();
-		expect(report.implementedCount).toBe(15);
+		// ‏🛑 ‏18 ולא 21. ברג׳יסטרי יש 21 handlers, אבל שלושה מהם
+		// (`Settings.RestEyeGaze` · `RestPointer` · `RestSwitch`) **אינם
+		// מופיעים כלל** בארבעת לוחות-הדגימה, ולכן אינם נספרים כאן. הם
+		// יושבים ב-`report.extra`, וראו הטסט שמסביר למה זה תקין.
+		expect(report.implementedCount).toBe(18);
 		expect(report.usedCount).toBe(66);
 	});
 
-	it('חמש-עשרה הפקודות מכסות 95.3% מההפעלות', () => {
+	it('שמונה-עשרה הפקודות מכסות 97.4% מההפעלות', () => {
 		const report = computeCoverage();
-		// 3,875 לפני סלייס 11 · +150 מחמש הפקודות (44+33+30+30+13).
-		expect(report.coveredActivations).toBe(4025);
-		expect(report.activationPct).toBe(95.3);
+		// ‏4,025 אחרי סלייס 11 · ‏+88 משלוש פקודות סלייס 13 בלוחות-הדגימה
+		// (`Settings.RestAll` 32 · `Action.InsertCellText` 51 · `SpeechPlaySound` 5).
+		expect(report.coveredActivations).toBe(4113);
+		expect(report.activationPct).toBe(97.4);
 	});
 
 	it('🔑 הפילוח לפי רמה — autoContent מלא, page ריק', () => {
 		const { byLevel } = computeCoverage();
-		expect(byLevel.cell.coveredActivations).toBe(3859);
-		expect(byLevel.cell.activationPct).toBe(95.2);
+		expect(byLevel.cell.coveredActivations).toBe(3947);
+		expect(byLevel.cell.activationPct).toBe(97.4);
 		expect(byLevel.autoContent).toMatchObject({
 			coveredActivations: 166,
 			totalActivations: 166,
@@ -76,16 +81,35 @@ describe('computeCoverage', () => {
 		]);
 	});
 
-	it('כל handler ברג׳יסטרי הוא פקודה שבשימוש בפועל', () => {
+	/**
+	 * 🛑 **הטסט הזה שינה את טענתו בסלייס 13, וזו אינה הרפיה.**
+	 *
+	 * קודם הוא דרש `extra === []` — "אין handler לפקודה שאינה בשימוש".
+	 * הדרישה הייתה נכונה כל עוד הרג׳יסטרי כיסה רק פקודות מלוחות-הדגימה,
+	 * ו**אינה נכונה כהנחה**: ‏`Settings.RestEyeGaze` · `RestPointer` ·
+	 * ‏`RestSwitch` אינם מופיעים באף אחד מארבעת הלוחות — אבל בקורפוס כולו
+	 * הם ‏**‏3,099 · ‏3,092 · ‏2,762 = ‏8,953 הפעלות.** מימושם הוא כיסוי
+	 * ללוחות שטרם נטענו, לא קוד מת.
+	 *
+	 * הכלל שנשאר: ‏**‏`extra` מותר רק לפקודה שקיימת בקטלוג** — ולא מזהה
+	 * שהומצא. זה מה שנבדק כאן.
+	 */
+	it('כל handler הוא פקודת-קטלוג; extra מותר ומתועד', () => {
 		const report = computeCoverage();
-		expect(report.extra).toEqual([]);
-		expect(report.implementedCount).toBe(Object.keys(commandRegistry).length);
+		expect(report.extra).toEqual([
+			'Settings.RestEyeGaze',
+			'Settings.RestPointer',
+			'Settings.RestSwitch'
+		]);
+		expect(report.implementedCount + report.extra.length).toBe(
+			Object.keys(commandRegistry).length
+		);
 	});
 
 	it('החסרות ממוינות מהנפוצה לנדירה', () => {
 		const report = computeCoverage();
-		expect(report.missing[0].id).toBe('Settings.RestAll');
-		expect(report.missing).toHaveLength(51);
+		expect(report.missing[0].id).toBe('Settings.SetScreenBrightness');
+		expect(report.missing).toHaveLength(48);
 	});
 
 	it('🔑 חמש הפקודות של סלייס 11 יצאו מרשימת החסרות', () => {
@@ -114,18 +138,18 @@ describe('computeCoverage', () => {
 describe('formatCoverageReport', () => {
 	it('מדפיס 15/66 ואת אחוז ההפעלות', () => {
 		const text = coverageSummary();
-		expect(text).toContain('15/66');
-		expect(text).toContain('95.3%');
+		expect(text).toContain('18/66');
+		expect(text).toContain('97.4%');
 	});
 
 	it('מדפיס שורת-רמות שבה רואים את ה-0/4 של רמת-הדף', () => {
 		const text = coverageSummary();
-		expect(text).toContain('תא 3859/4052');
+		expect(text).toContain('תא 3947/4052');
 		expect(text).toContain('AutoContent 166/166');
 		expect(text).toContain('דף 0/4');
 	});
 
 	it('מונה את הפקודות החסרות הנפוצות', () => {
-		expect(coverageSummary()).toContain('Settings.RestAll (64)');
+		expect(coverageSummary()).toContain('Settings.SetScreenBrightness (12)');
 	});
 });

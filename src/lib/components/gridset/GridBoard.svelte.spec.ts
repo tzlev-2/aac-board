@@ -72,6 +72,7 @@ function makeCtx(page: Page): RuntimeContext {
 		},
 		speak: () => {},
 		stopSpeaking: () => {},
+		playSound: () => {},
 		reportUnimplemented: () => {}
 	};
 }

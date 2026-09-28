@@ -76,7 +76,8 @@ function makeCtx(textAtTop = true): RuntimeContext {
 			items: []
 		},
 		speak: () => {},
-		stopSpeaking: () => {}
+		stopSpeaking: () => {},
+		playSound: () => {}
 	} as RuntimeContext;
 }
 

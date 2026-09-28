@@ -276,19 +276,27 @@ export function cellCommands(cell: Cell, page: Page): readonly CommandInvocation
 }
 
 /**
- * הקשר-ריצה שנושא את **הפריט שהתא מציג כרגע**. ‏`AutoContent.Activate` היא
- * פקודה אחת שמשרתת תא אחד לכל פריט — מה שמבדיל בין ההפעלות אינו הפרמטרים
- * (אין לה כאלה) אלא הפריט שבמשבצת.
+ * הקשר-ריצה שנושא את **התא שרצים עליו ואת הפריט שהוא מציג כרגע**.
+ *
+ * שתי פקודות נשענות על זה, ואף אחת מהן אינה קוראת פרמטר:
+ * ‏`AutoContent.Activate` — פקודה אחת שמשרתת תא אחד לכל פריט, ומה שמבדיל בין
+ * ההפעלות הוא `autoContentItem`; ‏`Action.InsertCellText` — מכניסה את
+ * ה-`Caption` של `cell`.
  *
  * 🔑 **האצלה מפורשת ולא `Object.create`/spread:** ‏`GridRuntime` מחזיק שדות
  * פרטיים (`#history`, ‏`#pageName`), וקריאה למתודה שלו דרך אובייקט-נגזר
  * הייתה זורקת. כאן כל קריאה חוזרת ל-`ctx` המקורי כמקבל.
+ *
+ * 🛑 **מחזיר את `ctx` כמות שהוא כששניהם חסרים** — כך שרשרת שהורצה ישירות
+ * דרך `executeCommandChain` אינה משלמת עטיפה, ו-30 הטסטים שמזריקים `ctx`
+ * מזויף ממשיכים לקבל בדיוק את האובייקט שהזריקו.
  */
-export function withAutoContentItem(
+export function withCellContext(
 	ctx: RuntimeContext,
+	cell: Cell | undefined,
 	item: WordListItem | undefined
 ): RuntimeContext {
-	if (!item) return ctx;
+	if (!item && !cell) return ctx;
 	return {
 		get gridSet() {
 			return ctx.gridSet;
@@ -302,20 +310,44 @@ export function withAutoContentItem(
 		get output() {
 			return ctx.output;
 		},
-		autoContentItem: item,
+		autoContentItem: item ?? ctx.autoContentItem,
+		cell: cell ?? ctx.cell,
 		navigate: (name) => ctx.navigate(name),
 		back: () => ctx.back(),
 		home: () => ctx.home(),
 		speak: (text, opts) => ctx.speak(text, opts),
 		stopSpeaking: () => ctx.stopSpeaking(),
+		playSound: (path) => ctx.playSound(path),
 		reportUnimplemented: (id) => ctx.reportUnimplemented(id)
 	};
 }
 
+/**
+ * @deprecated השם הישן, מסלייס 10. ‏`withCellContext` נושא גם את התא.
+ * נשמר כדי שקוראים קיימים לא יישברו.
+ */
+export function withAutoContentItem(
+	ctx: RuntimeContext,
+	item: WordListItem | undefined
+): RuntimeContext {
+	return withCellContext(ctx, undefined, item);
+}
+
 // ── רג'יסטרי הפקודות ─────────────────────────────────────────────────────
-// 15 פקודות = 4,025 מתוך 4,222 ההפעלות בשלוש הרמות בלוחות-הדגימה (95.3%).
-// ברמת-התא: 14 פקודות = 3,859 מתוך 4,052 (95.2%). ב-`org-1` בלבד — כל שלוש
-// הרמות — 1,113 מתוך 1,152 (96.6%), ולפני הסלייס 1,046 (90.8%).
+// 21 פקודות אחרי סלייס 13.
+//
+// 🛑 **הכיסוי נמדד לכל לוח בנפרד, ולא על לוח אחד.** זה עיקר סלייס 13: השער
+// ("≥96%") נמדד עד כה על `org-1` בלבד, ובמדידה לכל לוחות-הארגון התגלה
+// ש-`org-3` עומד על **87.3%** — תשע נקודות מתחת, ואיש לא ידע.
+//
+// נמדד 28.9.2026, אלמנט `<Command ID=…>` תחת `Grids/**/grid.xml`, שלוש הרמות:
+//   | לוח   | לפני            | אחרי            |
+//   | org-1 | 1,113/1,152 96.6% | 1,114/1,152 96.7% |
+//   | org-2 | 2,074/2,110 98.3% | 2,075/2,110 98.3% |
+//   | org-3 |   419/480  87.3% |   462/480  96.3% |
+//
+// ‏`org-4` **אינו לוח רביעי** — ‏53 מ-54 חברי ה-zip זהי-CRC ל-`org-3`, והם
+// נבדלים ב-`Settings0/settings.xml` בלבד. אינו נספר.
 
 export const commandRegistry: Partial<Record<CommandId, CommandHandler>> = {
 	/**
@@ -488,7 +520,100 @@ export const commandRegistry: Partial<Record<CommandId, CommandHandler>> = {
 		if (!out.pos && item.partOfSpeech) out.pos = item.partOfSpeech;
 		if (image) out.image = image;
 		ctx.output.insert(out);
-	}
+	},
+
+	/**
+	 * ‏1,386 הפעלות בקורפוס (‏12 בלוחות-הדגימה, מהן **6 ב-`org-3`**).
+	 *
+	 * 🔑 **הנשא הוא הכתובית של התא, ואין לה פרמטר** — ‏0 פרמטרים ב-1,386
+	 * מ-1,386. לכן היא הפקודה הראשונה שנזקקת ל-`ctx.cell`.
+	 *
+	 * 🛑 **תא בלי כתובית הוא המקרה השכיח, לא הקצה:** ‏581 מ-1,386 (‏41.9%),
+	 * ו-**6 מ-6 ב-`org-3`** — שם כל השש יושבות בדף `.תבנית` על תאים שאין
+	 * להם `CaptionAndImage` כלל. אין מה להכניס, ולכן אין פעולה; זה **לא**
+	 * מדווח כלא-ממומש, כי הפקודה כן ממומשת והיא פשוט ריקה.
+	 *
+	 * ‏`insert` ולא `appendToStream`: היא מכניסה **מילה** ("book", "different"),
+	 * ולא נדבקת למילה שלפניה כמו פיסוק. והראיה שאין כאן שאלת-פיסוק בכלל —
+	 * היא **ראשונה בשרשרת ב-1,386 מ-1,386**, ולבדה ב-1,361 (‏98.2%).
+	 * לעולם לא נמדדה פקודה שקודמת לה.
+	 */
+	'Action.InsertCellText': (_params, ctx) => {
+		const text = ctx.cell?.caption?.trim();
+		if (!text) return;
+		const item: OutputItem = { text };
+		// ⚠️ **לא-מאומת מול Grid** — שהסמל של התא נכנס לפס-הפלט יחד עם
+		// הכתובית. זה מה ש-`Action.InsertText` עושה עם הסמל שעל ה-`<s>` שלה,
+		// והמקבילה כאן היא `CaptionAndImage/Image`; אבל האם Grid מציג אותו
+		// בחלל-העבודה לא נמדד. ‏`OutputItem.image` אופציונלי, ולכן הנזק אם
+		// זו טעות הוא סמל עודף בשבב — לא כשל.
+		if (ctx.cell?.image) item.image = ctx.cell.image;
+		ctx.output.insert(item);
+	},
+
+	/**
+	 * ‏842 הפעלות בקורפוס (‏12 בלוחות-הדגימה, מהן **5 ב-`org-3`** — כולן בדף
+	 * "פיל פילון", שיר מוקלט שורה-שורה).
+	 *
+	 * 🔑 **הקלטה, לא TTS.** ‏`filedata` ב-749 מ-842, וערכו `.mp3` ב-748 מ-749
+	 * — כלומר **סיומת**, לא תוכן ולא שם-קובץ. הנתיב המלא בארכיון חושב כבר
+	 * ב-`assignEmbeddedPaths` ויושב ב-`embeddedPath`; חמשת נתיבי `org-3`
+	 * שהכלל חזה (`Grids/פיל פילון/4-0-0-filedata.mp3` וכו') נמצאו בארכיון
+	 * **חמישה מתוך חמישה**.
+	 *
+	 * 🛑 **‏93 מ-842 מגיעות בלי `filedata` כלל.** אין קובץ, אין מה לנגן, ואין
+	 * שגיאה — יוצאים בשקט. מי שהיה מדווח כאן `reportUnimplemented` היה מזהם
+	 * את דוח הכיסוי בפקודה שדווקא כן ממומשת.
+	 *
+	 * ⚠️ **‏`wait` נקרא ואינו נצרך — לא-מאומת מול Grid.** ‏`0` ×597 · `1` ×242.
+	 * הפקודה אחרונה או לבדה ב-822 מ-842 (‏97.6%), ולכן כמעט תמיד אין לה מה
+	 * להשהות; ומה Grid ממתין לו בדיוק לא נמדד. החזרת `CommandPause` הייתה
+	 * דורשת את **אורך הקובץ**, שאינו ידוע לפני שהוא נטען. בדיוק כמו
+	 * `cancellable` — נמדד, מתועד, לא מומצא.
+	 */
+	SpeechPlaySound: (params, ctx) => {
+		const value = params.filedata;
+		// ‏`{ data }` הוא הצורה היחידה שנמדדה; `embeddedPath` נוסף במעבר
+		// שאחרי הפרסור, ואינו קיים על `GridSet` שנבנה מ-JSON או ב-fixture.
+		const path =
+			typeof value === 'object' && value !== null && 'embeddedPath' in value
+				? value.embeddedPath
+				: undefined;
+		if (!path) return;
+		ctx.playSound(path);
+	},
+
+	/*
+	 * ── `Settings.Rest*` — no-op **מתועד**, ‏11,734 הפעלות ────────────────
+	 *
+	 * 🛑 זו אינה "פקודה שלא הספקנו". ההכרעה מעוגנת בשלוש מדידות, והנימוק
+	 * המלא + מה שנשאר לא-מאומת יושבים ב-`gridset-core-design.md` §1.
+	 *
+	 * בקצרה: אין **שום** פרמטר-משך ב-11,734 המופעים (רק `indicatorenabled`,
+	 * ו-`action=Toggle` ב-2,449) — כלומר **מצב**, לא השהיה למשך X. והמצב
+	 * שהוא משהה הוא **הפעלה מקרית ממודאליות פסיבית** (dwell, סריקה): ארבעת
+	 * המזהים מתחלקים בדיוק לפי שיטת-גישה. ‏`WEB_FEATURES` מוציא את `Dwell`
+	 * במפורש, אין ב-`src/` dwell ולא לולאת-סריקה, וההפעלה היא `onclick`.
+	 * **לחיצה כבר מכוונת — אין כאן מה להשהות.**
+	 *
+	 * 🛑 ומימוש "אמיתי" היה הרסני: אצלנו הקלט היחיד הוא הלחיצה, ולכן חסימתה
+	 * הייתה נועלת את הלוח **בלי דרך חזרה** — גם לא דרך תא-המנוחה עצמו.
+	 *
+	 * נשארות ברג'יסטרי כדי שלא תיספרנה כלא-ממומשות, בדיוק כמו
+	 * `Settings.RequiredFeature`.
+	 *
+	 * ℹ️ ‏`Settings.RestTouch` נמדד **פעם אחת** בקורפוס ואינו כאן (אינו באף
+	 * לוח-ארגון). ‏🛑 ‏`Settings.Restart` (‏8) אינה מהמשפחה למרות התחילית.
+	 */
+
+	/** ‏2,781 בקורפוס · **32 ב-`org-3`**, כולן על תא "מנוחה" ב-(6,2). */
+	'Settings.RestAll': () => {},
+	/** ‏3,099 בקורפוס · ‏0 בלוחות-הארגון. */
+	'Settings.RestEyeGaze': () => {},
+	/** ‏3,092 בקורפוס · ‏0 בלוחות-הארגון. */
+	'Settings.RestPointer': () => {},
+	/** ‏2,762 בקורפוס · ‏0 בלוחות-הארגון. */
+	'Settings.RestSwitch': () => {}
 };
 
 /** מזהי הפקודות שיש להן handler. */
@@ -555,5 +680,5 @@ export function executeCommands(
 	item?: WordListItem,
 	options?: ExecuteOptions
 ): Promise<void> {
-	return executeCommandChain(cellCommands(cell, ctx.page), withAutoContentItem(ctx, item), options);
+	return executeCommandChain(cellCommands(cell, ctx.page), withCellContext(ctx, cell, item), options);
 }
