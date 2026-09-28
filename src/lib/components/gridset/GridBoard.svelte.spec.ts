@@ -209,6 +209,68 @@ describe('GridBoard', () => {
 		const wrap = screen.getByTestId('grid-board').element().parentElement!;
 		expect(getComputedStyle(wrap).flexGrow).toBe('1');
 	});
+
+	it('תא עם tileColour אטום — .tile עם רקע תואם ואותו שטח-רשת כמו .cell', () => {
+		const cell = makeCell({
+			x: 1,
+			y: 1,
+			style: { ...style, tileColour: '#FF0000FF' }
+		});
+		const p = makePage({ cells: [cell] });
+		const screen = render(GridBoard, { page: p, ctx: makeCtx(p) });
+		const tile = screen.getByTestId('grid-tile').element();
+		const cellEl = screen.getByTestId('grid-cell').element();
+		const tileStyle = getComputedStyle(tile);
+		const cellStyle = getComputedStyle(cellEl);
+
+		expect(tileStyle.backgroundColor).toBe('rgb(255, 0, 0)');
+		expect(tileStyle.gridColumnStart).toBe(cellStyle.gridColumnStart);
+		expect(tileStyle.gridColumnEnd).toBe(cellStyle.gridColumnEnd);
+		expect(tileStyle.gridRowStart).toBe(cellStyle.gridRowStart);
+		expect(tileStyle.gridRowEnd).toBe(cellStyle.gridRowEnd);
+	});
+
+	it('tileColour שקוף — אין .tile ב-DOM', async () => {
+		const cell = makeCell({ style: { ...style, tileColour: '#00000000' } });
+		const p = makePage({ cells: [cell] });
+		const screen = render(GridBoard, { page: p, ctx: makeCtx(p) });
+
+		await expect.element(screen.getByTestId('grid-tile')).not.toBeInTheDocument();
+	});
+
+	it('.tile נגישות — aria-hidden וללא טקסט', () => {
+		const cell = makeCell({ style: { ...style, tileColour: '#FF0000FF' }, caption: 'כפתור' });
+		const p = makePage({ cells: [cell] });
+		const screen = render(GridBoard, { page: p, ctx: makeCtx(p) });
+		const tile = screen.getByTestId('grid-tile').element();
+
+		expect(tile.getAttribute('aria-hidden')).toBe('true');
+		expect(tile.textContent?.trim()).toBe('');
+	});
+
+	it('.tile מתחת ל-.cell — z-index נמוך יותר', () => {
+		const cell = makeCell({ style: { ...style, tileColour: '#FF0000FF' } });
+		const p = makePage({ cells: [cell] });
+		const screen = render(GridBoard, { page: p, ctx: makeCtx(p) });
+		const tile = screen.getByTestId('grid-tile').element();
+		const cellEl = screen.getByTestId('grid-cell').element();
+
+		expect(Number(getComputedStyle(tile).zIndex)).toBeLessThan(
+			Number(getComputedStyle(cellEl).zIndex)
+		);
+	});
+
+	it('תא בקצה הלוח — מרווחי הרחבה שונים מתא פנימי', () => {
+		const edge = makeCell({ x: 0, y: 0, style: { ...style, tileColour: '#FF0000FF' } });
+		const inner = makeCell({ x: 2, y: 1, style: { ...style, tileColour: '#FF0000FF' } });
+		const p = makePage({ columns: 4, rows: 3, cells: [edge, inner] });
+		const screen = render(GridBoard, { page: p, ctx: makeCtx(p) });
+		const [edgeTile, innerTile] = screen.getByTestId('grid-tile').elements();
+
+		const edgeMargin = getComputedStyle(edgeTile).marginInlineStart;
+		const innerMargin = getComputedStyle(innerTile).marginInlineStart;
+		expect(edgeMargin).not.toBe(innerMargin);
+	});
 });
 
 describe('cellRenderers registry', () => {
