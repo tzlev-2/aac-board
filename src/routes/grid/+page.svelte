@@ -139,6 +139,13 @@
 			<button type="button" onclick={() => loadFromUrl('/org-3.gridset', 'org-3.gridset')}>
 				לוח עם סמלי PCS — ‏34 דפים
 			</button>
+			<!--
+				🔑 יעד מדידת A7.5 (TileColour) — הקובץ ב-.gitignore כמו שלושת האחרים.
+				38 מופעי TileColour; org-* נושאים 0.
+			-->
+			<button type="button" onclick={() => loadFromUrl('/b037.gridset', 'b037.gridset')}>
+				לוח b037 — מקלדת פשוטה (TileColour)
+			</button>
 		</div>
 		{#if loading}
 			<p class="status" data-testid="grid-loading" role="status">טוען את הלוח…</p>
