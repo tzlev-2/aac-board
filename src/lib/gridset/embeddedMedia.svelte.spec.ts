@@ -147,8 +147,17 @@ describe('שחזור נתיב המדיה המוטמעת', () => {
 		if (typeof value !== 'object' || !('data' in value)) throw new Error('צפוי ערך-data');
 		// 🛑 בלי מקף בין `filedata` ל-`.mp3` — הנקודה באה מהערך עצמו.
 		expect(value.embeddedPath).toBe('Grids/דף/5-1-2-filedata.mp3');
-		// והבייטים **אינם** נפרשים: אין נגן, ואין למי להגיש אותם.
-		expect(gridSet.media?.has('Grids/דף/5-1-2-filedata.mp3')).toBe(false);
+		// 🛑 **הטענה כאן התהפכה בסלייס 13, וזו אינה הרפיה.**
+		//
+		// בסלייס 12 הבייטים **לא** נפרשו, והנימוק היה נכון באותו רגע:
+		// ‏`SpeechPlaySound` לא היה ממומש — "אין נגן, ואין למי להגיש אותם".
+		// סלייס 13 מימש אותו (‏`commands.ts` · ‏`ctx.playSound`), ולכן
+		// **התנאי שהצדיק את אי-הפרישה חדל להתקיים**: פרישה-לא של קובץ שיש
+		// לו צרכן פירושה פקודה שמצליחה בשקט ולא משמיעה דבר.
+		//
+		// ⚠️ ‏`org-1` מכיל **קובץ-שמע מוטמע אחד בדיוק** —
+		// ‏`Grids/מצלמה/5-1-2-filedata.mp3` — ולכן זו אינה הרחבה תיאורטית.
+		expect(gridSet.media?.has('Grids/דף/5-1-2-filedata.mp3')).toBe(true);
 	});
 
 	it('פריט `page.wordList` — התחילית היא `wordlist-{אינדקס}`', async () => {

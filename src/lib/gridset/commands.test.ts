@@ -588,7 +588,46 @@ describe('CommandExecution.Wait — השהיית המשך השרשרת', () => {
 		expect(ctx.log).toEqual([]);
 		await spy.releaseAll();
 		await chain;
-		expect(ctx.unimplemented).toEqual({ 'Photos.Snapshot': 1, SpeechPlaySound: 1 });
+		// 🛑 ‏`SpeechPlaySound` **אינו** ברשימה יותר — סלייס 13 מימש אותו.
+		// כאן אין לו `filedata`, ולכן הוא יוצא בשקט בלי לנגן ובלי להיספר
+		// כלא-ממומש. ‏`Photos.Snapshot` נשאר הפקודה היחידה ללא handler.
+		expect(ctx.unimplemented).toEqual({ 'Photos.Snapshot': 1 });
+	});
+
+	/**
+	 * 🔑 החיזוק שמחליף את מה שהטסט הקודם בדק במקרה.
+	 *
+	 * הטסט למעלה הוכיח "השרשרת נמשכה" דרך **ספירת לא-ממומשות** — מדד עקיף
+	 * שנשבר ברגע שפקודה בשרשרת מקבלת handler. כאן אותה שרשרת בדיוק, אבל
+	 * ‏`SpeechPlaySound` מקבל `filedata` אמיתי, וההוכחה היא **האפקט**:
+	 * הצליל נוגן, ורק אחרי ההשהיה.
+	 */
+	it('אחרי Wait, SpeechPlaySound עם filedata מנגן בפועל', async () => {
+		const ctx = fakeContext();
+		const spy = delaySpy();
+		const chain = executeCommands(
+			cell(
+				cmd('CommandExecution.Wait', { waittime: '00:00:02', cancellable: '1' }),
+				cmd('Photos.Snapshot'),
+				cmd('SpeechPlaySound', {
+					filedata: { embeddedPath: 'Grids/מצלמה/5-1-2-filedata.mp3' }
+				})
+			),
+			ctx,
+			undefined,
+			{ delay: spy.delay }
+		);
+		// לפני שחרור ההשהיה — כלום. גם לא הצליל.
+		expect(ctx.log).toEqual([]);
+		await spy.releaseAll();
+		await chain;
+		// הסדר הוא סדר-השרשרת: ‏`Photos.Snapshot` עדיין בלי handler, ואחריו
+		// הצליל. שניהם **אחרי** ההשהיה.
+		expect(ctx.log).toEqual([
+			'unimplemented:Photos.Snapshot',
+			'sound:Grids/מצלמה/5-1-2-filedata.mp3'
+		]);
+		expect(ctx.unimplemented).toEqual({ 'Photos.Snapshot': 1 });
 	});
 
 	it('🔑 שרשרת בלי Wait נשארת סינכרונית לחלוטין', () => {
@@ -676,26 +715,32 @@ describe('executeCommands', () => {
 		expect(ctx.log).toEqual([]);
 	});
 
-	it('הרג׳יסטרי מחזיק בדיוק את חמש-עשרה הפקודות', () => {
-		expect(Object.keys(commandRegistry).sort()).toEqual(
-			[
-				'Action.Clear',
-				'Action.DeleteLetter',
-				'Action.DeleteWord',
-				'Action.InsertText',
-				'Action.Letter',
-				'Action.Number',
-				'Action.Punctuation',
-				'Action.Space',
-				'Action.Speak',
-				'AutoContent.Activate',
-				'CommandExecution.Wait',
-				'Jump.Back',
-				'Jump.Home',
-				'Jump.To',
-				'Settings.RequiredFeature'
-			].sort()
-		);
+	it('הרג׳יסטרי מחזיק בדיוק את עשרים ואחת הפקודות', () => {
+		// ‏21 = ‏15 (עד סלייס 11) + ‏6 (סלייס 13: `Action.InsertCellText` ·
+		// ‏`SpeechPlaySound` · ארבע `Settings.Rest*`).
+		expect(Object.keys(commandRegistry).sort()).toEqual([
+			'Action.Clear',
+			'Action.DeleteLetter',
+			'Action.DeleteWord',
+			'Action.InsertCellText',
+			'Action.InsertText',
+			'Action.Letter',
+			'Action.Number',
+			'Action.Punctuation',
+			'Action.Space',
+			'Action.Speak',
+			'AutoContent.Activate',
+			'CommandExecution.Wait',
+			'Jump.Back',
+			'Jump.Home',
+			'Jump.To',
+			'Settings.RequiredFeature',
+			'Settings.RestAll',
+			'Settings.RestEyeGaze',
+			'Settings.RestPointer',
+			'Settings.RestSwitch',
+			'SpeechPlaySound'
+		]);
 	});
 });
 
