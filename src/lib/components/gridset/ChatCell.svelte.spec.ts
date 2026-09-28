@@ -126,3 +126,44 @@ describe('ChatCell — סמל מעל מילה בפס-הפלט', () => {
 		expect(screen.getByTestId('chat-cell').element().textContent).toBe('שמלה כובע');
 	});
 });
+
+describe('ChatCell — סמן כתיבה', () => {
+	it('.caret קיים כשיש פריטים', async () => {
+		const screen = mount([{ text: 'שלום' }]);
+		const root = screen.getByTestId('chat-cell').element() as HTMLElement;
+		expect(root.querySelector('.caret')).not.toBeNull();
+	});
+
+	it('🛑 textContent נשאר מדויק גם עם הסמן — אותו תרחיש של שורה 110', async () => {
+		const screen = mount([
+			{ text: '1', image: { library: 'widgit', path: 'one.emf' } },
+			{ text: ' + ', image: { library: 'widgit', path: 'plus.emf' } },
+			{ text: '2', image: { library: 'widgit', path: 'two.emf' } }
+		]);
+		await expect.element(screen.getByTestId('chat-cell')).toBeInTheDocument();
+		expect(screen.getByTestId('chat-cell').element().textContent).toBe('1 + 2');
+	});
+
+	it('הסמן הוא האלמנט האחרון בזרם', async () => {
+		const screen = mount([
+			{ text: '1', image: { library: 'widgit', path: 'one.emf' } },
+			{ text: '2', image: { library: 'widgit', path: 'two.emf' } }
+		]);
+		const root = screen.getByTestId('chat-cell').element() as HTMLElement;
+		const output = root.querySelector('.output-text')!;
+		expect(root.querySelector('.caret')).toBe(output.lastElementChild);
+	});
+
+	it('.caret נושא aria-hidden="true"', async () => {
+		const screen = mount([{ text: 'א' }]);
+		const root = screen.getByTestId('chat-cell').element() as HTMLElement;
+		expect(root.querySelector('.caret')?.getAttribute('aria-hidden')).toBe('true');
+	});
+
+	it('פס ריק — הסמן קיים ו-textContent ריק', async () => {
+		const screen = mount([]);
+		const root = screen.getByTestId('chat-cell').element() as HTMLElement;
+		expect(root.querySelector('.caret')).not.toBeNull();
+		expect(root.textContent).toBe('');
+	});
+});
