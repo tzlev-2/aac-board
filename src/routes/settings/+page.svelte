@@ -11,6 +11,14 @@
 		type TtsVoice
 	} from '$lib/services/tts-providers';
 	import { exportBoardsJSON } from '$lib/services/storage';
+	import {
+		ARASAAC_LICENSE_URL,
+		ARASAAC_SITE_URL,
+		ARASAAC_TERMS_URL,
+		ATTRIBUTION_FIELDS,
+		ATTRIBUTION_SENTENCE_EN,
+		ATTRIBUTION_SENTENCE_HE
+	} from '$lib/attribution';
 
 	const sStore = settingsStore();
 	const bStore = boardStore();
@@ -360,6 +368,47 @@
 				איפוס לברירת מחדל
 			</button>
 		</section>
+
+		<!--
+			ייחוס ARASAAC — 🛑 דרישת רישיון (CC BY-NC-SA), לא קרדיט של נימוס.
+			המיקום: **בתחתית ההגדרות ולא על הלוח.** הלוח תופס את כל המסך ונועד
+			למשתמש שאינו קורא; טקסט-רישיון שם גוזל שטח-תקשורת ואינו נקרא.
+			הנוסח והראיה לו: src/lib/attribution.ts.
+		-->
+		<section class="card" data-testid="attribution">
+			<h2 class="card-title">
+				<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+					<path
+						d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"
+					/>
+				</svg>
+				סמלים ורישיון
+			</h2>
+
+			<p class="legal" dir="rtl">{ATTRIBUTION_SENTENCE_HE}</p>
+
+			<!--
+				⚠️ הנוסח האנגלי הוא **הרשמי**, והעברי הוא תרגום שלנו — ל-ARASAAC אין
+				נוסח עברי. לכן האנגלי מוצג ולא מוחלף. dir="ltr" כדי שהסוגריים
+				והנקודות לא יתהפכו בתוך עמוד RTL.
+			-->
+			<p class="legal legal-en" dir="ltr">{ATTRIBUTION_SENTENCE_EN}</p>
+
+			<dl class="attribution-fields">
+				{#each ATTRIBUTION_FIELDS as field (field.label)}
+					<dt>{field.label}</dt>
+					<dd dir="ltr">{field.value}</dd>
+				{/each}
+			</dl>
+
+			<p class="legal legal-links">
+				<a href={ARASAAC_SITE_URL} target="_blank" rel="noopener noreferrer">arasaac.org</a>
+				·
+				<a href={ARASAAC_TERMS_URL} target="_blank" rel="noopener noreferrer">תנאי השימוש</a>
+				·
+				<a href={ARASAAC_LICENSE_URL} target="_blank" rel="noopener noreferrer">נוסח הרישיון</a>
+			</p>
+		</section>
 	</div>
 </div>
 
@@ -573,6 +622,49 @@
 
 	.btn-danger:hover {
 		background: #ffcdd2;
+	}
+
+	/* ייחוס — טקסט משפטי: קטן, משני, וקריא. לא מוסתר ולא מודגש. */
+	.legal {
+		margin: 0;
+		font-size: 12px;
+		line-height: 1.5;
+		color: var(--text-secondary, #616161);
+	}
+
+	.legal-en {
+		font-style: italic;
+	}
+
+	.legal-links {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 6px;
+	}
+
+	.legal a {
+		color: var(--primary, #1976d2);
+	}
+
+	.attribution-fields {
+		display: grid;
+		/* תווית צרה + ערך שממלא — ‏auto/1fr, ולא רוחב קבוע שיישבר בתרגום. */
+		grid-template-columns: auto 1fr;
+		gap: 2px 10px;
+		margin: 0;
+		font-size: 12px;
+	}
+
+	.attribution-fields dt {
+		font-weight: 600;
+		color: var(--text-secondary, #616161);
+	}
+
+	.attribution-fields dd {
+		margin: 0;
+		/* 🛑 לוגי ולא `text-align: left` — הדף כולו RTL והערכים הם LTR. */
+		text-align: start;
+		color: var(--text-primary, #212121);
 	}
 
 	.hidden-input {

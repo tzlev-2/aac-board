@@ -484,7 +484,9 @@ describe('createSymbolResolver', () => {
 			byLibrary: { widgit: 2, grid3x: 1, none: 1 },
 			resolvedByLibrary: { widgit: 1 },
 			byMatch: { exact: 1, loose: 0 },
-			resolvedBySource: { arasaac: 1 }
+			resolvedBySource: { arasaac: 1 },
+			// אף אחד מה-refs כאן אינו מוטמע, ולכן אין דחיות-פורמט לספור.
+			embeddedUnsupported: {}
 		});
 	});
 

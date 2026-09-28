@@ -17,22 +17,73 @@
  * מימוש בלי עימוד מעלים שליש מאוצר-המילים.
  */
 
-import type { Cell, WordListItem } from './types';
+import type { Cell, ImageRef, WordListItem } from './types';
 
 /**
- * 🛑 כיתובי תא-הניווט — **אינם מגיעים מהלוח.** הם מחרוזות של Grid
- * (‏`he-IL.ts`, הקשר `Auto Content: More/Back`, עם ההערה המפורשת
- * *"item automatically added to auto content"*), ולכן הם שייכים ל-i18n
- * של הקלון. אין כאן מנגנון i18n עדיין — כשיהיה, זה המקום לחבר.
+ * כיתובי תא-הניווט — **אינם מגיעים מהלוח**, הם מחרוזות של Grid עצמו.
+ *
+ * ## ✅ אומת מול Grid, ‏28.9.2026 — הכיתובים **לא** הומצאו
+ *
+ * המקור הוא קובץ-התרגום של Grid עצמו,
+ * ‏`~/work/grid-mapping/raw/he-IL.ts` (‏Qt ‏`.ts`, ‏1.08MB), בהקשר
+ * ‏`<name>Auto Content</name>` (שורה 925). שתי הרשומות, מילה-במילה:
+ *
+ * | שורות | `<source>` | `<comment>` | `<translation>` |
+ * |---|---|---|---|
+ * | 1025–1029 | `More` | *"Caption for item automatically added to auto content to go to the next page"* | **`עוד`** |
+ * | 938–942 | `Back` | *"Caption for item automatically added to auto content to go back to the start from the last page"* | **`חזור`** |
+ *
+ * 🔑 ה-`<comment>` הוא העוגן ולא רק התרגום: הוא אומר במפורש *item
+ * automatically added to auto content* — כלומר בדיוק התא המסונתז הזה, ולא
+ * כפתור-ניווט כללי. ‏`first` ולא `back` בשמנו כי המשמעות היא *"to the
+ * start"*, ‏`Back` הוא רק ה-`source` האנגלי.
+ *
+ * ## האייקון — השם אומת, הקובץ אינו בידינו
+ *
+ * משפחת האייקונים של Grid לעימוד תוכן-אוטומטי היא `[grid3x]autocells_*`,
+ * ‏נמדדה על 116 קבצים: ‏`autocells_next` ‏1,049 · `autocells_previous` ‏188 ·
+ * ‏`autocells_start` ‏4 · `autocells_end` ‏2. ההצמדות לכיתוב:
+ *
+ * | אייקון | כיתובים שנצפו לידו |
+ * |---|---|
+ * | `autocells_next.wmf` | `More` ‏687 · **`עוֹד` ‏113** · `עוד` ‏25 · `More words` ‏48 |
+ * | `autocells_start.wmf` | **`חזור` — ב-`org-1` עצמו**, עם `Jump.Home` · `Back` (b100) · `first page` (b097/b098) |
+ *
+ * ⚠️ **מה שזה כן מוכיח ומה שלא.** התאים שנמצאו הם תאים **שנכתבו ביד**
+ * (שרשרתם `Jump.Home` / `Prediction.MoreWords`), ולא התא **המסונתז**. הראיה
+ * היא לאוצר-האייקונים של Grid ולהצמדה שלו לכיתוב — ‏`autocells_start`
+ * ‏+ `חזור` נמצאים יחד באותו תא ב-`org-1`. היא **אינה** צילום של התא המסונתז.
+ *
+ * 🛑 **ולכן האייקון אינו מוצג.** ‏`[grid3x]` היא ספרייה חיצונית שנשלחת עם
+ * Grid ואינה בתוך אף `.gridset`, והסיומת `.wmf` היא Windows Metafile שאף
+ * דפדפן אינו מרנדר. ה-`ImageRef` נמסר בכל זאת לשרשרת-הפתירה הרגילה
+ * (‏`symbols.ts`) — שם `[grid3x]` נפתר ב-41% דרך שם-הבסיס, וכאן כמעט ודאי
+ * לא ייפתר, וייפול לכיתוב לבדו. זה בדיוק מה שקורה לכל ref של `[grid3x]`,
+ * ואין כאן מסלול מיוחד.
  */
 export const WORDLIST_NAV_LABELS = {
 	next: 'עוד',
 	first: 'חזור'
 } as const;
 
+/**
+ * הפניות-האייקון של Grid לתא-הניווט. ‏`library: 'grid3x'` ולא `''` — זו
+ * הפניית-ספרייה חיצונית, לא מדיה מוטמעת, ולכן `embeddedMedia` אינו נוגע בה.
+ */
+export const WORDLIST_NAV_IMAGES: { readonly next: ImageRef; readonly first: ImageRef } = {
+	next: { library: 'grid3x', path: 'autocells_next.wmf' },
+	first: { library: 'grid3x', path: 'autocells_start.wmf' }
+};
+
 export type WordListSlot =
 	| { kind: 'item'; item: WordListItem; index: number }
-	| { kind: 'nav'; action: 'next' | 'first'; label: string }
+	| {
+			kind: 'nav';
+			action: 'next' | 'first';
+			label: string;
+			/** האייקון של Grid לפעולה הזאת. אומת בשמו; ראו למעלה למה אינו מוצג. */
+			image: ImageRef;
+	  }
 	| { kind: 'empty' };
 
 export interface WordListPage {
@@ -89,10 +140,12 @@ export function pageWordList(
 		const cell = order[i];
 		if (cell === navCell) {
 			const onLastPage = page === pageCount - 1;
+			const action = onLastPage ? 'first' : 'next';
 			slots.set(cell, {
 				kind: 'nav',
-				action: onLastPage ? 'first' : 'next',
-				label: onLastPage ? WORDLIST_NAV_LABELS.first : WORDLIST_NAV_LABELS.next
+				action,
+				label: WORDLIST_NAV_LABELS[action],
+				image: WORDLIST_NAV_IMAGES[action]
 			});
 			continue;
 		}

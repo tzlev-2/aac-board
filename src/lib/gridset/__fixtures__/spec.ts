@@ -92,6 +92,15 @@ export interface FixturePage {
 	/** מפתח = AutoContentType (למשל "Chat.History"). */
 	autoContentCommands?: Record<string, FixtureCommand[]>;
 	commands?: FixtureCommand[];
+	/**
+	 * קבצי מדיה **מוטמעים** שיושבים בספריית הדף — מפתח = שם-הקובץ בלבד
+	 * (`2-0-0-text-0.jpg`), בלי `Grids/<דף>/`.
+	 *
+	 * 🛑 השם כאן הוא **השם המלא**, בעוד ה-`<Image>` שבתא נושא רק את **הזנב**
+	 * שלו (`-0-text-0.jpg`). זו בדיוק המלכודת שהבדיקות אמורות לתפוס, ולכן
+	 * המחולל **אינו** מחשב אחד מהשני.
+	 */
+	media?: Record<string, Uint8Array>;
 }
 
 export interface GridsetSpec {

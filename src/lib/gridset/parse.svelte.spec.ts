@@ -309,7 +309,9 @@ describe('מלכודת 6 — הדף מחזיק מנועים', () => {
 		expect(page.wordList).toEqual([
 			{
 				text: { paragraphs: [{ sentences: [{ runs: ['אתם'] }] }] },
-				image: { library: '', path: '-0.emf' },
+				// 🔑 ‏`embeddedPath` נוסף במעבר-אחרי-פרסור: התחילית של פריט
+				// ‏`/Grid/WordList` היא `wordlist-{אינדקס}` (נמדד 103/103).
+				image: { library: '', path: '-0.emf', embeddedPath: 'Grids/Page 1/wordlist-0-0.emf' },
 				partOfSpeech: 'Pronoun',
 				grammar: { number: 'plural', person: 'second' }
 			}
@@ -513,7 +515,9 @@ describe('ImageRef', () => {
 		expect(page.cells.map((c) => c.image)).toEqual([
 			{ library: 'widgit', path: 'widgit rebus\\h\\have.emf' },
 			{ library: 'widgit', path: 'england\\uk wrebus\\1 pound.emf' },
-			{ library: '', path: '-0-text-0.png' },
+			// 🛑 ההפניה חסרת-הספרייה היא **מוטמעת**, ולכן היא — ורק היא — מקבלת
+			// ‏`embeddedPath`. התחילית היא `{X}-{Y}` של התא (‏X=2, ‏Y חסר ⇒ 0).
+			{ library: '', path: '-0-text-0.png', embeddedPath: 'Grids/Page 1/2-0-0-text-0.png' },
 			{ library: 'grid3x', path: 'align_left.wmf?tone=2' }
 		]);
 	});

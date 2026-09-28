@@ -220,6 +220,11 @@ export function buildGridset(spec: GridsetSpec): Uint8Array {
 	};
 	for (const page of spec.pages) {
 		files[`Grids/${page.name}/grid.xml`] = strToU8(gridXml(page));
+		// מדיה מוטמעת יושבת **לצד** ה-grid.xml, באותה ספרייה — כך זה בקובץ
+		// האמיתי (`Grids/לקרוא/2-2-0-text-0.jpeg`), ועל זה נשען שחזור הנתיב.
+		for (const [name, bytes] of Object.entries(page.media ?? {})) {
+			files[`Grids/${page.name}/${name}`] = bytes;
+		}
 	}
 	return zipSync(files);
 }

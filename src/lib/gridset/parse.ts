@@ -36,6 +36,7 @@ import type {
 	WordListItem
 } from './types';
 import { hasRichTextChildren, normalizeRichText, parseImageRef } from './richText';
+import { assignEmbeddedPaths, isRenderableImage } from './embeddedMedia';
 import {
 	attr,
 	childByName,
@@ -91,9 +92,12 @@ export async function parseGridSet(
 	// unzipSync ולא unzip: הגרסה האסינכרונית של fflate פותחת Worker דרך blob URL.
 	// החתימה נשארת async כדי שהמעבר ל-Worker לא ישבור קוראים.
 	//
-	// ה-filter מונע פרישה של הסמלים המוטמעים (‏emf/png/mp3 — רוב נפח הקובץ).
-	// ⚠️ המודל אינו מחזיק blobs, ולכן אין מה לאבד כאן; מי שיצטרך את הקבצים
-	// האלה מסיר את ה-filter בשורה אחת.
+	// 🔑 **מעבר ראשון — XML בלבד**, וזה נשאר כך גם עכשיו כשמדיה מוטמעת נתמכת.
+	// 🛑 ההערה שהייתה כאן ("מי שיצטרך את הקבצים האלה מסיר את ה-filter בשורה
+	// אחת") **הייתה שגויה ונמשכה**: הסרת ה-filter פורשת את **כל** נפח הארכיון
+	// לזיכרון — ‏2,703 png · 1,930 wmf · 728 mp3 במצורפים, מאות MB. מה שנדרש
+	// אינו "בלי filter" אלא filter שני, צר, שאפשר לבנות רק **אחרי** שה-XML
+	// נקרא: הוא זה שאומר לאילו קבצים יש בכלל הפניה. ראו את המעבר השני למטה.
 	const files = unzipSync(bytes, { filter: (file) => /\.xml$/i.test(file.name) });
 	// 🔑 מסודר, כדי שריבוי Settings*/ או סדר-ZIP שרירותי לא ישנו את התוצאה
 	const paths = Object.keys(files).sort();
@@ -111,18 +115,56 @@ export async function parseGridSet(
 	const resolve = opts.resolveStyle ?? createStyleResolver(styles);
 
 	const pages: Record<string, Page> = {};
+	/** נתיבי המדיה שיש אליהם הפניה — הקלט ל-filter של המעבר השני. */
+	const referenced: string[] = [];
 	for (const path of paths) {
 		const match = GRID_RE.exec(path);
 		if (!match) continue;
 		const name = match[2];
-		pages[name] = parsePage(name, parseXml(decode(files[path]), path), resolve);
+		const page = parsePage(name, parseXml(decode(files[path]), path), resolve);
+		pages[name] = page;
+		// 🛑 **ספריית ה-ZIP ולא `page.name`.** הן שוות-ערך היום (שתיהן `match[2]`),
+		// אבל הן שני דברים: `page.name` הוא יעד `Jump.To` ומפתח ב-`pages`, וכאן
+		// נדרש בדיוק אותו רצף-בייטים ש-`fflate` החזיר כשם-הרשומה — אחרת ההשוואה
+		// במעבר השני נכשלת בשקט.
+		// 🔑 ולא סתם: ב-`org-3` **ספריית ה-ZIP המרכזית נושאת שמות cp1255 והכותרת
+		// המקומית UTF-8**, והשניים אינם זהים (`unzip` מזהיר `mismatching "local"
+		// filename`). ‏fflate קורא את ההכותרת המקומית ומחזיר עברית תקינה; מה
+		// שחשוב הוא שכל השמות — גם `grid.xml` וגם התמונה שלידו — באים מאותו מקור.
+		referenced.push(...assignEmbeddedPaths(page, path.slice(0, path.lastIndexOf('/'))));
 	}
 
 	return {
 		...parseSettings(parseXml(decode(files[settingsPath]), settingsPath)),
 		pages,
-		styles
+		styles,
+		media: extractEmbeddedMedia(bytes, referenced)
 	};
+}
+
+/**
+ * מעבר שני על ה-ZIP — **רק** הקבצים שיש אליהם הפניה, ורק אלה שהדפדפן מציג.
+ *
+ * 🔑 **זו ה"עצלות" שהבריף דורש, והיא ב-`filter` ולא ב-`Object.keys` שאחריו.**
+ * ‏`filter` של fflate נקרא **לפני** ההיפוך של כל רשומה, ולכן רשומה שנדחית בו
+ * אינה נפרשת כלל. פרישה-אז-סינון הייתה מחזיקה את אותה תוצאה ואת אותו נפח-שיא
+ * בזיכרון — כלומר לא הייתה קונה דבר.
+ *
+ * העלות של מעבר שני היא סריקת ספריית ה-ZIP פעם נוספת (‏O(רשומות), בלי פרישה).
+ *
+ * 🛑 ‏`emf`/`wmf` נדחים **כאן** ולא בשכבת-התצוגה: ‏Windows Metafile הם קרוב
+ * למחצית ההפניות המוטמעות בקורפוס, ופרישתם הייתה מבזבזת זיכרון על בייטים
+ * שאי-אפשר להגיש ל-`<img>`. הם נופלים לשכבה הבאה של `symbols.ts`, כמו כל
+ * הפניה שלא נפתרה.
+ */
+function extractEmbeddedMedia(
+	bytes: Uint8Array,
+	referenced: readonly string[]
+): ReadonlyMap<string, Uint8Array> {
+	const wanted = new Set(referenced.filter(isRenderableImage));
+	if (wanted.size === 0) return new Map();
+	const files = unzipSync(bytes, { filter: (file) => wanted.has(file.name) });
+	return new Map(Object.entries(files));
 }
 
 function decode(bytes: Uint8Array | undefined): string {
