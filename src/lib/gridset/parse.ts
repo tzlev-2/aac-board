@@ -36,7 +36,7 @@ import type {
 	WordListItem
 } from './types';
 import { hasRichTextChildren, normalizeRichText, parseImageRef } from './richText';
-import { assignEmbeddedPaths, isRenderableImage } from './embeddedMedia';
+import { assignEmbeddedPaths, isPlayableAudio, isRenderableImage } from './embeddedMedia';
 import {
 	attr,
 	childByName,
@@ -161,7 +161,10 @@ function extractEmbeddedMedia(
 	bytes: Uint8Array,
 	referenced: readonly string[]
 ): ReadonlyMap<string, Uint8Array> {
-	const wanted = new Set(referenced.filter(isRenderableImage));
+	// 🔑 סלייס 13: גם שמע. ‏`SpeechPlaySound` מנגנת mp3 מוטמע, ולכן הוא כבר
+	// אינו נדחה כאן. הנפח נשאר חסום — ‏23 מ-115 הלוחות נושאים mp3, הגדול
+	// שבהם 3.2MB, ורק מה שיש אליו הפניה נפרש.
+	const wanted = new Set(referenced.filter((p) => isRenderableImage(p) || isPlayableAudio(p)));
 	if (wanted.size === 0) return new Map();
 	const files = unzipSync(bytes, { filter: (file) => wanted.has(file.name) });
 	return new Map(Object.entries(files));

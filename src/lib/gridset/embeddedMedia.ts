@@ -42,8 +42,9 @@
  * - ‏`/Grid/BackgroundImage` (687). הכלל אומת (`background` + הערך), אבל
  *   ‏`Page.background.image` הוא `string` ולא `ImageRef`, ושינוי החוזה נוגע
  *   בסלייס 11. אף אחד מ-`org-1..4` אינו נושא רקע מוטמע.
- * - ‏`Parameter/data` — הנתיב **כן** נשמר (`embeddedPath` על הערך), הבייטים
- *   לא נפרשים. הסבר מלא ב-`parse.ts`.
+ * - ~~‏`Parameter/data` — הנתיב נשמר, הבייטים לא נפרשים.~~ **בוטל בסלייס 13:**
+ *   ‏`SpeechPlaySound` מנגנת אותם, ולכן הם נפרשים ככל מדיה אחרת. ‏5 מ-5
+ *   נתיבי ה-mp3 שהכלל חזה ב-`org-3` נמצאו בארכיון.
  *
  * ## 🛑 `emf`/`wmf` — אין דפדפן שמרנדר אותם
  *
@@ -74,6 +75,25 @@ export function isRenderableImage(path: string): boolean {
 }
 
 /**
+ * סיומות-שמע ש-`<audio>` מנגן. אותה גישה של רשימת-היתר, מאותו נימוק.
+ *
+ * 🔑 **בקורפוס יש בפועל רק `.mp3`** — ‏748 מ-749 ערכי `<data>`, והאחרון ריק.
+ * השאר כאן מראש כי הן זולות ומוכרות, ולא כי נמדדו.
+ */
+const PLAYABLE_AUDIO_EXTENSIONS = new Set(['mp3', 'wav', 'ogg', 'oga', 'm4a', 'aac', 'webm']);
+
+/**
+ * האם אפשר לנגן את הקובץ הזה ב-`<audio>` — ‏`SpeechPlaySound`.
+ *
+ * 🛑 **נפרד מ-`isRenderableImage` ולא מאוחד אליו.** שני הצרכנים שונים
+ * (`<img src>` מול `<audio src>`), וצירוף הרשימות היה מכניס `mp3` לנתיב
+ * שבונה `Blob` עם `type: image/…`.
+ */
+export function isPlayableAudio(path: string): boolean {
+	return PLAYABLE_AUDIO_EXTENSIONS.has(mediaExtension(path));
+}
+
+/**
  * ‏MIME לפי סיומת, לבנייה של `Blob`.
  *
  * 🛑 **לא אופציונלי.** ‏`new Blob([bytes])` בלי `type` הוא
@@ -85,6 +105,12 @@ export function mimeOf(path: string): string {
 	if (ext === 'jpg' || ext === 'jpeg') return 'image/jpeg';
 	if (ext === 'svg') return 'image/svg+xml';
 	if (RENDERABLE_EXTENSIONS.has(ext)) return `image/${ext}`;
+	// שמע — אותו נימוק בדיוק: ‏`<audio>` על `application/octet-stream` אינו
+	// מנגן. ‏`m4a`/`aac` הם `audio/mp4`, ולא `audio/m4a` שאינו טיפוס אמיתי.
+	if (ext === 'mp3') return 'audio/mpeg';
+	if (ext === 'oga') return 'audio/ogg';
+	if (ext === 'm4a' || ext === 'aac') return 'audio/mp4';
+	if (PLAYABLE_AUDIO_EXTENSIONS.has(ext)) return `audio/${ext}`;
 	return 'application/octet-stream';
 }
 
@@ -164,8 +190,12 @@ export function assignEmbeddedPaths(page: Page, dir: string): string[] {
 					// ולכן `5-1-2-filedata` + `.mp3`. מקף כאן היה מייצר
 					// ‏`5-1-2-filedata-.mp3` — שם שאינו קיים, בשקט.
 					value.embeddedPath = `${dir}/${prefix}${value.data}`;
-					// הבייטים אינם נפרשים (ראו parse.ts), ולכן הנתיב אינו מצטרף
-					// לרשימת-הפרישה.
+					// 🔑 **שונה מסלייס 12:** הבייטים **כן** נפרשים מאז סלייס 13,
+					// כי `SpeechPlaySound` מנגנת אותם. הנתיב מצטרף לרשימת-הפרישה,
+					// ו-`parse.ts` מסנן אותו ב-`isPlayableAudio`.
+					// הנפח חסום: ‏23 לוחות מ-115 נושאים mp3 בכלל, והגדול שבהם
+					// ‏3.2MB — לעומת מאות ה-MB של png/wmf שבגללן נולד הסינון.
+					assigned.push(value.embeddedPath);
 				}
 			}
 		});

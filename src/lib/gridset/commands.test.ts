@@ -118,6 +118,7 @@ function fakeContext(features: FeatureId[] = []): FakeContext {
 		},
 		speak: (text) => void log.push(`speak:${text ?? '<buffer>'}`),
 		stopSpeaking: () => void log.push('stop'),
+		playSound: (path) => void log.push(`sound:${path}`),
 		reportUnimplemented: (id) => {
 			unimplemented[id] = (unimplemented[id] ?? 0) + 1;
 			log.push(`unimplemented:${id}`);

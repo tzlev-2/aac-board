@@ -78,7 +78,8 @@ export type CommandId = string; // "Jump.To" | "Action.InsertText" | … (353 ב
  * ‏`{ data }` הוא ערך `<data>` — ‏`SpeechPlaySound Key="filedata"` (752 מופעים).
  * ‏🔑 ‏`data` הוא **סיומת** (`'.mp3'`) ולא תוכן ולא שם-קובץ; שם-הקובץ בארכיון
  * הוא `{X}-{Y}-{ci}-{key}` + הסיומת, והוא נשמר ב-`embeddedPath`.
- * ‏🛑 הבייטים **אינם** נפרשים (ראו `parse.ts`) — אין נגן, ואין למי להגיש אותם.
+ * ‏🔑 **הבייטים נפרשים מסלייס 13** — ‏`SpeechPlaySound` היא הנגן, ו-`playSound`
+ * ב-`RuntimeContext` היא הדרך אליו. (עד אז הם נדחו בטענה "אין למי להגיש".)
  */
 export type ParamValue =
 	| string
@@ -301,7 +302,9 @@ export interface GridSet {
 	 * 🛑 **אינו כל הארכיון, וזה העיקר.** נפרשות רק תמונות שיש אליהן הפניה מתא
 	 * (או מפריט `page.wordList`) **וש-דפדפן יכול להציג** — ‏`.gridset` מצורף
 	 * מגיע למאות MB, ו-`wmf`/`emf` הם קרוב למחצית ההפניות ואינם נתמכים.
-	 * ‏`emf`/`wmf`/`mp3` אינם כאן במכוון. ראו `embeddedMedia.ts` ו-`parse.ts`.
+	 * ‏`emf`/`wmf` אינם כאן במכוון. ‏🔑 **‏`mp3` כן, מסלייס 13** —
+	 * ‏`SpeechPlaySound` מנגנת אותו, והנפח חסום (הגדול בקורפוס: ‏3.2MB).
+	 * ראו `embeddedMedia.ts` ו-`parse.ts`.
 	 *
 	 * חסר (`undefined`) ב-`GridSet` שנבנה מ-JSON או ב-fixture — הצרכן חייב
 	 * לסבול היעדר.
@@ -322,9 +325,21 @@ export interface RuntimeContext {
 	 * 🔑 הפריט שהמשבצת מציגה כרגע — מה ש-`AutoContent.Activate` מכניסה
 	 * לפס-הפלט. הפקודה יושבת ב-`page.autoContentCommands` ומשרתת את **כל**
 	 * תאי הסוג, ולכן מה שמבדיל בין הפעלה להפעלה אינו פרמטר אלא ההקשר.
-	 * נקבע ב-`withAutoContentItem` לזמן ההפעלה בלבד; אינו קיים ב-`GridRuntime`.
+	 * נקבע ב-`withCellContext` לזמן ההפעלה בלבד; אינו קיים ב-`GridRuntime`.
 	 */
 	readonly autoContentItem?: WordListItem;
+
+	/**
+	 * 🔑 **התא שהשרשרת רצה עליו** — הנשא של `Action.InsertCellText`.
+	 *
+	 * הפקודה מגיעה **בלי שום פרמטר ב-1,386 מ-1,386 המופעים בקורפוס**, ומה
+	 * שהיא מכניסה הוא ה-`Caption` של התא. בלי השדה הזה אין לה מאין לקרוא.
+	 *
+	 * נקבע ב-`withCellContext` לזמן ההפעלה בלבד, בדיוק כמו `autoContentItem`,
+	 * ואינו קיים ב-`GridRuntime` — ההקשר הארוך-טווח אינו יודע על תא.
+	 * ‏`undefined` כשהשרשרת הורצה ישירות דרך `executeCommandChain` (בדיקות).
+	 */
+	readonly cell?: Cell;
 
 	navigate(pageName: string): void;
 	back(): void;
@@ -357,6 +372,17 @@ export interface RuntimeContext {
 
 	speak(text?: string, opts?: { auditory?: boolean; wait?: boolean }): void;
 	stopSpeaking(): void;
+
+	/**
+	 * מנגן **הקלטה מוטמעת** מתוך הארכיון — ‏`SpeechPlaySound` (‏842 הפעלות).
+	 *
+	 * 🛑 **זה אינו `speak`.** ‏TTS מסנתז מחרוזת; כאן מנגנים קובץ שהמורה הקליטה
+	 * ושמור ב-`gridSet.media`. ‏`path` הוא `embeddedPath` — הנתיב המלא בתוך
+	 * ה-ZIP, כפי ש-`assignEmbeddedPaths` חישב אותו.
+	 *
+	 * נתיב שאין לו בייטים אינו שגיאה ואינו זורק: הפקודה מדווחת ויוצאת.
+	 */
+	playSound(path: string): void;
 
 	/** פקודה שאין לה handler — נספרת, לעולם לא זורקת ולא שותקת. */
 	reportUnimplemented(id: CommandId): void;

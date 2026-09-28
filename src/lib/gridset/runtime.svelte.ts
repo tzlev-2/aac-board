@@ -12,6 +12,7 @@
 
 import { WEB_FEATURES } from './features';
 import { executeCommands, isCellAvailable } from './commands';
+import { mediaExtension, mimeOf } from './embeddedMedia';
 import { computeCoverage, formatCoverageReport, type CoverageReport } from './coverage';
 import type {
 	Cell,
@@ -30,6 +31,57 @@ export interface SpeechAdapter {
 }
 
 /**
+ * מתאם-ניגון להקלטה מוטמעת — ‏`SpeechPlaySound`. מוזרק מאותה סיבה:
+ * ‏`commands.ts` ו-`GridRuntime` נבדקים בלי `Audio` ובלי `createObjectURL`.
+ */
+export interface AudioAdapter {
+	play(bytes: Uint8Array, mime: string): void;
+	/** משחרר `blob:` URL-ים שנוצרו. נקרא בהחלפת לוח. */
+	dispose?(): void;
+}
+
+/**
+ * המתאם האמיתי — ‏`<audio>` על `blob:` URL.
+ *
+ * 🛑 **הקאש אינו אופטימיזציה אלא נכונות**, בדיוק כמו ב-`symbols.ts`: בלעדיו
+ * כל לחיצה על אותו תא הייתה מייצרת `Blob` נוסף על אותם בייטים, ו-`dispose`
+ * היה משחרר רק את האחרון. המפתח הוא **הבייטים עצמם**, כי הנתיב אינו מגיע
+ * לכאן.
+ *
+ * 🛑 ‏`type` חובה — ‏`new Blob([bytes])` בלי טיפוס הוא
+ * `application/octet-stream`, ו-`<audio>` מסרב לנגן אותו. אותו כשל בדיוק
+ * שתועד ב-`mimeOf`, בערוץ אחר.
+ */
+export function createAudioAdapter(): AudioAdapter {
+	const urls = new Map<Uint8Array, string>();
+	let current: HTMLAudioElement | undefined;
+
+	return {
+		play(bytes, mime) {
+			if (typeof URL === 'undefined' || typeof URL.createObjectURL !== 'function') return;
+			if (typeof Audio === 'undefined') return;
+			let url = urls.get(bytes);
+			if (!url) {
+				url = URL.createObjectURL(new Blob([bytes as BlobPart], { type: mime }));
+				urls.set(bytes, url);
+			}
+			// לחיצה חדשה עוצרת את הקודמת — שתי הקלטות במקביל אינן מובנות.
+			current?.pause();
+			current = new Audio(url);
+			// ‏`play()` מחזיר Promise שנדחה כשהדפדפן חוסם ניגון-אוטומטי. זו
+			// אינה שגיאה שצריך להעיף למעלה: אין מה לעשות איתה, והלוח ממשיך.
+			void current.play().catch(() => {});
+		},
+		dispose() {
+			current?.pause();
+			current = undefined;
+			for (const url of urls.values()) URL.revokeObjectURL(url);
+			urls.clear();
+		}
+	};
+}
+
+/**
  * המתאם האמיתי — `$lib/services/tts`. ה-import דינמי כדי ששרשרת ה-IndexedDB
  * וה-localStorage לא תיטען בסביבת בדיקה.
  */
@@ -44,6 +96,13 @@ export const ttsSpeechAdapter: SpeechAdapter = {
 	}
 };
 
+/**
+ * מדווח כש-`SpeechPlaySound` מצביעה על נתיב שאין לו בייטים ב-`gridSet.media`.
+ * הסיומת נוספת בסוגריים, כדי שיהיה אפשר לראות **למה** — ‏`(wav)` מספר סיפור
+ * אחר מ-`(?)`.
+ */
+export const SOUND_WITHOUT_MEDIA = 'SpeechPlaySound(no-media)';
+
 export interface RuntimeOptions {
 	/** דף פתיחה. ברירת מחדל: `gridSet.startGrid`. */
 	startPage?: string;
@@ -51,6 +110,8 @@ export interface RuntimeOptions {
 	features?: ReadonlySet<FeatureId>;
 	/** מתאם-דיבור. ברירת מחדל: `ttsSpeechAdapter`. */
 	speech?: SpeechAdapter;
+	/** מתאם-ניגון להקלטות מוטמעות. ברירת מחדל: `createAudioAdapter()`. */
+	audio?: AudioAdapter;
 	/** יעד `Jump.To` שאינו קיים ב-`pages`. ברירת מחדל: אזהרה בקונסול. */
 	onMissingPage?(name: string): void;
 	/** נקרא בפעם הראשונה שכל מזהה-פקודה נתקל בלי handler. */
@@ -167,6 +228,7 @@ export class GridRuntime implements RuntimeContext {
 	readonly output = new OutputBuffer();
 
 	#speech: SpeechAdapter;
+	#audio: AudioAdapter;
 	#onMissingPage: (name: string) => void;
 	#onUnimplemented?: (id: CommandId) => void;
 
@@ -178,6 +240,7 @@ export class GridRuntime implements RuntimeContext {
 		this.gridSet = gridSet;
 		this.features = options.features ?? WEB_FEATURES;
 		this.#speech = options.speech ?? ttsSpeechAdapter;
+		this.#audio = options.audio ?? createAudioAdapter();
 		this.#onUnimplemented = options.onUnimplemented;
 		this.#onMissingPage =
 			options.onMissingPage ??
@@ -259,6 +322,29 @@ export class GridRuntime implements RuntimeContext {
 
 	stopSpeaking(): void {
 		this.#speech.stop();
+	}
+
+	/**
+	 * מנגן הקלטה מוטמעת — ‏`SpeechPlaySound`.
+	 *
+	 * 🛑 **נתיב בלי בייטים מדווח ואינו זורק.** זה קורה בדיוק בשני מקרים שאינם
+	 * תקלה: ‏`GridSet` שנבנה מ-JSON או fixture (אין `media` כלל), וסיומת-שמע
+	 * שאינה ברשימת-ההיתר של `isPlayableAudio` ולכן לא נפרשה. הדיווח הוא כדי
+	 * שההיעדר יהיה **נראה בדוח הכיסוי** במקום לשתוק — אותו עיקרון כמו
+	 * `embeddedUnsupported` ב-`symbols.ts`.
+	 */
+	playSound(path: string): void {
+		const bytes = this.gridSet.media?.get(path);
+		if (!bytes) {
+			this.reportUnimplemented(`${SOUND_WITHOUT_MEDIA}(${mediaExtension(path) || '?'})`);
+			return;
+		}
+		this.#audio.play(bytes, mimeOf(path));
+	}
+
+	/** משחרר את ה-`blob:` URL-ים של השמע. נקרא בהחלפת לוח, כמו `SymbolResolver.dispose`. */
+	dispose(): void {
+		this.#audio.dispose?.();
 	}
 
 	// ── פקודות לא-ממומשות ──────────────────────────────────────────────────
