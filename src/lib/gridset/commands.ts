@@ -542,11 +542,11 @@ export const commandRegistry: Partial<Record<CommandId, CommandHandler>> = {
 		const text = ctx.cell?.caption?.trim();
 		if (!text) return;
 		const item: OutputItem = { text };
-		// ⚠️ **לא-מאומת מול Grid** — שהסמל של התא נכנס לפס-הפלט יחד עם
-		// הכתובית. זה מה ש-`Action.InsertText` עושה עם הסמל שעל ה-`<s>` שלה,
-		// והמקבילה כאן היא `CaptionAndImage/Image`; אבל האם Grid מציג אותו
-		// בחלל-העבודה לא נמדד. ‏`OutputItem.image` אופציונלי, ולכן הנזק אם
-		// זו טעות הוא סמל עודף בשבב — לא כשל.
+		// ✅ **עודכן — פס-הפלט אכן מציג סמל-מעל-מילה** (GRID-GAPS §3: צילום `eng-02`,
+		// סמל חצאית וסמל שמלה מעל השורה). האזהרה שהייתה כאן — "האם Grid מציג אותו
+		// בחלל-העבודה לא נמדד" — **נמשכת**, וזו הראיה ששללה אותה.
+		// 🛑 מה שנשאר לא-מאומת צר יותר: שהסמל שנכנס לפריט הוא זה של **התא**
+		// (`CaptionAndImage/Image`) ולא אחר. הנזק אם זו טעות נשאר סמל עודף בשבב.
 		if (ctx.cell?.image) item.image = ctx.cell.image;
 		ctx.output.insert(item);
 	},
