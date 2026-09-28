@@ -3,6 +3,7 @@
 exports[`snapshot > parseGridSet על דף בגודל orgHome — 6×4, 21 תאים, 20 מלאים 1`] = `
 {
   "language": "he-IL",
+  "media": Map {},
   "pages": {
     "דף ראשי": {
       "autoContentCommands": {

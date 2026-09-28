@@ -29,10 +29,33 @@ export interface Sentence {
 	runs: string[];
 }
 
-/** "[widgit]widgit rebus\h\have.emf" → { library: 'widgit', path: 'widgit rebus\h\have.emf' } */
+/**
+ * "[widgit]widgit rebus\h\have.emf" → { library: 'widgit', path: 'widgit rebus\h\have.emf' }
+ *
+ * 🔑 **שני סוגי הפניה, וההבחנה ביניהם היא `library`:**
+ *
+ * | | `library` | `path` | הפתירה |
+ * |---|---|---|---|
+ * | הפניית-ספרייה | `'widgit'` · `'grid3x'` · `'mjpcs#'` | הנתיב בספרייה החיצונית | ‏PCS/ARASAAC (`symbols.ts`) |
+ * | הפניה **מוטמעת** | `''` | **זנב** של שם-הקובץ ב-ZIP | ‏`media` של ה-`GridSet` |
+ *
+ * 🛑 ‏`path` של הפניה מוטמעת **אינו שם-קובץ שאפשר לחפש בארכיון** — הוא
+ * `-0-text-0.jpeg` בעוד הקובץ הוא `2-0-0-text-0.jpeg`. הנתיב המלא מחושב
+ * מ**שרשרת-המוצא** של ההפניה (תא, אינדקס-פקודה, מפתח-פרמטר) ולכן אינו זמין
+ * ל-`parseImageRef`; הוא נכתב ל-`embeddedPath` במעבר-אחרי-פרסור.
+ * ‏`embeddedMedia.ts` מחזיק את הכלל לכל נשא, מאומת מול 116 קבצים.
+ */
 export interface ImageRef {
 	library: string;
 	path: string;
+	/**
+	 * הנתיב המלא בתוך ה-ZIP (`Grids/<דף>/2-0-0-text-0.jpeg`) — **רק** להפניה
+	 * מוטמעת (`library === ''`), ורק אחרי `assignEmbeddedPaths`.
+	 *
+	 * ‏`undefined` על הפניית-ספרייה, ו-`undefined` גם על הפניה מוטמעת שלא
+	 * עברה את המעבר (למשל `ImageRef` שנבנה בבדיקה).
+	 */
+	embeddedPath?: string;
 }
 
 // ── דקדוק ────────────────────────────────────────────────────────────────
@@ -51,7 +74,17 @@ export interface Grammar {
 
 export type CommandId = string; // "Jump.To" | "Action.InsertText" | … (353 בקטלוג)
 
-export type ParamValue = string | RichText | { data: string } | WordListItem[];
+/**
+ * ‏`{ data }` הוא ערך `<data>` — ‏`SpeechPlaySound Key="filedata"` (752 מופעים).
+ * ‏🔑 ‏`data` הוא **סיומת** (`'.mp3'`) ולא תוכן ולא שם-קובץ; שם-הקובץ בארכיון
+ * הוא `{X}-{Y}-{ci}-{key}` + הסיומת, והוא נשמר ב-`embeddedPath`.
+ * ‏🛑 הבייטים **אינם** נפרשים (ראו `parse.ts`) — אין נגן, ואין למי להגיש אותם.
+ */
+export type ParamValue =
+	| string
+	| RichText
+	| { data: string; embeddedPath?: string }
+	| WordListItem[];
 
 export interface CommandInvocation {
 	id: CommandId;
@@ -237,6 +270,19 @@ export interface GridSet {
 	symbolSearchKeys: string[]; // ["widgit","sstix#","dbr#he"] — סדר עדיפות
 	pages: Record<string, Page>;
 	styles: Record<string, Style>; // הגולמיים; הפתירה כבר בתוך Cell.style
+	/**
+	 * בייטים של מדיה **מוטמעת**, לפי הנתיב בתוך ה-ZIP — ‏`ImageRef.embeddedPath`
+	 * הוא המפתח.
+	 *
+	 * 🛑 **אינו כל הארכיון, וזה העיקר.** נפרשות רק תמונות שיש אליהן הפניה מתא
+	 * (או מפריט `page.wordList`) **וש-דפדפן יכול להציג** — ‏`.gridset` מצורף
+	 * מגיע למאות MB, ו-`wmf`/`emf` הם קרוב למחצית ההפניות ואינם נתמכים.
+	 * ‏`emf`/`wmf`/`mp3` אינם כאן במכוון. ראו `embeddedMedia.ts` ו-`parse.ts`.
+	 *
+	 * חסר (`undefined`) ב-`GridSet` שנבנה מ-JSON או ב-fixture — הצרכן חייב
+	 * לסבול היעדר.
+	 */
+	media?: ReadonlyMap<string, Uint8Array>;
 }
 
 // ── הקשר-ריצה ────────────────────────────────────────────────────────────

@@ -20,18 +20,27 @@
 	/**
 	 * תא-נגזר: הכיתוב והסמל באים מהפריט, וכל השאר (סגנון, מיקום, span)
 	 * נשאר של התא האמיתי.
-	 * 🛑 לתא-הניווט **אין סמל** — ב-Grid יש לו אייקון (`◄●●`), אבל הוא
-	 * משאב של Grid ואין לנו אותו. הכיתוב לבדו, ומסומן כפער.
+	 *
+	 * ✅ **עודכן 28.9.2026 — לתא-הניווט כן יש הפניית-אייקון, והיא אומתה.**
+	 * ‏`[grid3x]autocells_next.wmf` ו-`[grid3x]autocells_start.wmf`; הראיה
+	 * והמגבלות ב-`wordListPager.ts` ליד `WORDLIST_NAV_IMAGES`. ההערה שהייתה
+	 * כאן ניחשה את הצורה (`◄●●`) — **זה נמשך ונמחק**, כי אייקון משוער בתיעוד
+	 * מכוון עבודה עתידית לכיוון שאין לו עוגן.
+	 *
+	 * 🛑 בפועל הוא כמעט ודאי לא ייפתר: ‏`[grid3x]` הוא ספרייה חיצונית של Grid
+	 * שאינה בידינו, ו-`.wmf` אינו נתמך בדפדפן. ההפניה נמסרת לשרשרת-הפתירה
+	 * **הרגילה**, ונופלת לכיתוב-לבדו בדיוק כמו כל ref אחר של `[grid3x]`.
+	 * אין כאן מסלול מיוחד, ואין placeholder.
 	 */
 	const derivedCell = $derived.by(() => {
 		if (!slot) return cell;
 		if (slot.kind === 'item')
 			return { ...cell, caption: richTextToString(slot.item.text), image: slot.item.image };
-		if (slot.kind === 'nav') return { ...cell, caption: slot.label, image: undefined };
+		if (slot.kind === 'nav') return { ...cell, caption: slot.label, image: slot.image };
 		return cell;
 	});
 </script>
 
 {#if slot?.kind === 'item' || slot?.kind === 'nav'}
-	<ButtonCell cell={derivedCell} {ctx} symbols={slot.kind === 'item' ? symbols : null} />
+	<ButtonCell cell={derivedCell} {ctx} {symbols} />
 {/if}

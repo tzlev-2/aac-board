@@ -44,7 +44,8 @@ const fakeSymbols: SymbolResolver = {
 		byLibrary: {},
 		resolvedByLibrary: {},
 		byMatch: {} as never,
-		resolvedBySource: {}
+		resolvedBySource: {},
+		embeddedUnsupported: {}
 	})
 };
 

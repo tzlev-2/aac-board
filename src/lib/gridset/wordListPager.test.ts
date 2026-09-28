@@ -149,3 +149,48 @@ describe('גבולות', () => {
 		expect([...slots.values()].every((s) => s.kind === 'empty')).toBe(true);
 	});
 });
+
+describe('כיתוב ואייקון תא-הניווט — אומתו מול Grid, 28.9.2026', () => {
+	const cells = [wl(0, 0), wl(1, 0), wl(0, 1), wl(1, 1)];
+	const many = words(...Array(10).fill('x'));
+
+	/**
+	 * 🔑 הבדיקה הזאת מקפיאה **ממצא**, לא בחירה. המקורות:
+	 *   כיתובים — `~/work/grid-mapping/raw/he-IL.ts`, הקשר `Auto Content`:
+	 *     `More` → `עוד` · `Back` → `חזור`, שניהם עם `<comment>` שאומר במפורש
+	 *     *"item automatically added to auto content"*.
+	 *   אייקונים — ‏116 קובצי `.gridset`: ‏`autocells_next.wmf` ×1,049 מוצמד
+	 *     לכיתוב `More`/`עוד`, ו-`autocells_start.wmf` מוצמד ל-`חזור`
+	 *     **ב-`org-1` עצמו**.
+	 * שינוי כאן חייב ראיה חדשה, לא העדפה.
+	 */
+	it('עמוד שאינו האחרון — `עוד` עם `autocells_next`', () => {
+		const nav = [...pageWordList(cells, many, 0).slots.values()].find((s) => s.kind === 'nav');
+		expect(nav).toMatchObject({
+			action: 'next',
+			label: 'עוד',
+			image: { library: 'grid3x', path: 'autocells_next.wmf' }
+		});
+	});
+
+	it('העמוד האחרון — `חזור` עם `autocells_start`', () => {
+		// ‏4 תאים עם גלישה ⇒ קיבולת 3 ⇒ ‏ceil(10/3)=4 עמודים ⇒ האחרון הוא 3.
+		const paged = pageWordList(cells, many, 3);
+		expect(paged.pageCount).toBe(4);
+		const nav = [...paged.slots.values()].find((s) => s.kind === 'nav');
+		expect(nav).toMatchObject({
+			action: 'first',
+			label: 'חזור',
+			image: { library: 'grid3x', path: 'autocells_start.wmf' }
+		});
+	});
+
+	it('🛑 האייקון הוא הפניית-**ספרייה** ולא מדיה מוטמעת', () => {
+		const nav = [...pageWordList(cells, many, 0).slots.values()].find((s) => s.kind === 'nav');
+		if (nav?.kind !== 'nav') throw new Error('צפוי תא-ניווט');
+		// ‏`library` לא-ריק ⇒ `assignEmbeddedPaths` מדלג עליו, ואין ניסיון
+		// לחפש `autocells_next.wmf` בתוך ה-ZIP (הוא לא שם — הוא נשלח עם Grid).
+		expect(nav.image.library).not.toBe('');
+		expect(nav.image.embeddedPath).toBeUndefined();
+	});
+});

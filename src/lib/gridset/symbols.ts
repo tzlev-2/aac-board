@@ -35,6 +35,7 @@
 import { pictogramUrl, searchPictograms, type ArasaacResult } from '$lib/services/arasaac';
 import { createSymbolCache, type CachedMatch, type SymbolCache } from './symbol-cache';
 import { PCS_AVAILABLE_IDS } from './pcs-manifest';
+import { isRenderableImage, mediaExtension, mimeOf } from './embeddedMedia';
 import type { Cell, GridSet, ImageRef, ParamValue, RichText } from './types';
 
 // ── החוזה החוצה ──────────────────────────────────────────────────────────
@@ -44,7 +45,11 @@ export type MatchQuality = 'exact' | 'loose';
 
 export interface SymbolResolution {
 	url: string | null;
-	source: 'arasaac' | 'pcs' | 'none';
+	/**
+	 * ‏`'embedded'` = קובץ שיושב **בתוך ה-`.gridset` עצמו**, מוגש כ-`blob:` URL.
+	 * 🔑 זו הראיה החזקה מכולן — התמונה שמחבר הלוח שם שם, ולא התאמת-מילה.
+	 */
+	source: 'arasaac' | 'pcs' | 'embedded' | 'none';
 	/** מה חיפשנו בפועל — לדיאגנוסטיקה. מחרוזת ריקה = לא היה מה לחפש. */
 	query: string;
 	/** שדות-דיאגנוסטיקה נוספים; קיימים רק כשהפתירה הצליחה. */
@@ -79,11 +84,31 @@ export interface SymbolResolverStats {
 	 * אומר כמה מכל אחד.
 	 */
 	resolvedBySource: Record<string, number>;
+	/**
+	 * הפניות מוטמעות שנדחו לפי סיומת, לפי הסיומת — ‏`{ wmf: 12, emf: 3 }`.
+	 *
+	 * 🔑 **בלי המונה הזה הכשל הזה בלתי-נראה.** ‏`wmf`/`emf` הם קרוב למחצית
+	 * ההפניות המוטמעות בקורפוס, והם נופלים לשכבה הבאה בשקט — כלומר תא שנפתר
+	 * דרך הכתובית העברית נראה בדיוק כמו תא שלא היה לו קובץ מעולם.
+	 */
+	embeddedUnsupported: Record<string, number>;
 }
 
 export interface SymbolResolver {
 	resolve(cell: Cell): Promise<SymbolResolution>;
 	stats(): SymbolResolverStats;
+	/**
+	 * משחרר את ה-`blob:` URL-ים שנוצרו למדיה מוטמעת.
+	 *
+	 * 🛑 **חובה בהחלפת לוח.** ‏`URL.createObjectURL` קושר את ה-`Blob` למסמך עד
+	 * ‏`revokeObjectURL` או עד ניווט — טעינת לוח שני בלי שחרור מחזיקה את
+	 * הבייטים של הראשון בזיכרון לנצח. הקורא הוא `GridSetView`, שנהרס
+	 * ונבנה מחדש ב-`{#key gridSet}`.
+	 *
+	 * אופציונלי בחוזה כדי שפותר-מזויף בבדיקה לא ייאלץ לממש אותו;
+	 * ‏`createSymbolResolver` **תמיד** מממש.
+	 */
+	dispose?(): void;
 }
 
 /** פונקציית החיפוש — מוזרקת בבדיקות כדי שלא תהיה רשת ב-CI. */
@@ -353,8 +378,51 @@ export function createSymbolResolver(
 		byLibrary: {},
 		resolvedByLibrary: {},
 		byMatch: { exact: 0, loose: 0 },
-		resolvedBySource: {}
+		resolvedBySource: {},
+		embeddedUnsupported: {}
 	};
+
+	/**
+	 * נתיב-ב-ZIP → ‏`blob:` URL. 🔑 **הקאש הזה אינו אופטימיזציה — הוא נכונות.**
+	 * ‏`WordListCell` בונה תא-נגזר חדש בכל רינדור, ולכן ה-`WeakMap` של `perCell`
+	 * אינו פוגע, והפותר נקרא שוב; בלי קאש-לפי-נתיב כל רינדור היה מייצר
+	 * ‏`Blob` **נוסף** על אותם בייטים, ו-`dispose` היה משחרר רק את האחרון.
+	 */
+	const blobUrls = new Map<string, string>();
+
+	/**
+	 * ‏`ImageRef` מוטמע → ‏`blob:` URL, או `null` כשאין לו קובץ בארכיון.
+	 *
+	 * 🛑 **שלושה מסלולי-נפילה, וכולם שקטים במכוון** — ‏`ImageRef` שאין לו קובץ
+	 * אינו שגיאה, הוא בדיוק כמו מזהה-PCS שאינו במניפסט: ממשיכים לשכבה הבאה.
+	 *   1. אין `embeddedPath` — ‏`GridSet` שנבנה מ-JSON או fixture בלי המעבר.
+	 *   2. אין `media` או אין בו את הנתיב — ‏`emf`/`wmf` נדחו כבר ב-`parse.ts`.
+	 *   3. ‏`URL.createObjectURL` חסר — ‏SSR. אין `window`, אין blob.
+	 */
+	function embeddedUrl(ref: ImageRef): string | null {
+		const path = ref.embeddedPath;
+		if (path === undefined) return null;
+
+		const existing = blobUrls.get(path);
+		if (existing) return existing;
+
+		const bytes = gridSet.media?.get(path);
+		if (!bytes) {
+			// נדחה בגלל הסיומת ⇒ נספר, כדי שההיעדר יהיה נראה בדוח.
+			const ext = mediaExtension(path);
+			if (ext && !isRenderableImage(path)) {
+				stats.embeddedUnsupported[ext] = (stats.embeddedUnsupported[ext] ?? 0) + 1;
+			}
+			return null;
+		}
+
+		if (typeof URL === 'undefined' || typeof URL.createObjectURL !== 'function') return null;
+		// ‏`type` מהסיומת: בלעדיו ה-Blob הוא `application/octet-stream`, וכרום
+		// מסרב להציג אותו ב-`<img>`.
+		const url = URL.createObjectURL(new Blob([bytes as BlobPart], { type: mimeOf(path) }));
+		blobUrls.set(path, url);
+		return url;
+	}
 
 	/** תא שנפתר פעם אחת אינו נספר פעמיים ואינו נשלח שוב לרשת. */
 	const perCell = new WeakMap<Cell, Promise<SymbolResolution>>();
@@ -403,6 +471,28 @@ export function createSymbolResolver(
 			: primary.library.trim()
 				? primary.library.trim().toLowerCase()
 				: EMBEDDED_LIBRARY;
+
+		// 🔑 **מדיה מוטמעת קודמת לכול, וזה אינו סדר-שרירותי.** כל שאר השכבות
+		// מחפשות **תחליף** לסמל שאיננו: ‏PCS עושה lookup לדלי שלנו, ו-ARASAAC
+		// מתאים *מילה* לפיקטוגרם. כאן הקובץ הוא מה שמחבר הלוח שם בלוח — זו
+		// התמונה עצמה ולא מועמדת לה. אם היא קיימת ואפשר להציג אותה, אין מה
+		// לשקול.
+		//
+		// 🛑 ונופל הלאה בשקט כשאין: ‏`emf`/`wmf` אינם נפרשים ב-`parse.ts`, ולכן
+		// תא שהפניתו המוטמעת היא `.wmf` ממשיך לכתובית העברית בדיוק כמו מזהה-PCS
+		// שאינו במניפסט. **אין כאן התחזות להצלחה ואין `<img>` שבור.**
+		for (const ref of refs) {
+			const url = embeddedUrl(ref);
+			if (url) {
+				return {
+					url,
+					source: 'embedded',
+					// לדיאגנוסטיקה: מה שמזהה את הקובץ הוא נתיבו, לא מילת-חיפוש.
+					query: ref.embeddedPath ?? '',
+					library
+				};
+			}
+		}
 
 		// 🔑 **‏PCS קודם לכל חיפוש — וזה אינו "ניחוש טוב יותר" אלא סוג-ראיה אחר.**
 		// ‏`[MJPCS#]` נושא מזהה מספרי, ולכן הפתירה היא **‏lookup ישיר לקובץ**:
@@ -518,8 +608,16 @@ export function createSymbolResolver(
 				byLibrary: { ...stats.byLibrary },
 				resolvedByLibrary: { ...stats.resolvedByLibrary },
 				byMatch: { ...stats.byMatch },
-				resolvedBySource: { ...stats.resolvedBySource }
+				resolvedBySource: { ...stats.resolvedBySource },
+				embeddedUnsupported: { ...stats.embeddedUnsupported }
 			};
+		},
+		dispose() {
+			for (const url of blobUrls.values()) URL.revokeObjectURL(url);
+			// 🛑 מנקים את המפה ולא רק משחררים: קריאה חוזרת ל-`resolve` אחרי
+			// ‏`dispose` הייתה מחזירה URL **מבוטל** — ‏`<img>` שבור שנראה כמו באג
+			// בפתירה. אחרי הניקוי היא בונה URL חדש, וזה נכון.
+			blobUrls.clear();
 		}
 	};
 }

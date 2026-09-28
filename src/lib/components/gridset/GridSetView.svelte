@@ -37,6 +37,19 @@
 	}
 
 	const { runtime, resolver } = init();
+
+	/**
+	 * 🛑 שחרור ה-`blob:` URL-ים של המדיה המוטמעת כשהלוח מוחלף.
+	 *
+	 * ‏`URL.createObjectURL` מחזיק את הבייטים עד `revokeObjectURL` או עד ניווט
+	 * — טעינת לוח שני הייתה משאירה את המדיה של הראשון בזיכרון. הנקודה הנכונה
+	 * היא כאן ולא ב-`ButtonCell`: הפותר חי לכל אורך חיי המופע הזה, וה-`{#key
+	 * gridSet}` אצל הקורא הורס אותו בדיוק כשהלוח מתחלף.
+	 *
+	 * ‏`$effect` בלי תלויות — רק ה-cleanup מעניין. ‏`dispose` אופציונלי בחוזה
+	 * (פותר-מזויף בבדיקה אינו חייב לממש אותו).
+	 */
+	$effect(() => () => resolver?.dispose?.());
 </script>
 
 <GridBoard page={runtime.page} ctx={runtime} symbols={resolver} />
