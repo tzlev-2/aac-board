@@ -5,6 +5,7 @@
 	 * (ראו docs/plans/gridset-core-design.md §7 — נשבר על ColumnSpan).
 	 */
 	import type { Cell, Page, RuntimeContext } from '$lib/gridset/types';
+	import { untrack } from 'svelte';
 	import { isCellAvailable } from '$lib/gridset/commands';
 	import type { SymbolResolver } from '$lib/gridset/symbols';
 	import { sizeNameToFr } from '$lib/gridset/visualDefaults';
@@ -33,7 +34,8 @@
 	// הצהרות-דרישה שלא ניתן היה להכריע נספרות פעם אחת לכל דף, לדוח-הכיסוי.
 	$effect(() => {
 		for (const cell of page.cells) {
-			isCellAvailable(cell, ctx.features, (id) => ctx.reportUnimplemented(id));
+			// מונה הדיווח אינו תלות של הדף: קריאתו וכתיבתו לא יריצו שוב את ה-effect.
+			isCellAvailable(cell, ctx.features, (id) => untrack(() => ctx.reportUnimplemented(id)));
 		}
 	});
 

@@ -1,6 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { render } from 'vitest-browser-svelte';
-import type { Cell, Page, ResolvedStyle, RuntimeContext, SizeName } from '$lib/gridset/types';
+import { tick } from 'svelte';
+import { createRuntime } from '$lib/gridset/runtime.svelte';
+import type {
+	Cell,
+	CommandInvocation,
+	Page,
+	ResolvedStyle,
+	RuntimeContext,
+	SizeName
+} from '$lib/gridset/types';
 import GridBoard from './GridBoard.svelte';
 import { cellRendererKey, resolveCellRenderer } from './cellRenderers';
 import ButtonCell from './ButtonCell.svelte';
@@ -78,6 +87,40 @@ function makeCtx(page: Page): RuntimeContext {
 }
 
 describe('GridBoard', () => {
+	it('דיווח דרישות עם מונה תגובתי מתייצב בלי להסתיר תאים זמינים', async () => {
+		const requirement = (feature?: string): CommandInvocation => ({
+			id: 'Settings.RequiredFeature',
+			params: feature ? { feature } : {}
+		});
+		const p = makePage({
+			cells: [
+				makeCell({ caption: 'בלי פרמטר', commands: [requirement()] }),
+				makeCell({ x: 1, caption: 'דרישה לא מוכרת', commands: [requirement('Telepathy')] }),
+				makeCell({ x: 2, caption: 'דרישה חסומה', commands: [requirement('EyeGazeAccess')] })
+			]
+		});
+		const runtime = createRuntime(makeCtx(p).gridSet, { features: new Set() });
+		const screen = render(GridBoard, { page: p, ctx: runtime });
+		await tick();
+
+		await expect.element(screen.getByText('בלי פרמטר')).toBeVisible();
+		await expect.element(screen.getByText('דרישה לא מוכרת')).toBeVisible();
+		await expect.element(screen.getByText('דרישה חסומה')).not.toBeInTheDocument();
+		expect(runtime.unimplemented).toEqual({
+			'Settings.RequiredFeature(no-param)': 1,
+			'Settings.RequiredFeature(Telepathy)': 1
+		});
+
+		// דיווח חיצוני משנה את אותו $state; הוא אינו ביקור נוסף בדף.
+		runtime.reportUnimplemented('Photos.Snapshot');
+		await tick();
+		expect(runtime.unimplemented).toEqual({
+			'Settings.RequiredFeature(no-param)': 1,
+			'Settings.RequiredFeature(Telepathy)': 1,
+			'Photos.Snapshot': 1
+		});
+	});
+
 	it('רשת 6×4 מייצרת 24 מיקומים', () => {
 		const p = makePage({ columns: 6, rows: 4 });
 		const screen = render(GridBoard, { page: p, ctx: makeCtx(p) });
@@ -267,8 +310,12 @@ describe('GridBoard', () => {
 		const screen = render(GridBoard, { page: p, ctx: makeCtx(p) });
 		const [edgeTile, innerTile] = screen.getByTestId('grid-tile').elements();
 
-		expect(edgeTile.getAttribute('style')).toContain('margin-inline-start: calc(-1 * var(--gutter))');
-		expect(innerTile.getAttribute('style')).toContain('margin-inline-start: calc(-1 * var(--gutter) / 2)');
+		expect(edgeTile.getAttribute('style')).toContain(
+			'margin-inline-start: calc(-1 * var(--gutter))'
+		);
+		expect(innerTile.getAttribute('style')).toContain(
+			'margin-inline-start: calc(-1 * var(--gutter) / 2)'
+		);
 	});
 });
 
