@@ -121,7 +121,12 @@ export async function parseGridSet(
 		const match = GRID_RE.exec(path);
 		if (!match) continue;
 		const name = match[2];
-		const page = parsePage(name, parseXml(decode(files[path]), path), resolve);
+		const page = parsePageXml(
+			name,
+			decode(files[path]),
+			resolve,
+			path.slice(0, path.lastIndexOf('/'))
+		);
 		pages[name] = page;
 		// 🛑 **ספריית ה-ZIP ולא `page.name`.** הן שוות-ערך היום (שתיהן `match[2]`),
 		// אבל הן שני דברים: `page.name` הוא יעד `Jump.To` ומפתח ב-`pages`, וכאן
@@ -277,6 +282,19 @@ function readStyleProps(el: Element | undefined): Partial<Style> {
 }
 
 // ── grid.xml ─────────────────────────────────────────────────────────────
+
+export function parsePageXml(
+	name: string,
+	xml: string,
+	resolve: StyleResolver,
+	zipDir: string
+): Page {
+	const root = parseXml(xml, `${zipDir}/grid.xml`);
+	if (root.localName !== 'Grid') throw new Error('invalid-grid-root');
+	const page = parsePage(name, root, resolve);
+	assignEmbeddedPaths(page, zipDir);
+	return page;
+}
 
 function parsePage(name: string, root: Element, resolve: StyleResolver): Page {
 	// 🛑 מלכודת 3: columns/rows הם **ספירת אלמנטים**, לא מאפיין.

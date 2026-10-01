@@ -187,3 +187,17 @@ export function setCellStyleColour(
 	if (last) return splice(xml, last.end, last.end, separator(xml, last.start) + element);
 	return insertFirst(xml, style, element);
 }
+
+/** Shared sparse patch for preview and archive output. */
+export function applyCellEditXml(
+	xml: string,
+	x: number,
+	y: number,
+	patch: { caption?: string; colours?: Partial<Record<CellColourField, string>> }
+): string {
+	if (patch.caption !== undefined) xml = setCellCaption(xml, x, y, patch.caption);
+	for (const [field, colour] of Object.entries(patch.colours ?? {})) {
+		if (colour !== undefined) xml = setCellStyleColour(xml, x, y, field as CellColourField, colour);
+	}
+	return xml;
+}

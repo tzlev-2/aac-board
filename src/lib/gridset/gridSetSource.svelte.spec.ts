@@ -122,3 +122,52 @@ describe('פתיחה מחדש של לוחות מקומיים', () => {
 		);
 	}
 });
+
+describe('single page preview pipeline', () => {
+	it('keeps source text, inherited styles, embedded refs and matches reopened output', async () => {
+		const { readPageXml } = await import('./gridSetSource');
+		const { parsePageXml } = await import('./parse');
+		const { createStyleResolver } = await import('./resolveStyle');
+		const { applyCellEditXml } = await import('./xmlEdit');
+		const pageXml = xml.replace(
+			'<Caption>old</Caption>',
+			'<Caption>old</Caption><Image>probe.png</Image>'
+		);
+		const bytes = zipSync({
+			'Settings0/settings.xml': strToU8(
+				'<GridSetSettings><StartGrid>page</StartGrid></GridSetSettings>'
+			),
+			'Settings0/Styles/styles.xml': strToU8(
+				'<StyleCatalog><Styles><Style Key="Default"><BackColour>#11223380</BackColour><FontName>Arial</FontName></Style></Styles></StyleCatalog>'
+			),
+			'prefix/gRiDs/page/GRID.xml': strToU8('\uFEFF' + pageXml),
+			'prefix/gRiDs/page/0-1probe.png': new Uint8Array([1, 2, 3])
+		});
+		const opened = await openGridSet(bytes);
+		const input = readPageXml(opened.source, 'page');
+		expect(input.xml).toBe(pageXml);
+		expect(input.hasBom).toBe(true);
+		expect(input.zipDir).toBe('prefix/gRiDs/page');
+		const edit = {
+			page: 'page',
+			x: 0,
+			y: 1,
+			caption: 'אֵ &<>🙂',
+			colours: { FontColour: '#FEDCBA80' }
+		};
+		const candidate = parsePageXml(
+			'page',
+			applyCellEditXml(input.xml, 0, 1, edit),
+			createStyleResolver(opened.gridSet.styles),
+			input.zipDir
+		);
+		const reopened = await openGridSet(writeGridSet(opened.source, [edit]));
+		expect(candidate).toEqual(reopened.gridSet.pages.page);
+		expect(candidate.cells[0].image?.embeddedPath).toBe('prefix/gRiDs/page/0-1probe.png');
+		expect(candidate.cells[0].style.backColour).toBe('#11223380');
+		expect(opened.source.bytes).toEqual(bytes);
+		expect(() => parsePageXml('page', '<Other/>', createStyleResolver({}), 'Grids/page')).toThrow(
+			'invalid-grid-root'
+		);
+	});
+});
