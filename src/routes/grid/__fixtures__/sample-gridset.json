@@ -26,6 +26,7 @@
 						"backColour": "#FFFFFFFF",
 						"fontColour": "#000000FF",
 						"borderColour": "#CCCCCCFF",
+						"tileColour": "#00000000",
 						"fontName": "Arial",
 						"fontSize": 22,
 						"backgroundShape": 1

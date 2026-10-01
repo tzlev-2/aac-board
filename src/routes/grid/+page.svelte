@@ -117,6 +117,7 @@
 
 	function saveCopy() {
 		if (!source) return;
+		error = '';
 		try {
 			const bytes = writeGridSet(source, []);
 			const url = URL.createObjectURL(
