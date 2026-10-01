@@ -2,6 +2,12 @@
 
 ## 2026-10-02
 
+### session לעריכה מצטברת של תאים
+
+ב־`src/routes/grid/gridset-edit-session.ts` נוסף cache של XML מקור ופותר סגנונות יחיד. `upsertCellEdit` ממזג שדות לפי כתובת נפרדת ו־`validateCellEdit` בודק צבעים ותווי XML. התוויות מרוכזות ב־`editor-messages.ts`. שש בדיקות חדשות מכסות מקור קבוע, preview מול reopen, ביטול ושמירה מצטברת בשני דפים, וכן שימור הרשומות שלא נערכו.
+
+## 2026-10-02
+
 ### עריכת מקור — צינור משותף לדף יחיד
 
 ב־`parse.ts` נוסף `parsePageXml` עם בדיקת שורש ושחזור נתיבי מדיה. `readPageXml` ב־`gridSetSource.ts` מחלץ דף יחיד ושומר BOM וטקסט מקור; `applyCellEditXml` ב־`xmlEdit.ts` משותף ל־preview ולשמירה. מנוע ZIP נשאר ללא שינוי. בדיקות שימור הקורפוס ופתיחה מחדש מכסות את הצינור ואת ירושת הסגנונות.
