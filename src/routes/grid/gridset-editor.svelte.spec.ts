@@ -3,7 +3,7 @@ import { tick } from 'svelte';
 import { buildGridset } from '$lib/gridset/__fixtures__/buildGridset';
 import { createRuntime } from '$lib/gridset/runtime.svelte';
 import { writeGridSet, openGridSet } from '$lib/gridset/gridSetSource';
-import { createGridSetEditor } from './gridset-editor.svelte';
+import { createGridSetEditor, validateJsonGridSet } from './gridset-editor.svelte';
 
 function bytes(caption = 'original') {
 	return buildGridset({
@@ -92,4 +92,27 @@ it('publishes only the latest load and retains source/model/edits on failed repl
 	} finally {
 		fetchMock.mockRestore();
 	}
+});
+
+it('accepts a complete JSON model and rejects a missing start page before replacing the board', async () => {
+	const editor = await loaded();
+	const identity = editor.gridSet;
+	const source = editor.source;
+	const valid = JSON.parse(JSON.stringify(editor.gridSet));
+	validateJsonGridSet(valid);
+	editor.loadFile(new File([JSON.stringify(valid)], 'valid.json', { type: 'application/json' }));
+	await expect.poll(() => editor.sourceName).toBe('valid.json');
+	expect(editor.source).toBeNull();
+	const validIdentity = editor.gridSet;
+
+	editor.loadFile(
+		new File(['{"pages":{},"startGrid":"missing"}'], 'bad.json', {
+			type: 'application/json'
+		})
+	);
+	await expect.poll(() => editor.error).toContain('דף פתיחה קיים');
+	expect(editor.gridSet).toBe(validIdentity);
+	expect(editor.source).toBeNull();
+	expect(editor.gridSet).not.toBe(identity);
+	expect(source).not.toBeNull();
 });

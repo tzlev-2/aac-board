@@ -37,6 +37,46 @@ export function nextFrame(): Promise<void> {
 	return new Promise((resolve) => requestAnimationFrame(() => setTimeout(resolve, 0)));
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+	return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function isJsonPage(value: unknown, name: string): boolean {
+	if (!isRecord(value)) return false;
+	return (
+		value.name === name &&
+		Number.isInteger(value.columns) &&
+		(value.columns as number) > 0 &&
+		Number.isInteger(value.rows) &&
+		(value.rows as number) > 0 &&
+		Array.isArray(value.columnWidths) &&
+		value.columnWidths.length === value.columns &&
+		Array.isArray(value.rowHeights) &&
+		value.rowHeights.length === value.rows &&
+		Array.isArray(value.cells) &&
+		Array.isArray(value.wordList) &&
+		typeof value.predictionSource === 'string' &&
+		isRecord(value.autoContentCommands) &&
+		isRecord(value.background)
+	);
+}
+
+/** JSON is already a display model, so reject malformed data before replacing the live model. */
+export function validateJsonGridSet(value: unknown): asserts value is GridSet {
+	if (
+		!isRecord(value) ||
+		typeof value.startGrid !== 'string' ||
+		value.startGrid.length === 0 ||
+		!isRecord(value.pages) ||
+		!isRecord(value.styles) ||
+		typeof value.language !== 'string' ||
+		!Array.isArray(value.symbolSearchKeys) ||
+		!Object.hasOwn(value.pages, value.startGrid) ||
+		!Object.entries(value.pages).every(([name, page]) => isJsonPage(page, name))
+	)
+		throw new Error('invalid-json');
+}
+
 /** Route-local state: the archive stays raw, only pages of the model are replaced. */
 export function createGridSetEditor() {
 	let gridSet = $state<GridSet>(SAMPLE_GRID_SET);
@@ -221,9 +261,8 @@ export function createGridSetEditor() {
 					const bytes = new Uint8Array(await file.arrayBuffer());
 					if (bytes[0] === 0x50 && bytes[1] === 0x4b) return openGridSet(bytes);
 					const parsed = JSON.parse(new TextDecoder().decode(bytes));
-					if (!parsed || typeof parsed !== 'object' || !parsed.pages || !parsed.startGrid)
-						throw new Error('invalid-json');
-					return { gridSet: parsed as GridSet, source: null };
+					validateJsonGridSet(parsed);
+					return { gridSet: parsed, source: null };
 				},
 				file.name,
 				messages.invalidFile

@@ -27,6 +27,8 @@ export const messages = {
 	clean: 'ללא שינויים',
 	downloaded: 'הוכן עותק להורדה:',
 	dynamicCaption: 'הכיתוב בתא זה נגזר מתוכן דינמי. אפשר לערוך צבעים בלבד.',
+	actionLetterCaption:
+		'בתא זה Grid 3 מציג את האות שבפקודת Action.Letter. שינוי הכתובית אינו משנה את האות המוצגת.',
 	rgb: 'RGB',
 	alpha: 'אטימות 0–255',
 	transparent: 'שקוף',
@@ -43,7 +45,7 @@ export const messages = {
 		'missing-cell': 'התא אינו קיים במקור.',
 		'dynamic-caption': 'כתובית של תא דינמי אינה ניתנת לעריכה.',
 		'invalid-grid-root': 'הדף אינו Grid תקין.',
-		'invalid-json': 'חסרים pages או startGrid בקובץ JSON.'
+		'invalid-json': 'מבנה ה־JSON אינו לוח תקין: דרושים דפים תקינים ודף פתיחה קיים.'
 	} as Record<string, string>
 };
 export const colourLabels: Record<CellColourField, string> = {

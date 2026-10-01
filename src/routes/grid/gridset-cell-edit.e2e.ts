@@ -583,6 +583,41 @@ test('13 invalid colour/PK/zip64 and missing Content preserve the last legal boa
 	await expect(page.getByRole('button', { name: 'שמור עותק', exact: true })).toBeDisabled();
 	await expect(cell(page, 0, 0)).not.toContainText('bad');
 });
+test('F1 Action.Letter warns about the displayed command letter, but a static cell does not', async ({
+	page
+}) => {
+	await start(page);
+	await upload(page, readFileSync('static/b037.gridset'), 'b037.gridset');
+	await edit(page);
+	await select(page, 0, 4).click();
+	await expect(page.getByTestId('action-letter-caption-notice')).toContainText('Action.Letter');
+	await expect(page.getByTestId('action-letter-caption-notice')).toContainText('Grid 3');
+	await upload(page, readFileSync('static/org-3.gridset'), 'org-3.gridset');
+	await edit(page);
+	await select(page, 0, 0).click();
+	await expect(page.getByTestId('action-letter-caption-notice')).toHaveCount(0);
+});
+test('F2 invalid JSON preserves the loaded board atomically and a valid JSON model loads', async ({
+	page
+}) => {
+	await start(page);
+	await upload(page, readFileSync('static/b037.gridset'), 'b037.gridset');
+	await page.locator('input[type=file]').setInputFiles({
+		name: 'bad.json',
+		mimeType: 'application/json',
+		buffer: Buffer.from('{"pages":{},"startGrid":"missing"}')
+	});
+	await expect(page.getByRole('alert')).toContainText('דף פתיחה קיים');
+	await expect(page.getByTestId('grid-source')).toContainText('b037.gridset');
+
+	await page.locator('input[type=file]').setInputFiles({
+		name: 'valid.json',
+		mimeType: 'application/json',
+		buffer: readFileSync('src/routes/grid/__fixtures__/sample-gridset.json')
+	});
+	await expect(page.getByTestId('grid-source')).toContainText('valid.json');
+	await expect(page.getByText('פריט-בדיקה')).toBeVisible();
+});
 test('14 delayed auto-fetch loses to manual upload and successful second load clears editing', async ({
 	page
 }) => {

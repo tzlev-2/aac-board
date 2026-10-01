@@ -45,6 +45,7 @@
 					: '??')
 		);
 	}
+	const hasActionLetter = $derived(cell.commands.some((command) => command.id === 'Action.Letter'));
 </script>
 
 <aside class="cell-editor" aria-label={messages.edit}>
@@ -60,6 +61,9 @@
 		></textarea>
 	</label>
 	{#if cell.contentType}<p class="hint">{messages.dynamicCaption}</p>{/if}
+	{#if hasActionLetter}<p class="hint" data-testid="action-letter-caption-notice">
+			{messages.actionLetterCaption}
+		</p>{/if}
 	{#each COLOUR_FIELDS as field (field)}
 		<fieldset disabled={busy}>
 			<legend>{colourLabels[field]}</legend>
