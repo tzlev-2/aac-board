@@ -2,6 +2,12 @@
 
 ## 2026-10-02
 
+### בחירת תא מבודדת מפקודות הלוח
+
+ב־`GridSetView.svelte` נוספו props אופציונליים לעריכה וחשיפת runtime לאחר mount. ב־`GridBoard.svelte` נוסף overlay לבחירת כל תא קיים; איפוס WordList תלוי בשם הדף בלבד. `GridCell.svelte` הופך inert ושומר guard לפני הפעלה. בדיקות אינטגרציה מכסות בחירה, פלט והיסטוריה, המשך Jump, תאים Hidden/Disabled ו־pager בדף אמיתי לאחר preview וביטול. `svelte-autofixer` מצא אפס issues; נשארו הצעות היוריסטיות על effects קיימים לדיווח ולניקוי, ועל איפוס pager המכוון.
+
+## 2026-10-02
+
 ### session לעריכה מצטברת של תאים
 
 ב־`src/routes/grid/gridset-edit-session.ts` נוסף cache של XML מקור ופותר סגנונות יחיד. `upsertCellEdit` ממזג שדות לפי כתובת נפרדת ו־`validateCellEdit` בודק צבעים ותווי XML. התוויות מרוכזות ב־`editor-messages.ts`. שש בדיקות חדשות מכסות מקור קבוע, preview מול reopen, ביטול ושמירה מצטברת בשני דפים, וכן שימור הרשומות שלא נערכו.

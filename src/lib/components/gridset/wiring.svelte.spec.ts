@@ -324,3 +324,111 @@ describe('סלייס 11 — השרשרת Space→Punctuation→Space על המס
 		expect(screen.getByTestId('chat-cell').element().textContent).toBe('1 +');
 	});
 });
+
+describe('edit isolation', () => {
+	it('selects hidden/disabled/required/dynamic cells without commands, keeps one runtime and resumes Jump', async () => {
+		const { tick } = await import('svelte');
+		const { openGridSet } = await import('$lib/gridset/gridSetSource');
+		const { createGridSetEditSession } = await import('../../../routes/grid/gridset-edit-session');
+		const { gridSet, source } = await openGridSet(buildGridset(spec));
+		const session = createGridSetEditSession(source, gridSet.styles);
+		const { createRuntime } = await import('$lib/gridset/runtime.svelte');
+		let runtime: ReturnType<typeof createRuntime> | undefined;
+		let mounts = 0;
+		const selected: string[] = [];
+		spoken.length = 0;
+		const screen = render(GridSetView, {
+			gridSet,
+			symbols: null,
+			editing: true,
+			runtimeOptions: { speech: recordingSpeech },
+			onRuntimeReady: (r) => {
+				runtime = r;
+				mounts++;
+			},
+			onSelectCell: (p, c) => selected.push(`${p.name}:${c.x},${c.y}`)
+		});
+		await tick();
+		expect(screen.getByTestId('edit-cell').elements()).toHaveLength(6);
+		await screen.getByTestId('edit-cell').nth(1).click();
+		await screen.getByTestId('edit-cell').nth(2).click();
+		await screen.getByTestId('edit-cell').nth(4).click();
+		expect(selected).toEqual(['בית:0,1', 'בית:1,1', 'בית:3,1']);
+		expect(runtime!.pageName).toBe('בית');
+		expect(runtime!.output.items).toEqual([]);
+		expect(spoken).toEqual([]);
+		expect(
+			screen
+				.getByTestId('grid-cell')
+				.elements()
+				.every((el) => (el as HTMLElement).inert)
+		).toBe(true);
+		runtime!.navigate('אוכל');
+		for (const word of ['one', 'two', 'three', 'four'])
+			runtime!.output.insert({ text: word });
+		const history = [...runtime!.history];
+		const items = [...runtime!.output.items];
+		const identity = runtime;
+		gridSet.pages['אוכל'] = session.preview('אוכל', [
+			{ page: 'אוכל', x: 1, y: 0, caption: 'preview' }
+		]);
+		await screen.rerender({ gridSet, editing: true });
+		await expect.element(screen.getByText('preview')).toBeVisible();
+		gridSet.pages['אוכל'] = session.preview('אוכל', []);
+		await screen.rerender({ gridSet, editing: false });
+		expect(runtime).toBe(identity);
+		expect(mounts).toBe(1);
+		expect(runtime!.history).toEqual(history);
+		expect(runtime!.output.items).toEqual(items);
+		await screen.getByRole('button', { name: 'לבגדים' }).click();
+		expect(runtime!.pageName).toBe('בגדים');
+	});
+	it('org-1 pager keeps second-page DOM through same-name preview, cancel, apply and mode changes', async () => {
+		const { tick } = await import('svelte');
+		const { openGridSet, writeGridSet } = await import('$lib/gridset/gridSetSource');
+		const { createGridSetEditSession } = await import('../../../routes/grid/gridset-edit-session');
+		const { gridSet, source } = await openGridSet(
+			new Uint8Array(await (await fetch('/org-1.gridset')).arrayBuffer())
+		);
+		const { createRuntime } = await import('$lib/gridset/runtime.svelte');
+		const runtime = createRuntime(gridSet, { speech: recordingSpeech });
+		runtime.navigate('בגדים - עוד');
+		const { default: GridBoard } = await import('./GridBoard.svelte');
+		const screen = render(GridBoard, { page: runtime.page, ctx: runtime, symbols: null });
+		await tick();
+		const at = (x: number, y: number) =>
+			screen
+				.getByTestId('grid-cell')
+				.elements()
+				.find(
+					(el) =>
+						el.getAttribute('data-cell-x') === String(x) &&
+						el.getAttribute('data-cell-y') === String(y)
+				)!;
+		(at(3, 3) as HTMLElement).click();
+		await tick();
+		expect(at(2, 1).textContent).toContain('כפכפים');
+		expect(at(1, 2).textContent).toContain('תכשיטים');
+		expect(at(3, 3).textContent).toContain('חזור');
+		const session = createGridSetEditSession(source, gridSet.styles);
+		const edit = { page: runtime.pageName, x: 2, y: 1, colours: { BackColour: '#123456FF' } };
+		for (const edits of [[edit], [], [edit]]) {
+			gridSet.pages[runtime.pageName] = session.preview(runtime.pageName, edits);
+			await screen.rerender({ page: runtime.page, editing: true });
+			await tick();
+			expect(at(2, 1).textContent).toContain('כפכפים');
+			expect(at(1, 2).textContent).toContain('תכשיטים');
+			expect(at(3, 3).textContent).toContain('חזור');
+		}
+		expect(writeGridSet(source, [edit]).length).toBeGreaterThan(0);
+		await screen.rerender({ editing: false });
+		expect(at(3, 3).textContent).toContain('חזור');
+		runtime.navigate(gridSet.startGrid);
+		await screen.rerender({ page: runtime.page });
+		await tick();
+		runtime.navigate('בגדים - עוד');
+		await screen.rerender({ page: runtime.page });
+		await tick();
+		expect(at(3, 3).textContent).toContain('עוד');
+	});
+});

@@ -336,3 +336,38 @@ describe('cellRenderers registry', () => {
 		expect(resolveCellRenderer(cell)).toBe(UnsupportedCell);
 	});
 });
+
+it('edit overlays include Hidden/Disabled and preserve the top-right span address', async () => {
+	const p = makePage({
+		cells: [
+			makeCell({ caption: 'hidden', visibility: 'Hidden', columnSpan: 2 }),
+			makeCell({ x: 2, caption: 'disabled', visibility: 'Disabled' })
+		]
+	});
+	const ctx = makeCtx(p);
+	let executions = 0;
+	ctx.navigate = () => {
+		executions++;
+	};
+	p.cells[0].commands = [{ id: 'Jump.To', params: { grid: 'other' } }];
+	const selected: number[] = [];
+	const screen = render(GridBoard, {
+		page: p,
+		ctx,
+		editing: true,
+		onSelectCell: (_, c) => selected.push(c.x)
+	});
+	const overlays = screen.getByTestId('edit-cell');
+	expect(overlays.elements()).toHaveLength(2);
+	await overlays.nth(0).click();
+	await overlays.nth(1).click();
+	expect(selected).toEqual([0, 2]);
+	expect(executions).toBe(0);
+	expect(getComputedStyle(overlays.nth(0).element()).gridColumn).toContain('span 2');
+	expect(
+		screen
+			.getByTestId('grid-cell')
+			.elements()
+			.every((el) => (el as HTMLElement).inert)
+	).toBe(true);
+});
