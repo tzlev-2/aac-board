@@ -2,6 +2,12 @@
 
 ## 2026-10-02
 
+### ממשק עריכת תא ושמירה מצטברת — נקודת ביקורת
+
+ב־`src/routes/grid/gridset-editor.svelte.ts` רוכזה לוגיקת הטיוטה, החלה/ביטול, טעינה אטומית ושמירת עותק. `GridSetCellEditor.svelte` מציג כתובית וארבעת הצבעים עם alpha מפורשת. `EditorDecision.svelte` משתמש ב־dialog טבעי להחלטה על טיוטה או החלפת מקור. הראוט מחליף Page בלבד ושומר key להחלפת מקור. בדיקות controller ושער check עברו; QA מלא של ה־build עדיין נדרש. רכיבי העורך החדשים עברו autofixer ללא issues או suggestions.
+
+## 2026-10-02
+
 ### בחירת תא מבודדת מפקודות הלוח
 
 ב־`GridSetView.svelte` נוספו props אופציונליים לעריכה וחשיפת runtime לאחר mount. ב־`GridBoard.svelte` נוסף overlay לבחירת כל תא קיים; איפוס WordList תלוי בשם הדף בלבד. `GridCell.svelte` הופך inert ושומר guard לפני הפעלה. בדיקות אינטגרציה מכסות בחירה, פלט והיסטוריה, המשך Jump, תאים Hidden/Disabled ו־pager בדף אמיתי לאחר preview וביטול. `svelte-autofixer` מצא אפס issues; נשארו הצעות היוריסטיות על effects קיימים לדיווח ולניקוי, ועל איפוס pager המכוון.

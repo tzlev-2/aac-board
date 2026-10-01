@@ -1,231 +1,234 @@
 <script lang="ts">
-	/**
-	 * המסלול של הלוח: קובץ → מודל → מריץ חי.
-	 *
-	 * 🔑 `.gridset` הוא ZIP, ולכן הוא נקרא כבייטים ולא כטקסט — הבדיקה היא
-	 * חתימת-הקובץ (`PK`) ולא הסיומת. ‏JSON שכבר בצורת `GridSet` ממשיך להיתמך
-	 * (‏`sampleGridSet.ts`, ‏`__fixtures__/sample-gridset.json`, ‏E2E).
-	 *
-	 * 🛑 `parseGridSet` משתמש ב-`unzipSync` **במכוון** (`parse.ts:96` — הגרסה
-	 * האסינכרונית של fflate פותחת Worker דרך blob URL), ולכן הפרסור חוסם את
-	 * ה-thread. מכאן מחוון-הטעינה, ומכאן גם ה-frame שממתינים לו לפניו: בלעדיו
-	 * המחוון לא נצבע כלל והמסך פשוט קופא.
-	 */
-	import type { GridSet } from '$lib/gridset/types';
-	import { openGridSet, writeGridSet, type GridSetSource } from '$lib/gridset/gridSetSource';
-	import GridSetView from '$lib/components/gridset/GridSetView.svelte';
-	import { SAMPLE_GRID_SET } from './sampleGridSet';
 	import { onMount } from 'svelte';
-
-	// ‏`SAMPLE_GRID_SET` הוא לוח-הדגמה מוטבע בן 9 תאים. הוא נשאר כ**מצב
-	// פתיחה** כדי שהדף יצייר משהו מיָד וב-SSR, אבל הוא **אינו מה שרוצים
-	// לראות** — הלוח האמיתי נטען ב-`onMount` מיד אחריו.
-	let gridSet = $state<GridSet>(SAMPLE_GRID_SET);
-	let source = $state<GridSetSource | null>(null);
-	let error = $state('');
-	let loading = $state(false);
-	let sourceName = $state('');
-
-	const pageCount = $derived(Object.keys(gridSet.pages).length);
-
-	function parseJsonGridSet(text: string): GridSet {
-		const parsed = JSON.parse(text);
-		if (!parsed || typeof parsed !== 'object' || !parsed.pages || !parsed.startGrid) {
-			throw new Error('חסרים pages/startGrid');
-		}
-		return parsed as GridSet;
-	}
-
-	/** ‏frame אחד כדי שהמחוון ייצבע לפני הפרסור החוסם. */
-	function nextFrame(): Promise<void> {
-		return new Promise((resolve) => requestAnimationFrame(() => setTimeout(resolve, 0)));
-	}
-
-	async function handleFiles(files: FileList | null) {
-		const file = files?.[0];
-		if (!file) return;
-
-		loading = true;
-		error = '';
-		await nextFrame();
-
-		try {
-			const bytes = new Uint8Array(await file.arrayBuffer());
-			// חתימת ZIP: 50 4B ("PK"). כל השאר — JSON.
-			const isZip = bytes[0] === 0x50 && bytes[1] === 0x4b;
-			if (isZip) {
-				const opened = await openGridSet(bytes);
-				gridSet = opened.gridSet;
-				source = opened.source;
-			} else {
-				gridSet = parseJsonGridSet(new TextDecoder().decode(bytes));
-				source = null;
-			}
-			sourceName = file.name;
-		} catch (e) {
-			error = `קובץ לא תקין: ${e instanceof Error ? e.message : String(e)}`;
-		} finally {
-			loading = false;
-		}
-	}
-
-	/**
-	 * ‏🛑 **תוכן Smartbox מורשה.** הלוחות תחת `static/` אינם בגיט
-	 * (‏`*.gridset` ב-`.gitignore`) ואינם נשלחים עם הקוד — הם נכנסים
-	 * **לתיקיית הבילד בלבד**, ולכן כל פריסה שמכילה אותם **חייבת לשבת
-	 * מאחורי Cloudflare Access.**
-	 *
-	 * נפרס כך ⟨28.9.2026⟩: ‏`aac-board` בחשבון הארגוני, ‏Access הועמד על
-	 * ‏`*.aac-board-bzq.pages.dev` **לפני** ההעלאה הראשונה. אומת שגם
-	 * ‏`/org-1.gridset` עצמו חסום, ולא רק הדף.
-	 */
-	async function loadFromUrl(url: string, name: string) {
-		loading = true;
-		error = '';
-		await nextFrame();
-		try {
-			const res = await fetch(url);
-			if (!res.ok) throw new Error(`${res.status}`);
-			const opened = await openGridSet(new Uint8Array(await res.arrayBuffer()));
-			gridSet = opened.gridSet;
-			source = opened.source;
-			sourceName = name;
-		} catch (e) {
-			error = `טעינה נכשלה: ${e instanceof Error ? e.message : String(e)}`;
-		} finally {
-			loading = false;
-		}
-	}
-
-	/**
-	 * 🔑 טעינה אוטומטית של הלוח האמיתי.
-	 *
-	 * בלי זה הדף נפתח על לוח-ההדגמה בן ה-9 תאים, ומי שנכנס לכתובת רואה
-	 * "לוח ישן" ומסיק שהפריסה לא עודכנה. ⟨נצרב 28.9.2026 — בדיוק זה קרה.⟩
-	 *
-	 * ‏`onMount` ולא בזמן-בנייה: הפרסור הוא של ZIP בצד-הלקוח.
-	 * כישלון אינו מפיל את הדף — נשארים על לוח-ההדגמה ומודיעים.
-	 */
+	import GridSetView from '$lib/components/gridset/GridSetView.svelte';
+	import GridSetCellEditor from './GridSetCellEditor.svelte';
+	import EditorDecision from './EditorDecision.svelte';
+	import { createGridSetEditor } from './gridset-editor.svelte';
+	import { messages } from './editor-messages';
+	const editor = createGridSetEditor();
+	const pages = $derived(Object.keys(editor.gridSet.pages));
+	const samples = ['org-1.gridset', 'org-2.gridset', 'org-3.gridset', 'b037.gridset'];
 	onMount(() => {
-		void loadFromUrl('/org-1.gridset', 'org-1.gridset');
+		editor.loadUrl('/org-1.gridset', 'org-1.gridset');
 	});
-
-	function handleDrop(e: DragEvent) {
-		e.preventDefault();
-		handleFiles(e.dataTransfer?.files ?? null);
+	function files(input: HTMLInputElement) {
+		const file = input.files?.[0];
+		input.value = '';
+		if (file) editor.loadFile(file);
 	}
-
-	function saveCopy() {
-		if (!source) return;
-		error = '';
-		try {
-			const bytes = writeGridSet(source, []);
-			const url = URL.createObjectURL(
-				new Blob([new Uint8Array(bytes)], { type: 'application/zip' })
-			);
-			const a = document.createElement('a');
-			a.href = url;
-			a.download = sourceName.replace(/(\.[^.]+)?$/, '-edited$1');
-			a.click();
-			URL.revokeObjectURL(url);
-		} catch (e) {
-			error = `שמירה נכשלה: ${e instanceof Error ? e.message : String(e)}`;
-		}
+	function drop(event: DragEvent) {
+		event.preventDefault();
+		const file = event.dataTransfer?.files?.[0];
+		if (file) editor.loadFile(file);
 	}
 </script>
 
-<div class="grid-page">
+<div class="grid-page" dir="rtl">
 	<div
 		class="dropzone"
-		role="button"
-		tabindex="0"
+		role="group"
+		aria-label={messages.load}
 		ondragover={(e) => e.preventDefault()}
-		ondrop={handleDrop}
+		ondrop={drop}
 	>
-		<label>
-			טעינת לוח — גררו קובץ <code>.gridset</code> לכאן, או בחרו:
-			<input
+		<label
+			>{messages.load}<input
+				aria-label={messages.load}
 				type="file"
+				disabled={editor.saving}
 				accept=".gridset,application/json,.json"
-				onchange={(e) => handleFiles((e.currentTarget as HTMLInputElement).files)}
-			/>
-		</label>
-		<div class="samples">
-			<button type="button" onclick={() => loadFromUrl('/org-1.gridset', 'org-1.gridset')}>
-				טען לוח לדוגמה — ‏96 דפים
-			</button>
-			<button type="button" onclick={() => loadFromUrl('/org-2.gridset', 'org-2.gridset')}>
-				לוח גדול יותר — ‏132 דפים
-			</button>
-			<!--
-				🔑 הלוח היחיד עם סמלי PCS. ‏`org-1` ו-`org-2` הם **אפס** הפניות
-				‏`[MJPCS#]` — ‏415 מתוך 415 יושבות כאן (‏76% מהפניות-הספרייה שלו).
-				בלי הכפתור הזה אי אפשר לראות את שכבת ה-PCS בכלל.
-			-->
-			<button type="button" onclick={() => loadFromUrl('/org-3.gridset', 'org-3.gridset')}>
-				לוח עם סמלי PCS — ‏34 דפים
-			</button>
-			<!--
-				🔑 יעד מדידת A7.5 (TileColour) — הקובץ ב-.gitignore כמו שלושת האחרים.
-				38 מופעי TileColour; org-* נושאים 0.
-			-->
-			<button type="button" onclick={() => loadFromUrl('/b037.gridset', 'b037.gridset')}>
-				לוח b037 — מקלדת פשוטה (TileColour)
-			</button>
-		</div>
-		<button type="button" disabled={source === null || loading} onclick={saveCopy}>שמור עותק</button
+				onchange={(e) => files(e.currentTarget)}
+			/></label
 		>
-		{#if loading}
-			<p class="status" data-testid="grid-loading" role="status">טוען את הלוח…</p>
-		{:else if sourceName}
-			<p class="status" data-testid="grid-source">{sourceName} · {pageCount} דפים</p>
+		<div class="samples">
+			{#each samples as name, i (name)}<button
+					type="button"
+					disabled={editor.saving}
+					onclick={() => editor.loadUrl('/' + name, name)}>{messages.samples[i]}</button
+				>{/each}
+		</div>
+		{#if editor.loading}<p data-testid="grid-loading" role="status">{messages.loading}</p>
+		{:else if editor.sourceName}<p data-testid="grid-source">
+				{editor.sourceName} · {pages.length}
+				{messages.pages}
+			</p>{/if}
+	</div>
+	<div class="toolbar">
+		<button
+			type="button"
+			aria-pressed={!editor.editing}
+			disabled={editor.busy}
+			onclick={() => editor.mode(false)}>{messages.use}</button
+		>
+		<button
+			type="button"
+			aria-pressed={editor.editing}
+			disabled={!editor.source || editor.busy}
+			onclick={() => editor.mode(true)}>{messages.edit}</button
+		>
+		{#if editor.editing}
+			<label
+				>{messages.page}<select
+					aria-label={messages.page}
+					disabled={editor.busy || !editor.runtime}
+					value={editor.runtime?.pageName ?? editor.gridSet.startGrid}
+					onchange={(e) => {
+						editor.navigate(e.currentTarget.value);
+						e.currentTarget.value = editor.runtime?.pageName ?? editor.gridSet.startGrid;
+					}}
+				>
+					{#each pages as name (name)}<option value={name}>{name}</option>{/each}
+				</select></label
+			>
 		{/if}
-		{#if error}
-			<p class="error" role="alert">{error}</p>
+		<span data-testid="grid-dirty">{editor.dirty ? messages.dirty : messages.clean}</span>
+		<button
+			type="button"
+			disabled={!editor.source ||
+				editor.busy ||
+				Boolean(editor.draftError) ||
+				Boolean(editor.pending)}
+			onclick={editor.saveCopy}>{editor.saving ? messages.saving : messages.save}</button
+		>
+	</div>
+	{#if !editor.source}<p class="hint">{messages.sourceMissing}</p>{/if}
+	{#if editor.error}<p class="error" role="alert">{editor.error}</p>{/if}
+	{#if editor.downloaded}<p role="status" data-testid="grid-download">
+			{messages.downloaded}
+			{editor.downloaded}
+		</p>{/if}
+	<div class="workspace">
+		<div class="board">
+			{#key editor.gridSet}<GridSetView
+					gridSet={editor.gridSet}
+					editing={editor.editing || editor.busy}
+					selection={editor.selection}
+					onSelectCell={editor.select}
+					onRuntimeReady={editor.runtimeReady}
+				/>{/key}
+		</div>
+		{#if editor.editing}
+			{#if editor.selectedCell && editor.selection && editor.form}
+				<GridSetCellEditor
+					cell={editor.selectedCell}
+					selection={editor.selection}
+					form={editor.form}
+					error={editor.draftError}
+					busy={editor.busy}
+					hasDraft={editor.hasDraft}
+					onCaption={editor.caption}
+					onColour={editor.colour}
+					onApply={editor.apply}
+					onCancel={editor.cancel}
+				/>
+			{:else}<aside class="choose-cell">{messages.select}</aside>{/if}
 		{/if}
 	</div>
-
-	{#key gridSet}
-		<GridSetView {gridSet} />
-	{/key}
+	{#if editor.pending}
+		<EditorDecision
+			kind={editor.pending}
+			invalid={Boolean(editor.draftError)}
+			onChoice={editor.resolvePending}
+		/>
+	{/if}
 </div>
 
 <style>
 	.grid-page {
 		display: flex;
 		flex-direction: column;
-		gap: 12px;
+		gap: 8px;
 		padding: 12px;
 		box-sizing: border-box;
-		height: 100%;
+		block-size: 100dvh;
+		min-block-size: 500px;
 	}
 	.dropzone {
 		border: 2px dashed #999;
 		border-radius: 8px;
-		padding: 8px 12px;
+		padding: 6px 10px;
 	}
-	.status {
-		margin: 4px 0 0;
-		color: #555;
-	}
-	.error {
-		color: #c62828;
-	}
-	.samples {
+	.samples,
+	.toolbar {
 		display: flex;
-		gap: 0.5rem;
-		margin-top: 0.6rem;
+		gap: 8px;
+		align-items: center;
 		flex-wrap: wrap;
 	}
-	.samples button {
-		padding: 0.45rem 0.9rem;
+	.samples {
+		margin-block-start: 6px;
+	}
+	.toolbar label {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+	}
+	.toolbar select {
+		max-inline-size: 280px;
+		min-block-size: 44px;
+		font: inherit;
+	}
+	button {
+		min-block-size: 44px;
+		padding-inline: 10px;
 		border: 1px solid #9bb;
 		border-radius: 6px;
 		background: #eef6f8;
 		cursor: pointer;
 		font: inherit;
 	}
-	.samples button:hover {
-		background: #dceef3;
+	button[aria-pressed='true'] {
+		background: #d3e7fa;
+		border-color: #075dcc;
+	}
+	button:disabled {
+		cursor: default;
+		opacity: 0.6;
+	}
+	p {
+		margin-block: 4px;
+	}
+	.error {
+		color: #a21a1a;
+	}
+	.hint {
+		font-size: 0.9rem;
+	}
+	.workspace {
+		display: flex;
+		gap: 12px;
+		flex: 1;
+		min-block-size: 0;
+	}
+	.board {
+		display: flex;
+		flex: 1;
+		min-inline-size: 0;
+		min-block-size: 0;
+	}
+	.choose-cell {
+		inline-size: 280px;
+		padding: 10px;
+		box-sizing: border-box;
+	}
+	:is(button, input, select):focus-visible {
+		outline: 3px solid #075dcc;
+		outline-offset: 2px;
+	}
+	@media (max-width: 720px) {
+		.grid-page {
+			block-size: auto;
+			min-block-size: 100dvh;
+		}
+		.workspace {
+			flex-direction: column;
+		}
+		.board {
+			block-size: 55dvh;
+			flex: none;
+		}
+		.choose-cell {
+			inline-size: 100%;
+		}
 	}
 </style>
