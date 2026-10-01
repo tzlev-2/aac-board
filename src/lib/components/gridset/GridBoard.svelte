@@ -77,7 +77,8 @@
 	let wordListPage = $state(0);
 	const pageName = $derived(page.name);
 	$effect(() => {
-		pageName;
+		// Reading pageName tracks navigation while same-name preview keeps the pager.
+		void pageName;
 		wordListPage = 0;
 	});
 

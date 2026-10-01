@@ -6,7 +6,7 @@ import { createGridSetEditSession, upsertCellEdit } from './gridset-edit-session
 
 function fixture() {
 	const page =
-		'<Grid><ColumnDefinitions><ColumnDefinition/><ColumnDefinition/></ColumnDefinitions><RowDefinitions><RowDefinition/></RowDefinitions><Cells><Cell><Content><CaptionAndImage><Caption>old</Caption><Image>image.png</Image></CaptionAndImage><Style><BasedOnStyle>shared</BasedOnStyle></Style><Commands><Command ID="SpeechPlaySound"><Parameter Key="data">sound.mp3</Parameter></Command></Commands></Content></Cell><Cell X="1"><Content><CaptionAndImage><Caption>neighbour</Caption></CaptionAndImage><Style><BasedOnStyle>shared</BasedOnStyle></Style></Content></Cell></Cells><WordList><Items><WordListItem><Text>word</Text><Image>word.png</Image></WordListItem></Items></WordList><Unknown flag="yes"/></Grid>';
+		'<Grid><ColumnDefinitions><ColumnDefinition/><ColumnDefinition/></ColumnDefinitions><RowDefinitions><RowDefinition/></RowDefinitions><Cells><Cell><Content><CaptionAndImage><Caption>old</Caption><Image>.png</Image></CaptionAndImage><Style><BasedOnStyle>shared</BasedOnStyle></Style><Commands><Command ID="SpeechPlaySound"><Parameter Key="filedata"><data>.mp3</data></Parameter></Command><Command ID="Action.InsertText"><Parameter Key="text"><s Image=".png"><r>symbol</r></s></Parameter></Command></Commands></Content></Cell><Cell X="1"><Content><CaptionAndImage><Caption>neighbour</Caption></CaptionAndImage><Style><BasedOnStyle>shared</BasedOnStyle></Style></Content></Cell></Cells><WordList><Items><WordListItem><Text>word</Text><Image>.png</Image></WordListItem></Items></WordList><Unknown flag="yes"/></Grid>';
 	return zipSync({
 		'Settings0/settings.xml': strToU8(
 			'<GridSetSettings><StartGrid>P</StartGrid></GridSetSettings>'
@@ -16,9 +16,10 @@ function fixture() {
 		),
 		'Grids/P/grid.xml': strToU8('\uFEFF' + page.replace('</Cells>', '</Cells>\r\n')),
 		'Grids/Q/grid.xml': strToU8(page),
-		'Grids/P/0-0image.png': new Uint8Array([1, 2]),
-		'Grids/P/wordlistword.png': new Uint8Array([3, 4]),
-		'Grids/P/sound.mp3': new Uint8Array([5, 6]),
+		'Grids/P/0-0.png': new Uint8Array([1, 2]),
+		'Grids/P/wordlist-0.png': new Uint8Array([3, 4]),
+		'Grids/P/0-0-0-filedata.mp3': new Uint8Array([5, 6]),
+		'Grids/P/0-0-1-text-.png': new Uint8Array([9, 10]),
 		'opaque.bin': new Uint8Array([7, 8])
 	});
 }
@@ -61,6 +62,17 @@ describe('transactional page preview', () => {
 		);
 		expect(final.gridSet.pages.P.cells[0].image).toEqual(opened.gridSet.pages.P.cells[0].image);
 		expect(final.gridSet.pages.P.wordList).toEqual(opened.gridSet.pages.P.wordList);
+		expect(final.gridSet.pages.P.cells[0].image?.embeddedPath).toBe('Grids/P/0-0.png');
+		expect(final.gridSet.pages.P.wordList[0].image?.embeddedPath).toBe('Grids/P/wordlist-0.png');
+		expect(final.gridSet.pages.P.cells[0].commands[0].params.filedata).toEqual({
+			data: '.mp3',
+			embeddedPath: 'Grids/P/0-0-0-filedata.mp3'
+		});
+		expect(final.gridSet.pages.P.cells[0].commands[1].params.text).toMatchObject({
+			paragraphs: [{ sentences: [{ image: { embeddedPath: 'Grids/P/0-0-1-text-.png' } }] }]
+		});
+		expect(final.gridSet.media?.size).toBe(4);
+
 		expect(final.gridSet.styles).toEqual(opened.gridSet.styles);
 		expect(final.gridSet.media).toEqual(opened.gridSet.media);
 		expect(opened.source.bytes).toEqual(bytes);
@@ -77,6 +89,14 @@ describe('transactional page preview', () => {
 			session.preview('P', [{ page: 'P', x: 0, y: 0, colours: { BackColour: 'red' } }])
 		).toThrow('invalid-colour');
 		expect(session.preview('P', [])).toEqual(before);
+		const missingSource = { ...opened.source, pageEntry: new Map<string, string>() };
+		expect(() =>
+			createGridSetEditSession(missingSource, {}).preview('P', [
+				{ page: 'P', x: 0, y: 0, caption: 'x' }
+			])
+		).toThrow();
+		expect(session.preview('P', [])).toEqual(before);
+
 		const files = unzipSync(fixture());
 		files['Grids/P/grid.xml'] = strToU8('<Grid><Cells><Cell/><Cell/></Cells></Grid>');
 		const duplicate = await openGridSet(zipSync(files));

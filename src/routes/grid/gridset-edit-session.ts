@@ -125,7 +125,9 @@ export function editedFilename(name: string): string {
 		name
 			.split(/[\\/]/)
 			.at(-1)
-			?.replace(/[\u0000-\u001f\u007f]/g, '') ?? '';
+			?.split('')
+			.filter((character) => character.charCodeAt(0) >= 32 && character.charCodeAt(0) !== 127)
+			.join('') ?? '';
 	const stem = basename.replace(/\.[^.]*$/, '').replace(/(?:-edited)+$/, '');
 	return `${stem || 'gridset'}-edited.gridset`;
 }

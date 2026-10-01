@@ -332,8 +332,7 @@ describe('edit isolation', () => {
 		const { createGridSetEditSession } = await import('../../../routes/grid/gridset-edit-session');
 		const { gridSet, source } = await openGridSet(buildGridset(spec));
 		const session = createGridSetEditSession(source, gridSet.styles);
-		const { createRuntime } = await import('$lib/gridset/runtime.svelte');
-		let runtime: ReturnType<typeof createRuntime> | undefined;
+		let runtime: import('$lib/gridset/runtime.svelte').GridRuntime | undefined;
 		let mounts = 0;
 		const selected: string[] = [];
 		spoken.length = 0;
@@ -365,7 +364,13 @@ describe('edit isolation', () => {
 		).toBe(true);
 		runtime!.navigate('אוכל');
 		for (const word of ['one', 'two', 'three', 'four'])
-			runtime!.output.insert({ text: word });
+			runtime!.output.insert({
+				text: word,
+				pos: 'Noun',
+				gender: 'female',
+				number: 'singular',
+				image: { library: 'test', path: word + '.svg' }
+			});
 		const history = [...runtime!.history];
 		const items = [...runtime!.output.items];
 		const identity = runtime;
