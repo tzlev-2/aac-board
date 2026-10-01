@@ -12,7 +12,7 @@
 	 * המחוון לא נצבע כלל והמסך פשוט קופא.
 	 */
 	import type { GridSet } from '$lib/gridset/types';
-	import { parseGridSet } from '$lib/gridset/parse';
+	import { openGridSet, writeGridSet, type GridSetSource } from '$lib/gridset/gridSetSource';
 	import GridSetView from '$lib/components/gridset/GridSetView.svelte';
 	import { SAMPLE_GRID_SET } from './sampleGridSet';
 	import { onMount } from 'svelte';
@@ -21,6 +21,7 @@
 	// פתיחה** כדי שהדף יצייר משהו מיָד וב-SSR, אבל הוא **אינו מה שרוצים
 	// לראות** — הלוח האמיתי נטען ב-`onMount` מיד אחריו.
 	let gridSet = $state<GridSet>(SAMPLE_GRID_SET);
+	let source = $state<GridSetSource | null>(null);
 	let error = $state('');
 	let loading = $state(false);
 	let sourceName = $state('');
@@ -52,9 +53,14 @@
 			const bytes = new Uint8Array(await file.arrayBuffer());
 			// חתימת ZIP: 50 4B ("PK"). כל השאר — JSON.
 			const isZip = bytes[0] === 0x50 && bytes[1] === 0x4b;
-			gridSet = isZip
-				? await parseGridSet(bytes)
-				: parseJsonGridSet(new TextDecoder().decode(bytes));
+			if (isZip) {
+				const opened = await openGridSet(bytes);
+				gridSet = opened.gridSet;
+				source = opened.source;
+			} else {
+				gridSet = parseJsonGridSet(new TextDecoder().decode(bytes));
+				source = null;
+			}
 			sourceName = file.name;
 		} catch (e) {
 			error = `קובץ לא תקין: ${e instanceof Error ? e.message : String(e)}`;
@@ -80,7 +86,9 @@
 		try {
 			const res = await fetch(url);
 			if (!res.ok) throw new Error(`${res.status}`);
-			gridSet = await parseGridSet(new Uint8Array(await res.arrayBuffer()));
+			const opened = await openGridSet(new Uint8Array(await res.arrayBuffer()));
+			gridSet = opened.gridSet;
+			source = opened.source;
 			sourceName = name;
 		} catch (e) {
 			error = `טעינה נכשלה: ${e instanceof Error ? e.message : String(e)}`;
@@ -105,6 +113,23 @@
 	function handleDrop(e: DragEvent) {
 		e.preventDefault();
 		handleFiles(e.dataTransfer?.files ?? null);
+	}
+
+	function saveCopy() {
+		if (!source) return;
+		try {
+			const bytes = writeGridSet(source, []);
+			const url = URL.createObjectURL(
+				new Blob([new Uint8Array(bytes)], { type: 'application/zip' })
+			);
+			const a = document.createElement('a');
+			a.href = url;
+			a.download = sourceName.replace(/(\.[^.]+)?$/, '-edited$1');
+			a.click();
+			URL.revokeObjectURL(url);
+		} catch (e) {
+			error = `שמירה נכשלה: ${e instanceof Error ? e.message : String(e)}`;
+		}
 	}
 </script>
 
@@ -147,6 +172,8 @@
 				לוח b037 — מקלדת פשוטה (TileColour)
 			</button>
 		</div>
+		<button type="button" disabled={source === null || loading} onclick={saveCopy}>שמור עותק</button
+		>
 		{#if loading}
 			<p class="status" data-testid="grid-loading" role="status">טוען את הלוח…</p>
 		{:else if sourceName}
