@@ -1,4 +1,10 @@
 <script lang="ts">
+	import {
+		fontPresentation,
+		fontPresentationGradient,
+		scheduleFontCaption,
+		cancelFontCaption
+	} from '$lib/gridset/fontColourPresentation';
 	import type { CellRendererProps } from './cellRenderers';
 	import type { SymbolResolution } from '$lib/gridset/symbols';
 	import {
@@ -19,6 +25,116 @@
 			: captionBelowSymbolFontSizeCss(cell.style.fontSize)
 	);
 	const captionMaxBlock = $derived(captionOnly ? undefined : captionBelowSymbolMaxBlockCss());
+
+	let captionElement = $state<HTMLSpanElement>();
+	// ערכי primitive מונעים הקמת observers מחדש כשדף אחר משתמש באותו סגנון.
+	const presentationFont = $derived(cell.style.fontColour);
+	const presentationBack = $derived(cell.style.backColour);
+	const presentationDisabled = $derived(cell.visibility === 'Disabled');
+	const presentation = $derived(
+		fontPresentation(presentationFont, presentationBack, captionOnly, presentationDisabled)
+	);
+	$effect(() => {
+		const span = captionElement,
+			model = presentation;
+		if (!span || !model.eligible) return;
+		const tile = span.closest<HTMLElement>('[data-testid="grid-cell"]');
+		if (!tile) return;
+		const forced = matchMedia('(forced-colors: active)');
+		const expectedBackground = document.createElement('span').style;
+		expectedBackground.backgroundImage = `linear-gradient(to bottom, rgb(${model.stops[0].join(', ')}), rgb(${model.stops[1].join(', ')}) 50%, rgb(${model.stops[2].join(', ')}))`;
+		let disposed = false;
+		const clear = () => {
+			for (const property of [
+				'background-image',
+				'background-size',
+				'background-position',
+				'background-repeat',
+				'background-clip',
+				'-webkit-background-clip',
+				'color',
+				'-webkit-text-fill-color'
+			])
+				span.style.removeProperty(property);
+		};
+		const measure = () => {
+			if (disposed) return;
+			if (
+				forced.matches ||
+				!CSS.supports('background-clip', 'text') ||
+				!CSS.supports('background-image', 'linear-gradient(to bottom in srgb, black, white)')
+			)
+				return clear;
+			for (let el: HTMLElement | null = span; el; el = el.parentElement) {
+				const style = getComputedStyle(el);
+				if (
+					style.opacity !== '1' ||
+					style.filter !== 'none' ||
+					style.mixBlendMode !== 'normal' ||
+					style.backdropFilter !== 'none'
+				)
+					return clear;
+				for (const pseudo of ['::before', '::after']) {
+					const ps = getComputedStyle(el, pseudo);
+					if (ps.content !== 'none' && ps.content !== 'normal') return clear;
+				}
+			}
+			const c = tile.getBoundingClientRect(),
+				r = span.getBoundingClientRect(),
+				cs = getComputedStyle(tile);
+			const width = parseFloat(cs.width),
+				boxHeight = parseFloat(cs.height);
+			const left = parseFloat(cs.borderLeftWidth),
+				right = parseFloat(cs.borderRightWidth);
+			const top = parseFloat(cs.borderTopWidth),
+				bottom = parseFloat(cs.borderBottomWidth);
+			const scaleX = c.width / width,
+				scaleY = c.height / boxHeight;
+			const height = boxHeight - top - bottom;
+			if (!(scaleX > 0 && scaleY > 0)) return clear;
+			const gradient = fontPresentationGradient(model, height);
+			if (
+				!gradient ||
+				cs.backgroundImage !== expectedBackground.backgroundImage ||
+				cs.backgroundOrigin !== 'padding-box' ||
+				cs.backgroundSize !== 'auto' ||
+				cs.backgroundPosition !== '0% 0%'
+			)
+				return clear;
+			return () => {
+				if (disposed) return;
+				clear();
+				span.style.backgroundImage = gradient;
+				span.style.backgroundSize = `${width - left - right}px ${height}px`;
+				span.style.backgroundPosition = `${(c.x - r.x) / scaleX + left}px ${(c.y - r.y) / scaleY + top}px`;
+				span.style.backgroundRepeat = 'no-repeat';
+				span.style.backgroundClip = 'text';
+				span.style.webkitBackgroundClip = 'text';
+				span.style.color = 'transparent';
+				span.style.webkitTextFillColor = 'transparent';
+			};
+		};
+		const schedule = () => {
+			if (!disposed) scheduleFontCaption(measure);
+		};
+		const observer = new ResizeObserver(schedule);
+		observer.observe(span);
+		observer.observe(tile);
+		forced.addEventListener('change', schedule);
+		window.addEventListener('resize', schedule);
+		document.fonts.addEventListener('loadingdone', schedule);
+		void document.fonts.ready.then(schedule);
+		schedule();
+		return () => {
+			disposed = true;
+			observer.disconnect();
+			cancelFontCaption(measure);
+			forced.removeEventListener('change', schedule);
+			window.removeEventListener('resize', schedule);
+			document.fonts.removeEventListener('loadingdone', schedule);
+			clear();
+		};
+	});
 
 	const iconBoxW = `${(VISUAL_DEFAULTS.iconBoxWidthRatio * 100).toFixed(3)}%`;
 	const iconTopPad = `${(((VISUAL_DEFAULTS.iconTopRatio * 217) / 277) * 100).toFixed(3)}%`;
@@ -45,6 +161,7 @@
 {#snippet caption()}
 	{#if cell.caption}
 		<span
+			bind:this={captionElement}
 			class="caption"
 			class:caption-only={captionOnly}
 			data-testid="cell-caption"
