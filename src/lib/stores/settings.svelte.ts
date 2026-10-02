@@ -76,8 +76,9 @@ export function settingsStore() {
 
 		async init() {
 			if (initialized) return;
+			let saved: Partial<AppSettings> | undefined;
 			try {
-				const saved = await get<AppSettings>(SETTINGS_KEY);
+				saved = await get<AppSettings>(SETTINGS_KEY);
 				if (saved) {
 					settings = { ...DEFAULTS, ...saved };
 				}
@@ -85,20 +86,22 @@ export function settingsStore() {
 				/* IndexedDB not available */
 			}
 
-			// Migrate legacy TTS settings from localStorage (Stage 3A)
+			// Read existing preferences without rewriting either storage representation.
+			// Catalog refreshes and ordinary visits must not normalize user values.
 			try {
 				const legacy = localStorage.getItem(TTS_LEGACY_KEY);
 				if (legacy) {
 					const parsed = JSON.parse(legacy);
-					if (!settings.ttsModel && parsed.modelId) settings.ttsModel = parsed.modelId;
-					if (!settings.ttsVoice && parsed.voiceURI) settings.ttsVoice = parsed.voiceURI;
-					if (parsed.rate) settings.ttsRate = parsed.rate;
-					if (parsed.pitch) settings.ttsPitch = parsed.pitch;
-					localStorage.removeItem(TTS_LEGACY_KEY);
-					await persist();
+					settings.ttsProvider = saved?.ttsProvider ?? parsed.provider ?? settings.ttsProvider;
+					settings.ttsModel = saved?.ttsModel ?? parsed.modelId ?? settings.ttsModel;
+					settings.ttsVoice = saved?.ttsVoice ?? parsed.voiceURI ?? settings.ttsVoice;
+					settings.ttsRate = saved?.ttsRate ?? parsed.rate ?? settings.ttsRate;
+					settings.ttsPitch = saved?.ttsPitch ?? parsed.pitch ?? settings.ttsPitch;
 				}
+				const theme = localStorage.getItem('theme');
+				if (!saved?.theme && (theme === 'light' || theme === 'dark')) settings.theme = theme;
 			} catch {
-				/* ignore */
+				/* ignore invalid or unavailable local storage */
 			}
 
 			initialized = true;

@@ -1,4 +1,28 @@
-# AAC Board — יומן פיתוח (Walkthrough)
+# Grid AAC Clone — יומן פיתוח (Walkthrough)
+
+## 2026-10-03 02:25
+
+### סלייס 23 — הקלון בשורש והסרת הפרויקט הישן
+
+#### מה בוצע?
+
+- `src/routes/+page.svelte` ו־`src/routes/grid/+page.svelte` מציגים את `GridEditorPage.svelte` המשותף. `/` נשאר בשורש; ששת נתיבי ה־legacy שנבדקו מחזירים 404. הוסרו 36 הקבצים שבמטריצת האב, כולל מעטפת Board/sets והצרכן הישיר היחיד של `nanoid`; ה־lockfile צומצם ללא שדרוג.
+- `src/routes/settings/+page.svelte` שומר פקדי קול/מודל/מהירות/גובה/theme וייחוס ARASAAC. פעולות לוחות/סטים וגודל אריחים הוסרו. `settingsStore.init()` קורא העדפות בלי כתיבה או בחירה אוטומטית של מודל/קול; ערכים שאינם בקטלוג נשארים מוצגים.
+- `src/service-worker.ts` מוחק רק מטמוני `aac-board-*` ישנים וקורא רק את מטמון הגרסה הנוכחית. HTML של נתיבים ישנים אינו fallback. תגובת offline משוכפלת לתגובה חדשה בעקבות הפניית static מ־`offline.html` אל `/offline`.
+- `tests/root-entry.e2e.ts` ו־`tests/settings.e2e.ts` מכסים root, תאימות, theme/TTS ושימור ערכי app-settings לא מוכרים, legacy IDB, סמלים/אודיו ודגל migration. desktop ו־360×800/390×844/844×390/768×1024 עברו ניווט, פלט, עריכת כתובית וארבעת הצבעים, שמירת תוכן ZIP ופתיחה מחדש עם CRC תקין, RTL וללא גלישה אופקית.
+- `check` עבר עם אפס שגיאות ואזהרות; build רגיל עבר ב־Bun הרשמי 1.3.13 ו־Node 22.23.2. עברו 226 בדיקות server; 12 בדיקות קורפוס דולגו. ארבע בדיקות SW מעודכנות עברו. ריצת client חלקית: 157 passed, שני דילוגים ושגיאת birpc; אין טענת suite מלא.
+- `README.md`, manifest, app description ו־offline מתארים את הקלון. `package.json` מכוון מסירה ל־Pages dev עם SHA נקי. השוואת board crop סינתטי בין base `/grid` ובין מועמד `/` ו־`/grid` באותו Chrome/viewport/font נתנה PNG זהה.
+
+#### החלטות ארכיטקטורה
+
+- בוצעה מטריצת 36 REMOVE ו־13 ADAPT המאושרת; קוד TTS/proxy/PCS/R2/cache/migration וה־H1 שנשמר בעץ אחר לא שונו. אין push, merge או deploy; קבלת המועמד העצמאית בבעלות המאמת והאב.
+
+#### מעקפים ופתרונות
+
+- `tests/owned-browser.ts` מחבר בדיקות ל־Chrome הקיים עם contexts בבעלות הבדיקה. `download.saveAs` בוטל בסביבה; הבדיקות לוכדות את הבייטים המדויקים של Blob `application/zip` שה־UI מוסר ל־URL.createObjectURL, משמרות אירוע/שם הורדה, בודקות CRC ותוכן ופותחות מחדש באותו context. שמירה פיזית של הדפדפן אינה מוכחת.
+- fixture root חסר Style תוקן ב־`tests/root-entry.e2e.ts`; WebSpeech חושף float32 ולכן בדיקת הפרמטרים מנרמלת לשלוש ספרות; בדיקת reload ממתינה ל־theme mirror שנכתב אחרי IDB. סבבי FAIL נשמרו בתיקיית הריצה המשותפת.
+- `b094.gridset` אינו בחבילת הקבצים המורשים ולכן בדיקתו מסומנת fixture unavailable. R2 המקומי ריק: בקשות PCS באותו origin וה־endpoint נבדקו, תצוגת סמלי PCS מורשים באתר חי ממתינה למסירת האב. אין שחזור rclone, סודות או שירותים. Chrome emulation בלבד; אין טענת Safari, מכשיר פיזי או האזנה אנושית.
+
 
 ## 2026-10-02
 

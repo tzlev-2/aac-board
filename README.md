@@ -1,42 +1,37 @@
-# sv
+# Grid AAC Clone
 
-Everything you need to build a Svelte project, powered by [`sv`](https://github.com/sveltejs/cli).
+SvelteKit 5 AAC application for opening `.gridset` boards, navigating and speaking,
+editing cell captions and colors, and downloading an edited ZIP copy.
 
-## Creating a project
+`/` renders the Clone directly. `/grid` is a compatibility entry to the same view.
+`/settings` provides voice/provider/model, rate, pitch, theme and ARASAAC attribution.
+The retired Board/sets screens are removed; stored legacy user data is preserved.
 
-If you're seeing this, you've probably already done this step. Congrats!
+## Development
 
-```sh
-# create a new project
-npx sv create my-app
-```
-
-To recreate this project with the same configuration:
-
-```sh
-# recreate this project
-bun x sv@0.12.6 create --template minimal --types ts --add prettier eslint vitest="usages:unit,component" playwright tailwindcss="plugins:none" sveltekit-adapter="adapter:cloudflare+cfTarget:workers" devtools-json mcp="ide:claude-code,cursor,gemini,vscode+setup:remote" --install bun .
-```
-
-## Developing
-
-Once you've created a project and installed dependencies with `npm install` (or `pnpm install` or `yarn`), start a development server:
+Use Node 22.23.2 and the official Bun 1.3.13 binary (packageManager pin).
+Run commands in your own checkout with a private cache outside worktrees.
 
 ```sh
-npm run dev
-
-# or start the server and open the app in a new browser tab
-npm run dev -- --open
+bun install --frozen-lockfile
+bun run check
+bun run test:unit -- --run
+bun run build
+bun run preview
 ```
 
-## Building
+Licensed `.gridset` examples (`org-1`, `org-2`, `org-3`, `b037`) are private inputs
+placed in `static/` for local builds; they must never be committed. Users can also
+open their own files. PCS assets are served by `/img/pcs/[id]` via the `PCS_ASSETS`
+R2 binding. Keep the proxy configuration and symbol/media attribution intact.
+Voice settings are read dynamically by the retained TTS providers and audio cache.
 
-To create a production version of your app:
+Playwright uses the production preview. For an existing Chrome GUI, set
+`AAC_CDP_URL=http://127.0.0.1:9222`; tests create and close their own contexts.
 
-```sh
-npm run build
-```
+## Deployment ownership
 
-You can preview the production build with `npm run preview`.
-
-> To deploy your app, you may need to install an [adapter](https://svelte.dev/docs/kit/adapters) for your target environment.
+After independent acceptance, the orchestrator merges and pushes `grid-clone`,
+builds the clean merged SHA and deploys Cloudflare Pages to branch `dev` with that
+exact `--commit-hash`. `bun run deploy` requires a clean checkout and uses `dev`.
+There is no Git merge to a `dev` branch. Preserve Cloudflare Access and all user data.

@@ -1,7 +1,7 @@
 {
-	"name": "לוח תקשורת AAC",
-	"short_name": "AAC Board",
-	"description": "אפליקציית תקשורת חלופית ומשלימה",
+	"name": "Grid AAC Clone",
+	"short_name": "Grid AAC",
+	"description": "Grid AAC Clone — תקשורת חלופית ומשלימה",
 	"start_url": "/",
 	"display": "standalone",
 	"orientation": "any",

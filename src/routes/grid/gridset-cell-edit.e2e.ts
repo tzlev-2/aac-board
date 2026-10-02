@@ -1,12 +1,18 @@
-import { test, expect, type Page, type Download } from '@playwright/test';
-import { readFileSync, mkdirSync, writeFileSync } from 'node:fs';
+import {
+	test,
+	expect,
+	type Page,
+	type SavedUICopy,
+	saveUIBlob
+} from '../../../tests/owned-browser';
+import { readFileSync, mkdirSync, writeFileSync, existsSync } from 'node:fs';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { resolve } from 'node:path';
 import { zipSync, unzipSync, strToU8, strFromU8 } from 'fflate';
 import { buildGridset } from '../../lib/gridset/__fixtures__/buildGridset';
 import { readZipIndex } from '../../lib/gridset/zipArchive';
 
-const artifacts = '/tmp/aac-gridset-edit-20-qa';
+const artifacts = process.env.AAC_TEST_ARTIFACTS ?? '/tmp/aac-gridset-edit-20-qa';
 mkdirSync(artifacts, { recursive: true });
 const colours = {
 	'מילוי תא': '#227744FF',
@@ -84,7 +90,7 @@ test.afterEach(async ({ page }) => {
 	expect(errors.get(page)).toEqual([]);
 });
 async function start(page: Page) {
-	await page.goto('/grid');
+	await page.goto('/');
 	await page.waitForLoadState('networkidle');
 }
 async function upload(page: Page, bytes: Uint8Array, name = 'probe.gridset') {
@@ -107,10 +113,9 @@ async function save(page: Page, name: string) {
 	const event = page.waitForEvent('download');
 	await page.getByRole('button', { name: 'שמור עותק', exact: true }).click();
 	const d = await event;
-	await d.saveAs(resolve(artifacts, name));
-	return d;
+	return saveUIBlob(page, d, resolve(artifacts, name));
 }
-async function reopen(page: Page, d: Download, name?: string) {
+async function reopen(page: Page, d: SavedUICopy, name?: string) {
 	await upload(
 		page,
 		new Uint8Array(readFileSync((await d.path())!)),
@@ -437,6 +442,10 @@ test('8 org-3 UI edit preserves 53/54 raw records and navigation after reopen', 
 test('9 b094 UI descriptor entry roundtrip preserves 862/863 records and valid CRC', async ({
 	page
 }) => {
+	test.skip(
+		!existsSync('static/b094.gridset'),
+		'Private b094 corpus fixture is unavailable; synthetic descriptor/CRC tests still run.'
+	);
 	const source = readFileSync('static/b094.gridset');
 	const probe = JSON.parse(
 		execFileSync(

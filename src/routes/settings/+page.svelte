@@ -1,8 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { messages } from './settings-messages';
 	import { settingsStore } from '$lib/stores/settings.svelte';
-	import { boardStore } from '$lib/stores/board.svelte';
-	import { setsStore } from '$lib/stores/sets.svelte';
 	import { speak, getModelsForProvider, getVoicesForProvider } from '$lib/services/tts';
 	import {
 		getDefaultModelForProvider,
@@ -10,7 +9,6 @@
 		type TtsProviderId,
 		type TtsVoice
 	} from '$lib/services/tts-providers';
-	import { exportBoardsJSON } from '$lib/services/storage';
 	import {
 		ARASAAC_LICENSE_URL,
 		ARASAAC_SITE_URL,
@@ -21,19 +19,14 @@
 	} from '$lib/attribution';
 
 	const sStore = settingsStore();
-	const bStore = boardStore();
-	const setStore = setsStore();
 
 	let availableVoices = $state<TtsVoice[]>([]);
-	let fileInput: HTMLInputElement | undefined;
 	let loadingVoices = $state(false);
 	let availableModels = $state<TtsModelOption[]>([]);
 	let loadingModels = $state(false);
 
 	onMount(async () => {
 		await sStore.init();
-		await setStore.init();
-		bStore.init();
 		await refreshModels();
 		await refreshVoices();
 	});
@@ -42,18 +35,6 @@
 		loadingModels = true;
 		try {
 			availableModels = await getModelsForProvider(sStore.settings.ttsProvider);
-			if (availableModels.length > 0) {
-				const currentModelExists = availableModels.some(
-					(model) => model.id === sStore.settings.ttsModel
-				);
-				if (!currentModelExists) {
-					const fallbackModel = getDefaultModelForProvider(sStore.settings.ttsProvider);
-					const nextModel = availableModels.some((model) => model.id === fallbackModel)
-						? fallbackModel
-						: availableModels[0].id;
-					sStore.update({ ttsModel: nextModel });
-				}
-			}
 		} catch (e) {
 			console.warn('[settings] refreshModels failed', e);
 			availableModels = [];
@@ -65,10 +46,6 @@
 		loadingVoices = true;
 		try {
 			availableVoices = await getVoicesForProvider(sStore.settings.ttsProvider, 'he');
-			// Auto-select the first voice if none is currently selected
-			if (availableVoices.length > 0 && !sStore.settings.ttsVoice) {
-				sStore.update({ ttsVoice: availableVoices[0].id });
-			}
 		} catch (e) {
 			console.warn('[settings] refreshVoices failed', e);
 			availableVoices = [];
@@ -92,74 +69,31 @@
 	}
 
 	function previewVoice() {
-		speak('שלום, זה ניסיון קול');
+		speak(messages.previewText);
 	}
 
 	const providers: { id: TtsProviderId; label: string }[] = [
-		{ id: 'webspeech', label: 'דפדפן' },
+		{ id: 'webspeech', label: messages.browser },
 		{ id: 'elevenlabs', label: 'ElevenLabs' },
 		{ id: 'gemini', label: 'Gemini' }
-	];
-
-	async function handleExport() {
-		const json = await exportBoardsJSON();
-		const blob = new Blob([json], { type: 'application/json' });
-		const url = URL.createObjectURL(blob);
-		const a = document.createElement('a');
-		a.href = url;
-		a.download = `aac-boards-${new Date().toISOString().slice(0, 10)}.json`;
-		a.click();
-		URL.revokeObjectURL(url);
-	}
-
-	function handleImport() {
-		fileInput?.click();
-	}
-
-	async function handleFileChange(e: Event) {
-		const input = e.target as HTMLInputElement;
-		const file = input.files?.[0];
-		if (!file) return;
-		const text = await file.text();
-		try {
-			const boards = JSON.parse(text);
-			await bStore.importBoards(boards);
-		} catch {
-			// Invalid JSON
-		}
-		input.value = '';
-	}
-
-	async function handleReset() {
-		if (confirm('לאפס את כל הלוחות לברירת מחדל?')) {
-			await setStore.resetToDefaults();
-			await sStore.resetToDefaults();
-		}
-	}
-
-	const tileSizes: { value: 'small' | 'medium' | 'large'; label: string }[] = [
-		{ value: 'small', label: 'קטן' },
-		{ value: 'medium', label: 'בינוני' },
-		{ value: 'large', label: 'גדול' }
 	];
 </script>
 
 <svelte:head>
-	<title>הגדרות — לוח תקשורת AAC</title>
+	<title>{messages.title}</title>
 </svelte:head>
 
 <div class="settings-page">
 	<header class="settings-header">
-		<a href="/" class="back-btn" aria-label="חזרה ללוח">
+		<a href="/" class="back-btn" aria-label={messages.back}>
 			<svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
 				<path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z" />
 			</svg>
 		</a>
-		<h1>הגדרות</h1>
+		<h1>{messages.heading}</h1>
 	</header>
 
 	<div class="settings-content">
-		<!-- TTS -->
 		<section class="card">
 			<h2 class="card-title">
 				<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
@@ -167,11 +101,11 @@
 						d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"
 					/>
 				</svg>
-				הגדרות קול
+				{messages.voiceHeading}
 			</h2>
 
 			<div class="field">
-				<span class="field-label">מנוע הקראה</span>
+				<span class="field-label">{messages.provider}</span>
 				<div class="toggle-group">
 					{#each providers as p (p.id)}
 						<button
@@ -185,21 +119,24 @@
 				</div>
 			</div>
 
-			{#if availableModels.length > 0}
+			{#if availableModels.length > 0 || sStore.settings.ttsModel}
 				<label class="field">
-					<span class="field-label">מודל</span>
+					<span class="field-label">{messages.model}</span>
 					<select
 						class="field-input"
 						value={sStore.settings.ttsModel}
 						onchange={(e) => handleModelChange((e.target as HTMLSelectElement).value)}
 						disabled={loadingModels}
 					>
+						{#if sStore.settings.ttsModel && !availableModels.some((model) => model.id === sStore.settings.ttsModel)}
+							<option value={sStore.settings.ttsModel}>{sStore.settings.ttsModel}</option>
+						{/if}
 						{#each availableModels as model (model.id)}
 							<option value={model.id}>{model.label}</option>
 						{/each}
 					</select>
 					{#if loadingModels}
-						<span class="field-hint">טוען מודלים...</span>
+						<span class="field-hint">{messages.loadingModels}</span>
 					{:else if availableModels.find((model) => model.id === sStore.settings.ttsModel)?.description}
 						<span class="field-hint">
 							{availableModels.find((model) => model.id === sStore.settings.ttsModel)?.description}
@@ -209,27 +146,30 @@
 			{/if}
 
 			<label class="field">
-				<span class="field-label">קול</span>
+				<span class="field-label">{messages.voice}</span>
 				<select
 					class="field-input"
 					value={sStore.settings.ttsVoice}
 					onchange={(e) => sStore.update({ ttsVoice: (e.target as HTMLSelectElement).value })}
-					disabled={loadingVoices || availableVoices.length === 0}
+					disabled={loadingVoices}
 				>
-					<option value="">ברירת מחדל</option>
+					<option value="">{messages.defaultVoice}</option>
+					{#if sStore.settings.ttsVoice && !availableVoices.some((voice) => voice.id === sStore.settings.ttsVoice)}
+						<option value={sStore.settings.ttsVoice}>{sStore.settings.ttsVoice}</option>
+					{/if}
 					{#each availableVoices as voice (voice.id)}
 						<option value={voice.id}>{voice.name}</option>
 					{/each}
 				</select>
 				{#if loadingVoices}
-					<span class="field-hint">טוען קולות...</span>
+					<span class="field-hint">{messages.loadingVoices}</span>
 				{:else if availableVoices.length === 0 && sStore.settings.ttsProvider !== 'webspeech'}
-					<span class="field-hint">לא נמצאו קולות זמינים</span>
+					<span class="field-hint">{messages.noVoices}</span>
 				{/if}
 			</label>
 
 			<label class="field">
-				<span class="field-label">מהירות: {sStore.settings.ttsRate.toFixed(1)}</span>
+				<span class="field-label">{messages.rate} {sStore.settings.ttsRate.toFixed(1)}</span>
 				<input
 					type="range"
 					min="0.5"
@@ -242,7 +182,7 @@
 			</label>
 
 			<label class="field">
-				<span class="field-label">גובה קול: {sStore.settings.ttsPitch.toFixed(1)}</span>
+				<span class="field-label">{messages.pitch} {sStore.settings.ttsPitch.toFixed(1)}</span>
 				<input
 					type="range"
 					min="0.5"
@@ -258,11 +198,10 @@
 				<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
 					<path d="M8 5v14l11-7z" />
 				</svg>
-				נסה קול
+				{messages.preview}
 			</button>
 		</section>
 
-		<!-- Display -->
 		<section class="card">
 			<h2 class="card-title">
 				<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
@@ -270,11 +209,11 @@
 						d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 14H4V6h16v12z"
 					/>
 				</svg>
-				תצוגה
+				{messages.display}
 			</h2>
 
 			<div class="field">
-				<span class="field-label">ערכת נושא</span>
+				<span class="field-label">{messages.theme}</span>
 				<div class="toggle-group">
 					<button
 						class="toggle-btn"
@@ -286,7 +225,7 @@
 								d="M6.76 4.84l-1.8-1.79-1.41 1.41 1.79 1.79 1.42-1.41zM4 10.5H1v2h3v-2zm9-9.95h-2V3.5h2V.55zm7.45 3.91l-1.41-1.41-1.79 1.79 1.41 1.41 1.79-1.79zm-3.21 13.7l1.79 1.8 1.41-1.41-1.8-1.79-1.4 1.4zM20 10.5v2h3v-2h-3zm-8-5c-3.31 0-6 2.69-6 6s2.69 6 6 6 6-2.69 6-6-2.69-6-6-6zm-1 16.95h2V19.5h-2v2.95zm-7.45-3.91l1.41 1.41 1.79-1.8-1.41-1.41-1.79 1.8z"
 							/>
 						</svg>
-						בהיר
+						{messages.light}
 					</button>
 					<button
 						class="toggle-btn"
@@ -298,83 +237,12 @@
 								d="M10 2c-1.82 0-3.53.5-5 1.35C7.99 5.08 10 8.3 10 12s-2.01 6.92-5 8.65C6.47 21.5 8.18 22 10 22c5.52 0 10-4.48 10-10S15.52 2 10 2z"
 							/>
 						</svg>
-						כהה
+						{messages.dark}
 					</button>
 				</div>
 			</div>
-
-			<div class="field">
-				<span class="field-label">גודל אריחים</span>
-				<div class="toggle-group">
-					{#each tileSizes as size (size.value)}
-						<button
-							class="toggle-btn"
-							class:active={sStore.settings.tileSize === size.value}
-							onclick={() => sStore.update({ tileSize: size.value })}
-						>
-							{size.label}
-						</button>
-					{/each}
-				</div>
-			</div>
 		</section>
 
-		<!-- Data -->
-		<section class="card">
-			<h2 class="card-title">
-				<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-					<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
-				</svg>
-				אוספים
-			</h2>
-
-			<a class="btn btn-action settings-link-btn" href="/sets">
-				<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-					<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
-				</svg>
-				ניהול אוספים ולוחות
-			</a>
-		</section>
-
-		<section class="card">
-			<h2 class="card-title">
-				<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-					<path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z" />
-				</svg>
-				נתונים
-			</h2>
-
-			<div class="btn-row">
-				<button class="btn btn-action" onclick={handleExport}>
-					<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-						<path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z" />
-					</svg>
-					ייצוא לוחות
-				</button>
-				<button class="btn btn-action" onclick={handleImport}>
-					<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-						<path d="M9 16h6v-6h4l-7-7-7 7h4v6zm-4 2h14v2H5v-2z" />
-					</svg>
-					ייבוא לוחות
-				</button>
-			</div>
-
-			<button class="btn btn-danger" onclick={handleReset}>
-				<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-					<path
-						d="M17.65 6.35A7.958 7.958 0 0012 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0112 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"
-					/>
-				</svg>
-				איפוס לברירת מחדל
-			</button>
-		</section>
-
-		<!--
-			ייחוס ARASAAC — 🛑 דרישת רישיון (CC BY-NC-SA), לא קרדיט של נימוס.
-			המיקום: **בתחתית ההגדרות ולא על הלוח.** הלוח תופס את כל המסך ונועד
-			למשתמש שאינו קורא; טקסט-רישיון שם גוזל שטח-תקשורת ואינו נקרא.
-			הנוסח והראיה לו: src/lib/attribution.ts.
-		-->
 		<section class="card" data-testid="attribution">
 			<h2 class="card-title">
 				<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
@@ -382,16 +250,11 @@
 						d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"
 					/>
 				</svg>
-				סמלים ורישיון
+				{messages.attribution}
 			</h2>
 
 			<p class="legal" dir="rtl">{ATTRIBUTION_SENTENCE_HE}</p>
 
-			<!--
-				⚠️ הנוסח האנגלי הוא **הרשמי**, והעברי הוא תרגום שלנו — ל-ARASAAC אין
-				נוסח עברי. לכן האנגלי מוצג ולא מוחלף. dir="ltr" כדי שהסוגריים
-				והנקודות לא יתהפכו בתוך עמוד RTL.
-			-->
 			<p class="legal legal-en" dir="ltr">{ATTRIBUTION_SENTENCE_EN}</p>
 
 			<dl class="attribution-fields">
@@ -404,21 +267,15 @@
 			<p class="legal legal-links">
 				<a href={ARASAAC_SITE_URL} target="_blank" rel="noopener noreferrer">arasaac.org</a>
 				·
-				<a href={ARASAAC_TERMS_URL} target="_blank" rel="noopener noreferrer">תנאי השימוש</a>
+				<a href={ARASAAC_TERMS_URL} target="_blank" rel="noopener noreferrer">{messages.terms}</a>
 				·
-				<a href={ARASAAC_LICENSE_URL} target="_blank" rel="noopener noreferrer">נוסח הרישיון</a>
+				<a href={ARASAAC_LICENSE_URL} target="_blank" rel="noopener noreferrer"
+					>{messages.license}</a
+				>
 			</p>
 		</section>
 	</div>
 </div>
-
-<input
-	type="file"
-	accept=".json"
-	class="hidden-input"
-	bind:this={fileInput}
-	onchange={handleFileChange}
-/>
 
 <style>
 	.settings-page {
@@ -600,31 +457,6 @@
 		background: #bbdefb;
 	}
 
-	.btn-row {
-		display: flex;
-		gap: 8px;
-	}
-
-	.btn-action {
-		flex: 1;
-		background: var(--bg-card-alt, #f5f5f5);
-		color: var(--text-primary, #212121);
-	}
-
-	.btn-action:hover {
-		background: var(--border-color, #e0e0e0);
-	}
-
-	.btn-danger {
-		background: #ffebee;
-		color: #c62828;
-	}
-
-	.btn-danger:hover {
-		background: #ffcdd2;
-	}
-
-	/* ייחוס — טקסט משפטי: קטן, משני, וקריא. לא מוסתר ולא מודגש. */
 	.legal {
 		margin: 0;
 		font-size: 12px;
@@ -665,13 +497,5 @@
 		/* 🛑 לוגי ולא `text-align: left` — הדף כולו RTL והערכים הם LTR. */
 		text-align: start;
 		color: var(--text-primary, #212121);
-	}
-
-	.hidden-input {
-		position: absolute;
-		width: 0;
-		height: 0;
-		opacity: 0;
-		pointer-events: none;
 	}
 </style>

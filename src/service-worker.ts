@@ -7,114 +7,79 @@ import { build, files, version } from '$service-worker';
 
 declare const self: ServiceWorkerGlobalScope;
 
-const CACHE = `aac-board-${version}`;
+const CACHE_PREFIX = 'aac-board-';
+const CACHE = `${CACHE_PREFIX}${version}`;
 const OFFLINE = '/offline.html';
-
-// Precache: hashed build assets + static files (includes offline.html)
 const PRECACHE = [...build, ...files];
+const CLONE_ROUTES = new Set(['/', '/grid', '/settings']);
 
-const log = (...args: unknown[]) => console.log('[SW]', ...args);
-
-log('script evaluated, version:', version);
-log('PRECACHE count:', PRECACHE.length);
-log('offline.html in PRECACHE:', PRECACHE.includes(OFFLINE));
-
-// Install: open cache and precache all known assets
 self.addEventListener('install', (event) => {
-	log('install — cache:', CACHE);
 	event.waitUntil(
-		caches
-			.open(CACHE)
-			.then((cache) => cache.addAll(PRECACHE))
-			.then(() => { log('install done, skipWaiting'); self.skipWaiting(); })
-			.catch((err) => { log('install FAILED:', err); throw err; })
+		caches.open(CACHE).then(async (cache) => {
+			await cache.addAll(PRECACHE);
+			await self.skipWaiting();
+		})
 	);
 });
 
-// Activate: delete old caches, claim all clients immediately
 self.addEventListener('activate', (event) => {
-	log('activate');
 	event.waitUntil(
-		caches
-			.keys()
-			.then((keys) => {
-				log('existing caches:', keys);
-				return Promise.all(keys.filter((k) => k !== CACHE).map((k) => {
-					log('deleting old cache:', k);
-					return caches.delete(k);
-				}));
-			})
-			.then(() => { log('activate done, claiming clients'); self.clients.claim(); })
+		caches.keys().then(async (keys) => {
+			// Only versioned app shells belong to this worker. Symbol/audio/user caches stay.
+			await Promise.all(
+				keys
+					.filter((key) => key.startsWith(CACHE_PREFIX) && key !== CACHE)
+					.map((key) => caches.delete(key))
+			);
+			await self.clients.claim();
+		})
 	);
 });
 
 self.addEventListener('fetch', (event) => {
 	const { request } = event;
 	const url = new URL(request.url);
-
-	// Only handle GET requests from the same origin
 	if (request.method !== 'GET' || url.origin !== self.location.origin) return;
 
-	// Navigation (SSR HTML pages) — network-first, cache response as side-effect,
-	// fall back to any cached HTML page so SvelteKit can boot from cache offline.
 	if (request.mode === 'navigate') {
-		log('navigate →', url.pathname);
 		event.respondWith(
-			Promise.race([
-				fetch(request, { redirect: 'follow' }),
-				new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 4000))
-			])
-				.then(async (res) => {
-					log('navigate network ok:', res.status, res.type);
-					// Cache the HTML response so it's available offline
-					if (res.ok && res.status === 200) {
-						const cache = await caches.open(CACHE);
-						cache.put(request, res.clone());
+			(async () => {
+				let timer: ReturnType<typeof setTimeout> | undefined;
+				const cache = await caches.open(CACHE);
+				try {
+					const response = await Promise.race([
+						fetch(request, { redirect: 'follow' }),
+						new Promise<never>((_, reject) => {
+							timer = setTimeout(() => reject(new Error('Navigation timeout')), 4000);
+						})
+					]);
+					if (response.ok && CLONE_ROUTES.has(url.pathname)) {
+						await cache.put(request, response.clone());
 					}
-					return res;
-				})
-				.catch(async (err) => {
-					log('navigate network failed:', err?.message, '— trying cache');
-
-					// 1. Exact URL match
-					const cached = await caches.match(request);
-					if (cached) { log('navigate: exact cache hit'); return cached; }
-
-					// 2. Any previously cached HTML page — SvelteKit will client-side route
-					const cache = await caches.open(CACHE);
-					const keys = await cache.keys();
-					const htmlKey = keys.find((k) => k.mode === 'navigate');
-					if (htmlKey) {
-						const shell = await cache.match(htmlKey);
-						if (shell) {
-							log('navigate: serving shell from', htmlKey.url);
-							return new Response(shell.body, {
-								status: 200,
-								headers: { 'Content-Type': 'text/html;charset=utf-8' }
-							});
-						}
+					return response;
+				} catch {
+					// Never consult other caches or serve a shell for a removed legacy route.
+					if (CLONE_ROUTES.has(url.pathname)) {
+						const cached = await cache.match(request);
+						if (cached) return cached;
 					}
-
-					// 3. Last resort: offline page
-					const offline = await caches.match(OFFLINE);
-					if (offline) {
-						log('navigate: serving offline.html');
-						return new Response(offline.body, {
-							status: 200,
-							headers: { 'Content-Type': 'text/html;charset=utf-8' }
-						});
-					}
-					log('navigate: no fallback — returning 503');
-					return new Response('אופליין', { status: 503 });
-				})
+					const offline = await cache.match(OFFLINE);
+					// Static hosting redirects /offline.html to /offline. A navigation fallback
+					// needs a fresh response so the cached redirect flag cannot reject it.
+					return offline
+						? new Response(offline.body, { status: 200, headers: offline.headers })
+						: new Response('Offline', { status: 503 });
+				} finally {
+					clearTimeout(timer);
+				}
+			})()
 		);
 		return;
 	}
 
-	// Precached assets (hashed JS/CSS/icons) — cache-first
 	if (PRECACHE.includes(url.pathname)) {
 		event.respondWith(
-			caches.match(request).then((cached) => cached ?? fetch(request))
+			caches.open(CACHE).then(async (cache) => (await cache.match(request)) ?? fetch(request))
 		);
 	}
 });

@@ -1,5 +1,6 @@
 import type { CellColourField } from '$lib/gridset/xmlEdit';
 export const messages = {
+	settings: 'הגדרות',
 	load: 'טעינת לוח — גררו קובץ .gridset לכאן, או בחרו:',
 	samples: [
 		'טען לוח לדוגמה — ‏96 דפים',

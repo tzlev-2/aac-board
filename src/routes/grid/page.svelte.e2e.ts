@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { expect, test } from '@playwright/test';
+import { expect, test } from '../../../tests/owned-browser';
 
 const fixturePath = fileURLToPath(new URL('./__fixtures__/sample-gridset.json', import.meta.url));
 
