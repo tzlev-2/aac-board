@@ -11,20 +11,33 @@
 	 * חדש, וההחלפה נעשית ב-`{#key gridSet}` אצל הקורא. כך `#pageName` וחוצץ
 	 * הפלט מתאפסים בטעינה, והיסטוריית-הניווט אינה נגררת בין לוחות.
 	 */
-	import type { GridSet } from '$lib/gridset/types';
-	import { createRuntime, type RuntimeOptions } from '$lib/gridset/runtime.svelte';
+	import { onMount } from 'svelte';
+	import type { GridSet, Page, Cell } from '$lib/gridset/types';
+	import {
+		createRuntime,
+		type GridRuntime,
+		type RuntimeOptions
+	} from '$lib/gridset/runtime.svelte';
 	import { createSymbolResolver, type SymbolResolver } from '$lib/gridset/symbols';
 	import GridBoard from './GridBoard.svelte';
 
 	let {
 		gridSet,
 		symbols,
-		runtimeOptions
+		runtimeOptions,
+		editing = false,
+		selection = null,
+		onSelectCell,
+		onRuntimeReady
 	}: {
 		gridSet: GridSet;
 		/** ‏`undefined` = פותר אמיתי · `null` = בלי סמלים (בדיקות ללא רשת). */
 		symbols?: SymbolResolver | null;
 		runtimeOptions?: RuntimeOptions;
+		editing?: boolean;
+		selection?: { page: string; x: number; y: number } | null;
+		onSelectCell?: (page: Page, cell: Cell) => void;
+		onRuntimeReady?: (runtime: GridRuntime) => void;
 	} = $props();
 
 	// הקריאה ל-props נעשית בתוך פונקציה ולא ברמת-הסקריפט: היא **חד-פעמית
@@ -37,6 +50,9 @@
 	}
 
 	const { runtime, resolver } = init();
+	onMount(() => {
+		onRuntimeReady?.(runtime);
+	});
 
 	/**
 	 * 🛑 שחרור ה-`blob:` URL-ים של המדיה המוטמעת כשהלוח מוחלף.
@@ -52,4 +68,11 @@
 	$effect(() => () => resolver?.dispose?.());
 </script>
 
-<GridBoard page={runtime.page} ctx={runtime} symbols={resolver} />
+<GridBoard
+	page={runtime.page}
+	ctx={runtime}
+	symbols={resolver}
+	{editing}
+	{selection}
+	{onSelectCell}
+/>

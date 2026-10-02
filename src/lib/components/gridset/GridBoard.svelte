@@ -16,12 +16,23 @@
 	} from '$lib/gridset/visualMeasured';
 	import { pageWordList } from '$lib/gridset/wordListPager';
 	import GridCell from './GridCell.svelte';
+	import { cellLabel } from '../../../routes/grid/editor-messages';
 
 	let {
 		page,
 		ctx,
-		symbols = null
-	}: { page: Page; ctx: RuntimeContext; symbols?: SymbolResolver | null } = $props();
+		symbols = null,
+		editing = false,
+		selection = null,
+		onSelectCell
+	}: {
+		page: Page;
+		ctx: RuntimeContext;
+		symbols?: SymbolResolver | null;
+		editing?: boolean;
+		selection?: { page: string; x: number; y: number } | null;
+		onSelectCell?: (page: Page, cell: Cell) => void;
+	} = $props();
 
 	// Hidden אינו מרונדר כלל — לא רק מוסתר חזותית.
 	// ואחריו שער-הזמינות: תא שהצהרת-הדרישה שלו אינה מתקיימת אינו מצויר אך
@@ -64,8 +75,10 @@
 	 * הלוח. יציאה וחזרה ⇒ עמוד 0. **אין להחזיק אותו ב-store גלובלי.**
 	 */
 	let wordListPage = $state(0);
+	const pageName = $derived(page.name);
 	$effect(() => {
-		page.name;
+		// Reading pageName tracks navigation while same-name preview keeps the pager.
+		void pageName;
 		wordListPage = 0;
 	});
 
@@ -80,7 +93,7 @@
 	 * זה רקע-לוח נקי, כפי שנמדד. תא שאינו `WordList` אינו במפה ולכן עובר.
 	 */
 	const drawnCells = $derived(
-		visibleCells.filter((cell) => paged.slots.get(cell)?.kind !== 'empty')
+		editing ? page.cells : visibleCells.filter((cell) => paged.slots.get(cell)?.kind !== 'empty')
 	);
 
 	function tileVisible(cell: Cell): boolean {
@@ -110,10 +123,7 @@
 	}
 </script>
 
-<div
-	class="grid-wrap"
-	style="--grid-rows: {page.rows}; --gutter-k: {gutterK}"
->
+<div class="grid-wrap" style="--grid-rows: {page.rows}; --gutter-k: {gutterK}">
 	<div
 		class="grid"
 		data-testid="grid-board"
@@ -136,12 +146,57 @@
 					"
 				></div>
 			{/if}
-			<GridCell {cell} {ctx} {symbols} slot={paged.slots.get(cell)} onNavigate={navigate} />
+			<GridCell
+				{cell}
+				{ctx}
+				{symbols}
+				{editing}
+				slot={paged.slots.get(cell)}
+				onNavigate={navigate}
+			/>
+			{#if editing}
+				<button
+					type="button"
+					class="edit-overlay"
+					class:selected={selection?.page === page.name &&
+						selection.x === cell.x &&
+						selection.y === cell.y}
+					data-testid="edit-cell"
+					data-cell-x={cell.x}
+					data-cell-y={cell.y}
+					aria-label={cellLabel(page.name, cell.x, cell.y, cell.caption)}
+					aria-pressed={selection?.page === page.name &&
+						selection.x === cell.x &&
+						selection.y === cell.y}
+					onclick={() => onSelectCell?.(page, cell)}
+					style="--x:{cell.x};--y:{cell.y};--cspan:{cell.columnSpan};--rspan:{cell.rowSpan};"
+				></button>
+			{/if}
 		{/each}
 	</div>
 </div>
 
 <style>
+	.edit-overlay {
+		grid-column: calc(var(--x) + 1) / span var(--cspan);
+		grid-row: calc(var(--y) + 1) / span var(--rspan);
+		z-index: 3;
+		background: transparent;
+		border: 0;
+		padding: 0;
+		cursor: pointer;
+		min-inline-size: 44px;
+		min-block-size: 44px;
+	}
+	.edit-overlay.selected {
+		outline: 4px solid #075dcc;
+		outline-offset: 2px;
+	}
+	.edit-overlay:focus-visible {
+		outline: 4px dashed #075dcc;
+		outline-offset: 2px;
+	}
+
 	.grid-wrap {
 		flex: 1 1 auto;
 		min-height: 0;
@@ -157,8 +212,7 @@
 		box-sizing: border-box;
 		/* 🔑 מרזב = שוליים: g = k·cellH, ואותו g ל-padding ול-gap (ב-cqh). */
 		--gutter: calc(
-			100cqh * var(--gutter-k) /
-				(var(--grid-rows) + var(--gutter-k) * (var(--grid-rows) + 1))
+			100cqh * var(--gutter-k) / (var(--grid-rows) + var(--gutter-k) * (var(--grid-rows) + 1))
 		);
 		padding: var(--gutter);
 		gap: var(--gutter);

@@ -28,9 +28,11 @@
 		ctx,
 		symbols = null,
 		slot,
-		onNavigate
+		onNavigate,
+		editing = false
 	}: {
 		cell: Cell;
+		editing?: boolean;
 		ctx: RuntimeContext;
 		symbols?: SymbolResolver | null;
 		slot?: WordListSlot;
@@ -55,7 +57,7 @@
 	const interactive = $derived(!disabled && (isNav || commands.length > 0));
 
 	function activate() {
-		if (!interactive) return;
+		if (editing || !interactive) return;
 		if (slot?.kind === 'nav') return onNavigate?.(slot.action);
 		// הפריט נמסר להקשר: `AutoContent.Activate` אינה נושאת פרמטרים, ומה
 		// שמבדיל בין משבצת למשבצת הוא הפריט שבה.
@@ -83,6 +85,7 @@
 	type={interactive ? 'button' : undefined}
 	role={interactive ? 'button' : undefined}
 	class="cell"
+	inert={editing}
 	class:disabled
 	class:interactive
 	data-testid="grid-cell"
