@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { userEvent } from 'vitest/browser';
 import { render } from 'vitest-browser-svelte';
 import { tick } from 'svelte';
 import { createRuntime } from '$lib/gridset/runtime.svelte';
@@ -370,4 +371,220 @@ it('edit overlays include Hidden/Disabled and preserve the top-right span addres
 			.elements()
 			.every((el) => (el as HTMLElement).inert)
 	).toBe(true);
+});
+
+// Real browser geometry drives eligibility; pointer capture is stubbed only for
+// synthetic timer/cancel events. Native touch and keyboard are replayed in Chrome QA.
+describe('full caption inspection before activation', () => {
+	const label = 'native-360x800';
+	async function readerBoard(overrides: Partial<Cell> = {}) {
+		const cell = makeCell({
+			style: { ...style, fontSize: 80 },
+			caption: label,
+			commands: [{ id: 'Jump.To', params: { grid: 'next' } }],
+			...overrides
+		});
+		const p = makePage({ cells: [cell] });
+		const ctx = makeCtx(p);
+		let executions = 0;
+		ctx.navigate = () => {
+			executions++;
+		};
+		const screen = render(GridBoard, { page: p, ctx });
+		const owner = screen.getByTestId('grid-cell').element() as HTMLElement;
+		owner.style.width = '30px';
+		owner.style.height = '120px';
+		await expect.poll(() => owner.hasAttribute('data-caption-unfit')).toBe(true);
+		vi.spyOn(owner, 'setPointerCapture').mockImplementation(() => {});
+		vi.spyOn(owner, 'hasPointerCapture').mockReturnValue(false);
+		return {
+			screen,
+			owner,
+			p,
+			ctx,
+			get executions() {
+				return executions;
+			}
+		};
+	}
+	const pointer = (owner: HTMLElement, type: string, x = 20) =>
+		owner.dispatchEvent(
+			new PointerEvent(type, {
+				pointerId: 7,
+				isPrimary: true,
+				button: 0,
+				clientX: x,
+				clientY: 30,
+				bubbles: true
+			})
+		);
+	const fullText = () => document.querySelector('[data-testid=full-caption]')?.textContent;
+	const hold = async (owner: HTMLElement) => {
+		vi.useFakeTimers();
+		pointer(owner, 'pointerdown');
+		await vi.advanceTimersByTimeAsync(399);
+		expect(fullText()).toBeUndefined();
+		await vi.advanceTimersByTimeAsync(1);
+		await tick();
+		vi.useRealTimers();
+	};
+	afterEach(() => {
+		vi.useRealTimers();
+		vi.restoreAllMocks();
+	});
+
+	it('stationary hold reveals exact text in the top layer; release/Close do not activate; next short tap once', async () => {
+		const f = await readerBoard();
+		await hold(f.owner);
+		expect(fullText()).toBe(label);
+		expect(document.querySelector('[data-testid=caption-reader]')?.matches(':popover-open')).toBe(
+			true
+		);
+		expect(getComputedStyle(document.querySelector('[data-testid=full-caption]')!).fontSize).toBe(
+			'20px'
+		);
+		pointer(f.owner, 'pointerup');
+		f.owner.click();
+		expect(f.executions).toBe(0);
+		await f.screen.getByRole('button', { name: 'סגירה' }).click();
+		expect(fullText()).toBeUndefined();
+		expect(f.executions).toBe(0);
+		pointer(f.owner, 'pointerdown');
+		pointer(f.owner, 'pointerup');
+		f.owner.click();
+		expect(f.executions).toBe(1);
+	});
+
+	it('movement or pointercancel cancels a pending hold and suppresses its release click', async () => {
+		const f = await readerBoard();
+		for (const cancel of ['pointermove', 'pointercancel']) {
+			vi.useFakeTimers();
+			pointer(f.owner, 'pointerdown');
+			pointer(f.owner, cancel, 31);
+			await vi.advanceTimersByTimeAsync(500);
+			await tick();
+			pointer(f.owner, 'pointerup');
+			f.owner.click();
+			expect(fullText()).toBeUndefined();
+			expect(f.executions).toBe(0);
+			vi.useRealTimers();
+		}
+	});
+
+	it('keyboard focus reads before Enter/Space; Escape clears with zero commands', async () => {
+		const f = await readerBoard();
+		// Synthetic keyboard events do not change Chrome's input modality.
+		// Native focus-visible/Enter/Space are covered by the product Chrome replay.
+		const matches = f.owner.matches.bind(f.owner);
+		vi.spyOn(f.owner, 'matches').mockImplementation(
+			(selector) => selector === ':focus-visible' || matches(selector)
+		);
+		await userEvent.keyboard('{Tab}');
+		f.owner.blur();
+		f.owner.focus();
+		f.owner.dispatchEvent(new FocusEvent('focus'));
+		await tick();
+		expect(fullText()).toBe(label);
+		expect(f.executions).toBe(0);
+		await userEvent.keyboard('{Escape}');
+		await tick();
+		expect(fullText()).toBeUndefined();
+		expect(f.executions).toBe(0);
+		for (const key of ['{Enter}', ' ']) {
+			f.owner.blur();
+			f.owner.focus();
+			f.owner.dispatchEvent(new FocusEvent('focus'));
+			await tick();
+			expect(fullText()).toBe(label);
+			await userEvent.keyboard(key);
+			await tick();
+			expect(fullText()).toBeUndefined();
+		}
+		expect(f.executions).toBe(2);
+	});
+
+	it('cell/page/WordList/mode replacement and unmount clear readers and pending timers', async () => {
+		const f = await readerBoard();
+		await hold(f.owner);
+		await f.screen.rerender({ editing: true });
+		await tick();
+		expect(fullText()).toBeUndefined();
+		expect(f.executions).toBe(0);
+		await f.screen.rerender({ editing: false });
+		await tick();
+		await expect.poll(() => f.owner.hasAttribute('data-caption-unfit')).toBe(true);
+		await hold(f.owner);
+		await f.screen.rerender({ pager: { wordListPage: 1, navigateWordList: () => {} } });
+		await tick();
+		expect(fullText()).toBeUndefined();
+		vi.useFakeTimers();
+		pointer(f.owner, 'pointerdown');
+		const replacement = makePage({ name: 'other', cells: [makeCell({ caption: 'replacement' })] });
+		await f.screen.rerender({ page: replacement, ctx: makeCtx(replacement) });
+		await vi.advanceTimersByTimeAsync(500);
+		await tick();
+		expect(fullText()).toBeUndefined();
+		expect(f.executions).toBe(0);
+		vi.useRealTimers();
+		f.screen.unmount();
+		await tick();
+		expect(document.querySelector('[data-testid=caption-reader]')).toBeNull();
+		const pending = await readerBoard();
+		vi.useFakeTimers();
+		pointer(pending.owner, 'pointerdown');
+		pending.screen.unmount();
+		await vi.advanceTimersByTimeAsync(500);
+		await tick();
+		expect(fullText()).toBeUndefined();
+		expect(pending.executions).toBe(0);
+		vi.useRealTimers();
+		const open = await readerBoard();
+		await hold(open.owner);
+		expect(fullText()).toBe(label);
+		open.screen.unmount();
+		await tick();
+		expect(fullText()).toBeUndefined();
+	});
+
+	it('passive unfit cells gain reading focus and no command; disabled cells stay unavailable', async () => {
+		const f = await readerBoard({ commands: [] });
+		expect(f.owner.tagName).toBe('DIV');
+		expect(f.owner.tabIndex).toBe(0);
+		await hold(f.owner);
+		expect(fullText()).toBe(label);
+		pointer(f.owner, 'pointerup');
+		f.owner.click();
+		expect(f.executions).toBe(0);
+		await f.screen.rerender({
+			page: makePage({ cells: [makeCell({ caption: label, visibility: 'Disabled' })] })
+		});
+		await tick();
+		expect(fullText()).toBeUndefined();
+		expect(f.owner.hasAttribute('data-caption-unfit')).toBe(false);
+		expect(f.owner.tabIndex).toBe(-1);
+	});
+
+	it('an actually loaded font changes a previously fitting caption to unfit without changing text/FontSize', async () => {
+		const f = await readerBoard();
+		f.owner.style.width = '280px';
+		f.owner.style.height = '160px';
+		await expect.poll(() => f.owner.hasAttribute('data-caption-unfit')).toBe(false);
+		const face = new FontFace('ReaderLoadedFont', 'local("DejaVu Sans")', {
+			sizeAdjust: '300%'
+		} as FontFaceDescriptors & { sizeAdjust: string });
+		document.fonts.add(face);
+		await face.load();
+		await document.fonts.ready;
+		try {
+			f.owner.style.fontFamily = 'ReaderLoadedFont';
+			window.dispatchEvent(new Event('resize'));
+			await expect.poll(() => f.owner.hasAttribute('data-caption-unfit')).toBe(true);
+			await hold(f.owner);
+			expect(fullText()).toBe(label);
+			expect(face.status).toBe('loaded');
+			expect(f.p.cells[0].style.fontSize).toBe(80);
+		} finally {
+			document.fonts.delete(face);
+		}
+	});
 });

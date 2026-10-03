@@ -1,5 +1,6 @@
 <script lang="ts">
-	import { observeCaptionFit } from '$lib/gridset/caption-fit';
+	import { untrack } from 'svelte';
+	import { captionFitReceipt, observeCaptionFit } from '$lib/gridset/caption-fit';
 	import { fontPresentation, fontPresentationGradient } from '$lib/gridset/fontColourPresentation';
 	import type { CellRendererProps } from './cellRenderers';
 	import type { SymbolResolution } from '$lib/gridset/symbols';
@@ -10,7 +11,7 @@
 		captionFontSizeCss
 	} from '$lib/gridset/visualDefaults';
 
-	let { cell, ctx, symbols = null }: CellRendererProps = $props();
+	let { cell, ctx, symbols = null, onCaptionFit }: CellRendererProps = $props();
 
 	const captionAtTop = $derived(ctx?.gridSet.textAtTop ?? VISUAL_DEFAULTS.captionAtTop);
 	/** תא בלי `Image` — דיו ממורכז אנכית (§4 שורות 65..134), לא מתחת לסמל. */
@@ -30,6 +31,7 @@
 		fontPresentation(presentationFont, presentationBack, captionOnly, presentationDisabled)
 	);
 	function presentCaption(span: HTMLSpanElement) {
+		const notify = onCaptionFit;
 		const model = presentation,
 			preferred = captionFontSize,
 			only = captionOnly;
@@ -124,7 +126,13 @@
 				clear();
 			}
 		};
-		const stopFit = only ? observeCaptionFit(span, preferred, paint) : undefined;
+		const stopFit = only
+			? observeCaptionFit(span, preferred, () => {
+					const receipt = captionFitReceipt(span);
+					untrack(() => notify?.(Boolean(receipt && 'after' in receipt && !receipt.after.fits)));
+					paint();
+				})
+			: undefined;
 		const observer = new ResizeObserver(paint);
 		observer.observe(span);
 		observer.observe(tile);
@@ -139,6 +147,7 @@
 			disposed = true;
 			observer.disconnect();
 			stopFit?.();
+			untrack(() => notify?.(false));
 			forced.removeEventListener('change', paint);
 			window.removeEventListener('resize', paint);
 			window.visualViewport?.removeEventListener('resize', paint);

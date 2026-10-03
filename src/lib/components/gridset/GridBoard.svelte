@@ -6,6 +6,7 @@
 	 */
 	import type { Cell, Page, RuntimeContext } from '$lib/gridset/types';
 	import { untrack } from 'svelte';
+	import { SvelteSet } from 'svelte/reactivity';
 	import { isCellAvailable } from '$lib/gridset/commands';
 	import type { SymbolResolver } from '$lib/gridset/symbols';
 	import { sizeNameToFr } from '$lib/gridset/visualDefaults';
@@ -100,6 +101,32 @@
 		editing ? page.cells : visibleCells.filter((cell) => paged.slots.get(cell)?.kind !== 'empty')
 	);
 
+	const uid = $props.id();
+	const hintId = `${uid}-caption-hint`;
+	const unfitOwners = new SvelteSet<HTMLElement>();
+	let reader = $state<{ owner: HTMLElement; text: string } | null>(null);
+	function readCaption(owner: HTMLElement, text: string | null) {
+		if (text !== null) reader = { owner, text };
+		else if (reader?.owner === owner) reader = null;
+	}
+	function captionAvailability(owner: HTMLElement, unfit: boolean) {
+		if (unfit) unfitOwners.add(owner);
+		else {
+			unfitOwners.delete(owner);
+			readCaption(owner, null);
+		}
+	}
+	function closeReader() {
+		const owner = reader?.owner;
+		reader = null;
+		owner?.dispatchEvent(new Event('caption-reader-close'));
+	}
+	function showReader(element: HTMLElement) {
+		// The native top layer escapes the board's size container and every clip.
+		element.showPopover();
+		return () => element.hidePopover();
+	}
+
 	function tileVisible(cell: Cell): boolean {
 		return gridColourToRgb(cell.style.tileColour).a > 0;
 	}
@@ -152,6 +179,10 @@
 			{/if}
 			<GridCell
 				{isCurrent}
+				inspectionScope={paged}
+				inspectionHintId={hintId}
+				onReadCaption={readCaption}
+				onCaptionAvailability={captionAvailability}
 				{cell}
 				{ctx}
 				{symbols}
@@ -179,9 +210,85 @@
 			{/if}
 		{/each}
 	</div>
+	{#if unfitOwners.size > 0 && !editing}
+		<p class="reader-hint" id={hintId}>לחיצה ממושכת על תא המסומן … לקריאת הכיתוב המלא</p>
+	{/if}
 </div>
 
+{#if reader}
+	<div class="reader-layer" popover="manual" {@attach showReader} data-testid="caption-reader">
+		<div class="reader-panel" role="dialog" tabindex="-1" aria-label="כיתוב מלא" aria-modal="false">
+			<p class="reader-text" dir="auto" data-testid="full-caption">{reader.text}</p>
+			<button type="button" onclick={closeReader}>סגירה</button>
+		</div>
+	</div>
+{/if}
+<svelte:window
+	onkeydown={(event) => {
+		if (reader && event.key === 'Escape') {
+			event.preventDefault();
+			closeReader();
+		}
+	}}
+/>
+
 <style>
+	.reader-layer {
+		position: fixed;
+		inset: 0;
+		margin: 0;
+		width: 100%;
+		height: 100dvh;
+		box-sizing: border-box;
+		border: 0;
+		padding: 10px;
+		background: rgb(0 0 0 / 35%);
+	}
+	.reader-layer:popover-open {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+	}
+	.reader-panel {
+		width: 100%;
+		max-height: 100%;
+		overflow: auto;
+		box-sizing: border-box;
+		padding: 16px;
+		border: 2px solid #111;
+		border-radius: 12px;
+		background: #fff;
+		color: #111;
+		font: 20px/1.4 sans-serif;
+	}
+	.reader-text {
+		margin: 0 0 16px;
+		white-space: pre-wrap;
+		overflow-wrap: anywhere;
+	}
+	.reader-panel button {
+		min-width: 44px;
+		min-height: 44px;
+		padding: 8px 16px;
+		font: inherit;
+		background: #fff;
+		color: #111;
+		border: 2px solid #111;
+		border-radius: 6px;
+		cursor: pointer;
+	}
+	.reader-hint {
+		position: absolute;
+		inset-block-start: 0;
+		inset-inline: 0;
+		z-index: 2;
+		margin: 0;
+		text-align: center;
+		font: 12px/1.2 sans-serif;
+		background: #fff;
+		color: #111;
+		pointer-events: none;
+	}
 	.edit-overlay {
 		grid-column: calc(var(--x) + 1) / span var(--cspan);
 		grid-row: calc(var(--y) + 1) / span var(--rspan);
@@ -203,6 +310,7 @@
 	}
 
 	.grid-wrap {
+		position: relative;
 		flex: 1 1 auto;
 		min-height: 0;
 		height: 100%;

@@ -13,6 +13,8 @@ import WordListCell from './WordListCell.svelte';
 
 export interface CellRendererProps {
 	cell: Cell;
+	/** Presentation result for measured caption-only text; never changes the model. */
+	onCaptionFit?: (unfit: boolean) => void;
 	ctx: RuntimeContext;
 	/**
 	 * פותר-הסמלים של הלוח (`createSymbolResolver`). ‏`null` = בלי סמלים
