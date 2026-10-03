@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { observeCaptionFit } from '$lib/gridset/caption-fit';
 	import {
 		fontPresentation,
 		fontPresentationGradient,
@@ -27,6 +28,13 @@
 	const captionMaxBlock = $derived(captionOnly ? undefined : captionBelowSymbolMaxBlockCss());
 
 	let captionElement = $state<HTMLSpanElement>();
+	function fitCaptionOnly(span: HTMLSpanElement) {
+		const preferred = captionFontSize;
+		// Reused cells and applied drafts update primitive text/style eligibility.
+		void cell.caption;
+		void cell.style.fontName;
+		if (captionOnly) return observeCaptionFit(span, preferred);
+	}
 	// ערכי primitive מונעים הקמת observers מחדש כשדף אחר משתמש באותו סגנון.
 	const presentationFont = $derived(cell.style.fontColour);
 	const presentationBack = $derived(cell.style.backColour);
@@ -162,6 +170,7 @@
 	{#if cell.caption}
 		<span
 			bind:this={captionElement}
+			{@attach fitCaptionOnly}
 			class="caption"
 			class:caption-only={captionOnly}
 			data-testid="cell-caption"
