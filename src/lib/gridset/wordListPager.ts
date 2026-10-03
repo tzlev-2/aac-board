@@ -18,6 +18,33 @@
  */
 
 import type { Cell, ImageRef, WordListItem } from './types';
+import { richTextToString } from './richText';
+
+/** Display projection only. The source array and item references remain in XML order. */
+export function displayWordList(
+	items: readonly WordListItem[],
+	sorting: string | undefined,
+	language: string
+): readonly WordListItem[] {
+	if (sorting !== 'Alphabetical') return items;
+	// A missing or invalid GridSet language has one deterministic fallback.
+	let locale = 'en';
+	try {
+		if (language && Intl.Collator.supportedLocalesOf(language).length) locale = language;
+	} catch {
+		// Invalid BCP 47 tag: retain the fixed fallback.
+	}
+	const collator = new Intl.Collator(locale, {
+		usage: 'sort',
+		sensitivity: 'variant',
+		numeric: false,
+		ignorePunctuation: false
+	});
+	return items
+		.map((item, index) => ({ item, index, key: richTextToString(item.text).trim() }))
+		.sort((a, b) => collator.compare(a.key, b.key) || a.index - b.index)
+		.map(({ item }) => item);
+}
 
 /**
  * כיתובי תא-הניווט — **אינם מגיעים מהלוח**, הם מחרוזות של Grid עצמו.

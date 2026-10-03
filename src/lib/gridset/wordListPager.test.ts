@@ -5,7 +5,7 @@
  * מיפוי 1:1 נכון.
  */
 import { describe, it, expect } from 'vitest';
-import { pageWordList, orderWordListCells, isWordListCell } from './wordListPager';
+import { pageWordList, orderWordListCells, isWordListCell, displayWordList } from './wordListPager';
 import type { Cell, WordListItem } from './types';
 
 const style = {
@@ -24,6 +24,45 @@ const word = (t: string): WordListItem => ({
 const words = (...t: string[]) => t.map(word);
 const textOf = (s: ReturnType<typeof pageWordList>['slots'] extends Map<Cell, infer S> ? S : never) =>
 	s.kind === 'item' ? s.item.text.paragraphs[0].sentences[0].runs[0] : s.kind === 'nav' ? s.label : '';
+
+describe('Sorting display projection', () => {
+	it('sorts the whole list before paging, retaining source item identity and media', () => {
+		const items = words('zebra', ' apple ', 'pear', 'banana', 'apple');
+		items[0].image = { library: '', path: '-0.png', embeddedPath: 'Grids/a/wordlist-0.png' };
+		const projected = displayWordList(items, 'Alphabetical', 'en-US');
+		expect(projected).toEqual([items[1], items[4], items[3], items[2], items[0]]);
+		expect(items.map((item) => item.text.paragraphs[0].sentences[0].runs[0])).toEqual([
+			'zebra',
+			' apple ',
+			'pear',
+			'banana',
+			'apple'
+		]);
+		expect(projected[4].image).toBe(items[0].image);
+		const cells = [wl(1, 0), wl(0, 0), wl(2, 0)];
+		const first = [...pageWordList(cells, projected, 0).slots.values()].map(textOf);
+		const next = [...pageWordList(cells, projected, 1).slots.values()].map(textOf);
+		expect(first).toEqual([' apple ', 'apple', 'עוד']);
+		expect(next).toEqual(['banana', 'pear', 'עוד']);
+	});
+	it('keeps XML order for absent, Frequency and unknown Sorting', () => {
+		const items = words('z', 'a');
+		for (const mode of [undefined, 'Frequency', 'Random']) {
+			expect(displayWordList(items, mode, 'en')).toBe(items);
+		}
+	});
+	it('uses one set locale, a fixed invalid-locale fallback, and source-index ties', () => {
+		const items = words('ב', 'a', 'א', 'a', '!a', 'á');
+		const en = displayWordList(items, 'Alphabetical', 'en-US');
+		const he = displayWordList(items, 'Alphabetical', 'he-IL');
+		expect(en[1]).toBe(items[1]);
+		expect(en.indexOf(items[1])).toBeLessThan(en.indexOf(items[3]));
+		expect(he).not.toEqual(en);
+		expect(displayWordList(items, 'Alphabetical', 'bad_locale')).toEqual(
+			displayWordList(items, 'Alphabetical', 'en')
+		);
+	});
+});
 
 describe('סדר המילוי', () => {
 	// 🛑 54 מ-146 דפי ה-WordList שומרים תאים בסדר שאינו (y,x).

@@ -88,6 +88,7 @@ export interface FixturePage {
 	rows: number;
 	cells: FixtureCell[];
 	wordList?: FixtureWordListItem[];
+	wordListSorting?: string;
 	predictionSource?: 'None' | 'WordList' | 'WordListAndPredictor' | 'LastSuggestedAndWordList';
 	/** מפתח = AutoContentType (למשל "Chat.History"). */
 	autoContentCommands?: Record<string, FixtureCommand[]>;

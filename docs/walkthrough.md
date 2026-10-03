@@ -1,5 +1,15 @@
 # Grid AAC Clone — יומן פיתוח (Walkthrough)
 
+## 2026-10-03 18:01
+
+### C7 · היטל מיון אלפביתי לרשימת מילים
+
+- `Page.wordListSorting` ו־`parsePage` קוראים `Sorting` אופציונלי רק מילד ישיר של `Grid/WordList`. `displayWordList` ב־`wordListPager.ts` בונה מערך הפניות חדש רק עבור `Alphabetical`, לפי `richTextToString().trim()`, ‏`Intl.Collator` בשפת הסט עם fallback קבוע `en`, ושובר שוויון לפי אינדקס XML. `GridBoard.svelte` מעביר את ההיטל למעמד לפני חישוב העמודים. `page.wordList`, ה־XML והשיוך של מדיה לפי אינדקס מקור נשמרים.
+- בבדיקת הדף היחיד עם `Frequency`, ‏`b094.gridset: Grids/Topics - Animals/grid.xml`, נמצא `Items` ריק ואין בו מדד דירוג. `Frequency`, ערך לא מוכר והיעדר Sorting שומרים על סדר המקור; C7 נשארת פתוחה ל־Frequency. הטענה הישנה ש־1,879 פריטי הבנק ב־`b094` מסודרים אקראית שגויה: סקירת התוכנית מצאה XML שכבר כמעט אלפביתי. לכן fixture סינתטי לא ממוין (`zebra, apple, pear, banana, apple`) שימש להוכחת שינוי UI בפועל.
+- `wordListPager.test.ts`, ‏`parse.svelte.spec.ts` ו־`gridSetSource.spec.ts` מכסים היטל, שפות, שוויון, היעדר/ערכי Sorting, עימוד, ZIP ומדיה. 23 בדיקות Node עברו (3 בדיקות קורפוס קיימות דולגו); בדיקות Vitest browser לא הורצו כי Chromium headless אינו מותקן במכונה. `check` עבר 0/0, ‏build עבר, ESLint בקבצים ששונו עבר. סריקת Svelte autofixer אינה זמינה בכלים של הסשן; `svelte-check` עבר.
+- Preview מבודד ב־Chrome דרך CDP עבר ב־1280×900, ‏360×800, ‏390×844, כולל אירועי מגע בשתי מידות המובייל, RTL וללא גלילה אופקית. ה־UI הציג `apple, apple` → `banana, pear` → `zebra` → חזרה להתחלה; גרסאות בלי Sorting, עם Frequency ועם ערך לא מוכר התחילו ב־`zebra, apple`. Save Copy אחרי עריכת תא הוריד קובץ פיזי, נפתח מאותו נתיב בדפדפן, ו־ZIP עבר CRC עם Sorting, סדר Items, מדיה והכתובית הערוכה.
+- זהו מועמד executor בלבד לאימות עצמאי; אין merge, push, deploy או סגירת C7.
+
 ## 2026-10-03 16:56
 
 ### C6 · קדימות חזרה על המשך Wait — תיקון צר, ממתין לאימות עצמאי

@@ -266,6 +266,8 @@ export interface Page {
 
 	/** 🔑 המנוע נגזר מהדף, לא גלובלי. /Grid/WordList — אחד לכל אחד מ-7,057 הדפים. */
 	wordList: WordListItem[];
+	/** Raw /Grid/WordList/Sorting; absent and unrecognized values retain XML order. */
+	wordListSorting?: string;
 	predictionSource: PredictionSource;
 
 	/**

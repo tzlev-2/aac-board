@@ -15,7 +15,7 @@
 		gutterRatioForCellSpacing,
 		verticalFillGradient
 	} from '$lib/gridset/visualMeasured';
-	import { pageWordList } from '$lib/gridset/wordListPager';
+	import { pageWordList, displayWordList } from '$lib/gridset/wordListPager';
 	import GridCell from './GridCell.svelte';
 	import { cellLabel } from '../../../routes/grid/editor-messages';
 
@@ -84,8 +84,11 @@
 		if (!pager) wordListPage = 0;
 	});
 
+	const displayedWordList = $derived(
+		displayWordList(page.wordList, page.wordListSorting, ctx.gridSet.language)
+	);
 	const paged = $derived(
-		pageWordList(page.cells, page.wordList, pager?.wordListPage ?? wordListPage)
+		pageWordList(page.cells, displayedWordList, pager?.wordListPage ?? wordListPage)
 	);
 
 	function navigate(action: 'next' | 'first') {

@@ -317,6 +317,8 @@ function parsePage(name: string, root: Element, resolve: StyleResolver): Page {
 		autoContentCommands: parseAutoContentCommands(root),
 		background: readBackground(root)
 	};
+	const wordListSorting = textOfChild(childByName(root, 'WordList'), 'Sorting');
+	if (wordListSorting !== undefined) page.wordListSorting = wordListSorting;
 
 	const guid = textOfChild(root, 'GridGuid');
 	if (guid) page.guid = guid;

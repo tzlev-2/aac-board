@@ -67,6 +67,23 @@ async function parseSinglePage(gridXml: string, opts?: { resolveStyle?: StyleRes
 	return page;
 }
 
+describe('page WordList Sorting', () => {
+	it('reads a direct WordList child without changing item order', async () => {
+		const items =
+			'<Items><WordListItem><Text><s><r>z</r></s></Text></WordListItem><WordListItem><Text><s><r>a</r></s></Text></WordListItem></Items>';
+		const modes = ['Alphabetical', 'Frequency', 'Unrecognized'];
+		for (const mode of modes) {
+			const page = await parseSinglePage(
+				grid({ extra: `<WordList>${items}<Sorting>${mode}</Sorting></WordList>` })
+			);
+			expect(page.wordListSorting).toBe(mode);
+			expect(page.wordList.map((item) => richTextToString(item.text))).toEqual(['z', 'a']);
+		}
+		const plain = await parseSinglePage(grid({ extra: `<WordList>${items}</WordList>` }));
+		expect(plain.wordListSorting).toBeUndefined();
+	});
+});
+
 // ── מלכודת 1 ─────────────────────────────────────────────────────────────
 
 describe('מלכודת 1 — X=0 הוא הימני, והקואורדינטה נשמרת כפי שהיא', () => {

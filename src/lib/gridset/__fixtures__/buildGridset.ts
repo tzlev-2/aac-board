@@ -175,7 +175,10 @@ function gridXml(page: FixturePage): string {
 	const items = page.wordList?.length
 		? `<Items>${page.wordList.map(wordListItemXml).join('')}</Items>`
 		: '<Items />';
-	parts.push(`<WordList>${items}</WordList>`);
+	const sorting = page.wordListSorting
+		? `<Sorting>${escapeXml(page.wordListSorting)}</Sorting>`
+		: '';
+	parts.push(`<WordList>${items}${sorting}</WordList>`);
 
 	return `<?xml version="1.0" encoding="utf-8"?><Grid ${XSI_XMLNS}>${parts.join('')}</Grid>`;
 }

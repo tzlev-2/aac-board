@@ -60,6 +60,28 @@ function assertPreserved(
 }
 
 describe('כתיבת מקור סינתטי', () => {
+	it('Sorting, XML item order and media survive an edited ZIP and reopen', () => {
+		const page =
+			'<Grid><Cells><Cell X="0" Y="0"><Content><CaptionAndImage><Caption>old</Caption></CaptionAndImage></Content></Cell></Cells><WordList><Items><WordListItem><Text><s><r>z</r></s></Text><Image>-0.png</Image></WordListItem><WordListItem><Text><s><r>a</r></s></Text></WordListItem></Items><Sorting>Alphabetical</Sorting></WordList></Grid>';
+		const untouched = '<Grid><WordList><Sorting>Frequency</Sorting><Items /></WordList></Grid>';
+		const source = sourceOf(
+			zipSync({
+				'Grids/page/grid.xml': strToU8(page),
+				'Grids/other/grid.xml': strToU8(untouched),
+				'Grids/page/wordlist-0.png': new Uint8Array([1, 2, 3])
+			})
+		);
+		const output = writeGridSet(source, [{ page: 'page', x: 0, y: 0, caption: 'new' }]);
+		const files = unzipSync(output);
+		expect(strFromU8(files['Grids/page/grid.xml'])).toBe(
+			page.replace('<Caption>old</Caption>', '<Caption>new</Caption>')
+		);
+		expect(strFromU8(files['Grids/other/grid.xml'])).toBe(untouched);
+		expect(files['Grids/page/wordlist-0.png']).toEqual(new Uint8Array([1, 2, 3]));
+		expect(readZipIndex(output).entries.map((entry) => entry.name)).toEqual(
+			source.index.entries.map((entry) => entry.name)
+		);
+	});
 	it('BOM בייטי נשמר, שתי עריכות באותו דף, מקור לא משתנה ושגיאות מזהים', () => {
 		const xml =
 			'<Grid>\r\n <Cells><Cell Y="4"><Content><CaptionAndImage><Caption>old</Caption><Image>keep</Image></CaptionAndImage><Style><BasedOnStyle>Default</BasedOnStyle></Style></Content></Cell></Cells>\r\n <Unknown a="1" />\r\n</Grid>';

@@ -425,6 +425,11 @@ readonly autoContentItem?: WordListItem;   // נקבע ב-withAutoContentItem ל
 ו-`/Grid/PredictionSource` (958) הוא מאפיין-דף עם הערכים
 `None | WordList | WordListAndPredictor | LastSuggestedAndWordList`.
 מנוע ה-WordList אינו גלובלי — **הוא נגזר מהדף הפעיל**.
+`Sorting` הוא ילד ישיר אופציונלי של `WordList` בדף. `Alphabetical` יוצר
+היטל תצוגה יציב לפני העימוד לפי `GridSet.language`; השדה אינו משנה את סדר
+`wordList` או שיוך המדיה לפי אינדקס XML. `Frequency`, ערך לא מוכר והיעדר
+השדה שומרים את סדר המקור עד שתימצא הגדרת דירוג מבוססת. שפה חסרה, לא תקינה
+או לא נתמכת נופלת ל־`en` קבוע.
 
 **‏(ב) ‏`AutoContentCommands` הן טבלת-פקודות ברמת הדף.** ‏3,194 מופעים של
 `AutoContentCommandCollection[AutoContentType]` (`Chat.History`,
@@ -441,6 +446,7 @@ interface Page {
 	rows: number;
 	cells: Cell[];
 	wordList: WordListItem[]; // (א)
+	wordListSorting?: string; // /Grid/WordList/Sorting, raw page value
 	predictionSource: PredictionSource; // (א)
 	autoContentCommands: Record<string, CommandInvocation[]>; // (ב)
 	commands?: CommandInvocation[]; // /Grid/Commands — פקודות דף (419)
