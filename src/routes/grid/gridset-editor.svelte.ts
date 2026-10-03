@@ -2,7 +2,8 @@ import {
 	openGridSet,
 	writeGridSet,
 	type CellEdit,
-	type GridSetSource
+	type GridSetSource,
+	type WordListEdit
 } from '$lib/gridset/gridSetSource';
 import type { Cell, GridSet, Page } from '$lib/gridset/types';
 import type { GridRuntime } from '$lib/gridset/runtime.svelte';
@@ -62,6 +63,7 @@ export function createGridSetEditor() {
 	let draftError = $state('');
 	let downloaded = $state('');
 	let appliedEdits = $state.raw<CellEdit[]>([]);
+	let wordListEdits = $state.raw<WordListEdit[]>([]);
 	let draft = $state.raw<CellEdit | null>(null);
 	let selection = $state.raw<CellAddress | null>(null);
 	let baseline: CellForm | null = null;
@@ -76,7 +78,7 @@ export function createGridSetEditor() {
 	let lastDownloadRevision = $state(0);
 	const busy = $derived(loading || saving);
 	const hasDraft = $derived(Boolean((draft && hasCellPatch(draft)) || draftError));
-	const dirty = $derived(appliedEdits.length > 0 || hasDraft);
+	const dirty = $derived(appliedEdits.length > 0 || wordListEdits.length > 0 || hasDraft);
 	const unsaved = $derived(hasDraft || revision !== lastDownloadRevision);
 
 	function resetSelection() {
@@ -201,6 +203,10 @@ export function createGridSetEditor() {
 			pending = { kind: 'load', run: () => {}, settle };
 		});
 	}
+	function recordWordListEdit(edit: WordListEdit) {
+		wordListEdits = [...wordListEdits, edit];
+		revision++;
+	}
 	function discardChanges(): boolean {
 		try {
 			const pages = appliedEdits
@@ -210,6 +216,8 @@ export function createGridSetEditor() {
 			const replacements = pages.map((name) => [name, session!.preview(name, [])] as const);
 			for (const [name, page] of replacements) gridSet.pages[name] = page;
 			appliedEdits = [];
+			wordListEdits = [];
+			runtime?.clearWordListDrafts();
 			revision = 0;
 			lastDownloadRevision = 0;
 			resetSelection();
@@ -238,13 +246,14 @@ export function createGridSetEditor() {
 		session = opened.editSession;
 		sourceName = name;
 		appliedEdits = [];
+		wordListEdits = [];
 		revision = 0;
 		lastDownloadRevision = 0;
 		editing = false;
 		downloaded = '';
 		resetSelection();
 		gridSet = opened.gridSet;
-		runtime = createRuntime(gridSet);
+		runtime = createRuntime(gridSet, { onWordListEdit: recordWordListEdit });
 	}
 	function mode(value: boolean) {
 		if (value && !source) return;
@@ -317,7 +326,7 @@ export function createGridSetEditor() {
 						)!
 					)
 				: null;
-			const bytes = writeGridSet(source, effective);
+			const bytes = writeGridSet(source, effective, wordListEdits);
 			url = URL.createObjectURL(new Blob([new Uint8Array(bytes)], { type: 'application/zip' }));
 			if (!valid()) return false;
 			const anchor = document.createElement('a');
@@ -431,6 +440,9 @@ export function createGridSetEditor() {
 		},
 		get appliedEdits() {
 			return appliedEdits;
+		},
+		get wordListEdits() {
+			return wordListEdits;
 		},
 		get selectedCell() {
 			return selection

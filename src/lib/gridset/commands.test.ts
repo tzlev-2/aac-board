@@ -717,8 +717,7 @@ describe('executeCommands', () => {
 		expect(ctx.log).toEqual([]);
 	});
 
-	it('הרג׳יסטרי מחזיק בדיוק את עשרים ושתיים הפקודות', () => {
-		// ‏22 = ‏21 אחרי סלייס 13 + `Prediction.PredictThis`.
+	it('הרג׳יסטרי מחזיק בדיוק את עשרים וארבע הפקודות', () => {
 		expect(Object.keys(commandRegistry).sort()).toEqual([
 			'Action.Clear',
 			'Action.DeleteLetter',
@@ -735,6 +734,8 @@ describe('executeCommands', () => {
 			'Jump.Back',
 			'Jump.Home',
 			'Jump.To',
+			'Prediction.AddToWordList',
+			'Prediction.DeleteWord',
 			'Prediction.PredictThis',
 			'Settings.RequiredFeature',
 			'Settings.RestAll',
@@ -948,6 +949,32 @@ describe('Prediction.PredictThis', () => {
 		};
 		executeCommands(cell(cmd('Prediction.PredictConjugations')), ctx);
 		expect(ctx.unimplemented['Prediction.PredictConjugations']).toBe(1);
+		expect(ctx.buffer).toEqual([]);
+	});
+});
+
+describe('Prediction.AddToWordList / DeleteWord', () => {
+	it('arms without mutating the page list or inventing an output item', () => {
+		const ctx = fakeContext();
+		const kept = wordItem('keep-page');
+		ctx.page.wordList = [kept];
+		const armed: string[] = [];
+		ctx.toggleWordListArm = (mode) => {
+			armed.push(mode);
+		};
+		executeCommands(cell(cmd('Prediction.AddToWordList', { indicatorenabled: '1' })), ctx);
+		executeCommands(cell(cmd('Prediction.DeleteWord', { indicatorenabled: '1' })), ctx);
+		expect(armed).toEqual(['add', 'delete']);
+		expect(ctx.page.wordList).toEqual([kept]);
+		expect(ctx.buffer).toEqual([]);
+		expect(ctx.unimplemented).toEqual({});
+	});
+
+	it('is implemented even when the context has no arm hook', () => {
+		const ctx = fakeContext();
+		executeCommands(cell(cmd('Prediction.AddToWordList')), ctx);
+		executeCommands(cell(cmd('Prediction.DeleteWord')), ctx);
+		expect(ctx.unimplemented).toEqual({});
 		expect(ctx.buffer).toEqual([]);
 	});
 });

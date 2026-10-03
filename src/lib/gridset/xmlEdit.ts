@@ -1,3 +1,5 @@
+import type { ImageRef, RichText, Sentence, WordListItem } from './types';
+
 /** עריכה בטווחי מחרוזת בלבד. אין serialization או נרמול XML. */
 interface ElementRange {
 	name: string;
@@ -200,4 +202,71 @@ export function applyCellEditXml(
 		if (colour !== undefined) xml = setCellStyleColour(xml, x, y, field as CellColourField, colour);
 	}
 	return xml;
+}
+
+export type WordListArm = 'add' | 'delete';
+
+export type WordListEdit =
+	| { page: string; index: number; op: 'replace'; item: WordListItem }
+	| { page: string; index: number; op: 'remove' };
+
+function formatImageRef(image: ImageRef): string {
+	return image.library ? `[${image.library}]${image.path}` : image.path;
+}
+
+function escapeXmlAttr(text: string): string {
+	return escapeXmlText(text).replaceAll('"', '&quot;');
+}
+
+function serializeSentence(sentence: Sentence): string {
+	const image = sentence.image ? ` Image="${escapeXmlAttr(formatImageRef(sentence.image))}"` : '';
+	const runs = sentence.runs.map((run) => `<r>${escapeXmlText(run)}</r>`).join('');
+	return `<s${image}>${runs}</s>`;
+}
+
+function serializeRichText(text: RichText): string {
+	return text.paragraphs
+		.map((paragraph) => `<p>${paragraph.sentences.map(serializeSentence).join('')}</p>`)
+		.join('');
+}
+
+/** Compact node for the touched item only. Neighbours keep their original bytes. */
+export function serializeWordListItem(item: WordListItem): string {
+	let xml = `<WordListItem><Text>${serializeRichText(item.text)}</Text>`;
+	if (item.image) xml += `<Image>${escapeXmlText(formatImageRef(item.image))}</Image>`;
+	if (item.partOfSpeech) xml += `<PartOfSpeech>${escapeXmlText(item.partOfSpeech)}</PartOfSpeech>`;
+	if (item.grammar?.number) xml += `<Number>${escapeXmlText(item.grammar.number)}</Number>`;
+	if (item.grammar?.person) xml += `<Person>${escapeXmlText(item.grammar.person)}</Person>`;
+	return `${xml}</WordListItem>`;
+}
+
+function pageWordListItems(xml: string): ElementRange[] {
+	const grid = elements(xml).find((el) => el.name.split(':').at(-1) === 'Grid');
+	const wordList = grid && child(grid, 'WordList');
+	const items = wordList && child(wordList, 'Items');
+	return items?.children.filter((el) => el.name.split(':').at(-1) === 'WordListItem') ?? [];
+}
+
+export function findWordListItemRange(
+	xml: string,
+	index: number
+): { start: number; end: number } | undefined {
+	const node = pageWordListItems(xml)[index];
+	return node && { start: node.start, end: node.end };
+}
+
+export function applyWordListEditXml(
+	xml: string,
+	edit: { index: number; op: 'replace'; item: WordListItem } | { index: number; op: 'remove' }
+): string {
+	const nodes = pageWordListItems(xml);
+	const node = nodes[edit.index];
+	if (!node) throw new Error(`missing WordList item ${edit.index}`);
+	if (edit.op === 'replace')
+		return splice(xml, node.start, node.end, serializeWordListItem(edit.item));
+	const next = nodes[edit.index + 1];
+	if (next) return splice(xml, node.start, next.start, '');
+	const previous = nodes[edit.index - 1];
+	if (previous) return splice(xml, previous.end, node.end, '');
+	return splice(xml, node.start, node.end, '');
 }

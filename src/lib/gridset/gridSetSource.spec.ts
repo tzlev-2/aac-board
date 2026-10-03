@@ -82,6 +82,39 @@ describe('כתיבת מקור סינתטי', () => {
 			source.index.entries.map((entry) => entry.name)
 		);
 	});
+	it('splices one WordList item and leaves neighbour XML and media bytes', () => {
+		const first =
+			'<WordListItem><Text><s><r>old</r></s></Text><Image>-0.png</Image></WordListItem>';
+		const second = '<WordListItem><Text><s><r>keep</r></s></Text></WordListItem>';
+		const other = '<Grid><WordList><Sorting>Frequency</Sorting><Items /></WordList></Grid>';
+		const page = `<Grid><Cells><Cell X="0" Y="0"><Content><CaptionAndImage><Caption>old</Caption></CaptionAndImage></Content></Cell></Cells><WordList><Items>${first}${second}</Items></WordList></Grid>`;
+		const bytes = zipSync({
+			'Grids/page/grid.xml': strToU8(page),
+			'Grids/other/grid.xml': strToU8(other),
+			'Grids/page/wordlist-0.png': new Uint8Array([1, 2, 3])
+		});
+		const source = sourceOf(bytes);
+		const output = writeGridSet(
+			source,
+			[],
+			[
+				{
+					page: 'page',
+					index: 0,
+					op: 'replace',
+					item: { text: { paragraphs: [{ sentences: [{ runs: ['saved'] }] }] } }
+				}
+			]
+		);
+		const files = unzipSync(output);
+		const xml = strFromU8(files['Grids/page/grid.xml']);
+		expect(xml).toContain(second);
+		expect(xml).toContain('<r>saved</r>');
+		expect(xml).not.toContain('<r>old</r>');
+		expect(strFromU8(files['Grids/other/grid.xml'])).toBe(other);
+		expect(files['Grids/page/wordlist-0.png']).toEqual(new Uint8Array([1, 2, 3]));
+		expect(source.bytes).toEqual(bytes);
+	});
 	it('BOM בייטי נשמר, שתי עריכות באותו דף, מקור לא משתנה ושגיאות מזהים', () => {
 		const xml =
 			'<Grid>\r\n <Cells><Cell Y="4"><Content><CaptionAndImage><Caption>old</Caption><Image>keep</Image></CaptionAndImage><Style><BasedOnStyle>Default</BasedOnStyle></Style></Content></Cell></Cells>\r\n <Unknown a="1" />\r\n</Grid>';

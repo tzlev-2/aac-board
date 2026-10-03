@@ -47,28 +47,24 @@ describe('טבלת השימוש — שלוש רמות', () => {
 });
 
 describe('computeCoverage', () => {
-	it('שמונה-עשרה פקודות מתוך 66', () => {
+	it('עשרים פקודות מתוך 66', () => {
 		const report = computeCoverage();
-		// ‏🛑 ‏18 ולא 22. ברג׳יסטרי יש 22 handlers, אבל ארבעה מהם
-		// (`Settings.RestEyeGaze` · `RestPointer` · `RestSwitch` ·
-		// `Prediction.PredictThis`) **אינם מופיעים כלל** בארבעת לוחות-הדגימה,
-		// ולכן אינם נספרים כאן. הם יושבים ב-`report.extra`.
-		expect(report.implementedCount).toBe(18);
+		// ‏20 בלוחות-הדגימה. ארבעה handlers (`Settings.RestEyeGaze` ·
+		// `RestPointer` · `RestSwitch` · `Prediction.PredictThis`) נשארים extra.
+		expect(report.implementedCount).toBe(20);
 		expect(report.usedCount).toBe(66);
 	});
 
-	it('שמונה-עשרה הפקודות מכסות 97.4% מההפעלות', () => {
+	it('עשרים הפקודות מכסות 97.5% מההפעלות', () => {
 		const report = computeCoverage();
-		// ‏4,025 אחרי סלייס 11 · ‏+88 משלוש פקודות סלייס 13 בלוחות-הדגימה
-		// (`Settings.RestAll` 32 · `Action.InsertCellText` 51 · `SpeechPlaySound` 5).
-		expect(report.coveredActivations).toBe(4113);
-		expect(report.activationPct).toBe(97.4);
+		expect(report.coveredActivations).toBe(4115);
+		expect(report.activationPct).toBe(97.5);
 	});
 
 	it('🔑 הפילוח לפי רמה — autoContent מלא, page ריק', () => {
 		const { byLevel } = computeCoverage();
-		expect(byLevel.cell.coveredActivations).toBe(3947);
-		expect(byLevel.cell.activationPct).toBe(97.4);
+		expect(byLevel.cell.coveredActivations).toBe(3949);
+		expect(byLevel.cell.activationPct).toBe(97.5);
 		expect(byLevel.autoContent).toMatchObject({
 			coveredActivations: 166,
 			totalActivations: 166,
@@ -108,7 +104,7 @@ describe('computeCoverage', () => {
 	it('החסרות ממוינות מהנפוצה לנדירה', () => {
 		const report = computeCoverage();
 		expect(report.missing[0].id).toBe('Settings.SetScreenBrightness');
-		expect(report.missing).toHaveLength(48);
+		expect(report.missing).toHaveLength(46);
 	});
 
 	it('🔑 חמש הפקודות של סלייס 11 יצאו מרשימת החסרות', () => {
@@ -137,13 +133,13 @@ describe('computeCoverage', () => {
 describe('formatCoverageReport', () => {
 	it('מדפיס 15/66 ואת אחוז ההפעלות', () => {
 		const text = coverageSummary();
-		expect(text).toContain('18/66');
-		expect(text).toContain('97.4%');
+		expect(text).toContain('20/66');
+		expect(text).toContain('97.5%');
 	});
 
 	it('מדפיס שורת-רמות שבה רואים את ה-0/4 של רמת-הדף', () => {
 		const text = coverageSummary();
-		expect(text).toContain('תא 3947/4052');
+		expect(text).toContain('תא 3949/4052');
 		expect(text).toContain('AutoContent 166/166');
 		expect(text).toContain('דף 0/4');
 	});

@@ -361,6 +361,16 @@ export interface RuntimeContext {
 	readonly predictionPage?: number;
 	navigatePrediction?(action: 'next' | 'first'): void;
 
+	/**
+	 * Runtime-only WordList arming. `null`/`undefined` = not armed.
+	 * Never writes CellEdit colours. Optional on legacy test contexts.
+	 */
+	readonly wordListArmed?: 'add' | 'delete' | null;
+	toggleWordListArm?(mode: 'add' | 'delete'): void;
+	visibleWordList?(page?: Page): readonly WordListItem[];
+	applyWordListTarget?(index: number): boolean;
+	clearWordListDrafts?(): void;
+
 	output: {
 		insert(item: OutputItem): void;
 		insertLetter(letter: string): void;

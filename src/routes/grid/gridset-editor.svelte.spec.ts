@@ -187,3 +187,45 @@ it('Back guards a retained runtime, preserves draft decisions and applied edits,
 	expect(editor.selection).not.toBeNull();
 	expect(editor.canGoBack).toBe(false);
 });
+
+it('keeps a WordList draft off the opened pages and asks before replacing the board', async () => {
+	const editor = createGridSetEditor();
+	const fileBytes = buildGridset({
+		startGrid: 'News',
+		language: 'he',
+		pages: [
+			{
+				name: 'News',
+				columns: 2,
+				rows: 1,
+				wordList: [{ text: 'one' }, { text: 'two' }],
+				cells: [
+					{ x: 0, y: 0, contentType: 'AutoContent', contentSubType: 'WordList' },
+					{ x: 1, y: 0, caption: 'save', commands: [{ id: 'Prediction.AddToWordList' }] }
+				]
+			},
+			{ name: 'Other', columns: 1, rows: 1, cells: [{ x: 0, y: 0, caption: 'other' }] }
+		]
+	});
+	await editor.loadFile(new File([new Uint8Array(fileBytes)], 'news.gridset'));
+	const runtime = editor.runtime!;
+	const original = runtime.page.wordList;
+	runtime.output.insert({ text: 'saved' });
+	runtime.toggleWordListArm('add');
+	expect(runtime.applyWordListTarget(0)).toBe(true);
+	expect(runtime.page.wordList).toBe(original);
+	expect(runtime.visibleWordList()[0].text.paragraphs[0].sentences[0].runs[0]).toBe('saved');
+	expect(editor.dirty).toBe(true);
+	expect(editor.unsaved).toBe(true);
+	expect(editor.source!.bytes).toEqual(fileBytes);
+	const stay = editor.loadFile(new File([new Uint8Array(bytes('new'))], 'other.gridset'));
+	await expect.poll(() => editor.pending).toBe('load');
+	await editor.resolvePending('stay');
+	expect(await stay).toBe(false);
+	expect(runtime.visibleWordList()[0].text.paragraphs[0].sentences[0].runs[0]).toBe('saved');
+	expect(editor.discardChanges()).toBe(true);
+	expect(runtime.visibleWordList()).toEqual(original);
+	expect(editor.dirty).toBe(false);
+	expect(editor.unsaved).toBe(false);
+	expect(editor.wordListEdits).toEqual([]);
+});

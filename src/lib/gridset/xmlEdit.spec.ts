@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
+	applyWordListEditXml,
 	escapeXmlText,
 	findCellRange,
+	findWordListItemRange,
+	serializeWordListItem,
 	setCellCaption,
 	setCellStyleColour,
 	type CellColourField
@@ -98,6 +101,66 @@ describe('עריכת XML כירורגית', () => {
 		);
 		expect(setCellCaption(xml, 0, 4, '')).toBe(
 			xml.replace('<Caption>real</Caption>', '<Caption></Caption>')
+		);
+	});
+});
+
+describe('surgical WordList XML', () => {
+	const item = (text: string, extra = '') =>
+		`<WordListItem><Text><s><r>${text}</r></s></Text>${extra}</WordListItem>`;
+	const page = (items: string) =>
+		`<Grid><Cells><Cell><Content><Style><BasedOnStyle>Default</BasedOnStyle></Style></Content></Cell></Cells><WordList><Items>${items}</Items></WordList></Grid>`;
+	const word = (text: string) => ({
+		text: { paragraphs: [{ sentences: [{ runs: [text] }] }] }
+	});
+
+	it('replaces one item and leaves neighbour bytes identical', () => {
+		const neighbour = item('keep', '<Image>wordlist-1.png</Image>');
+		const xml = page(`${item('old')}${neighbour}`);
+		const range = findWordListItemRange(xml, 1)!;
+		expect(xml.slice(range.start, range.end)).toBe(neighbour);
+		const after = applyWordListEditXml(xml, { index: 0, op: 'replace', item: word('new &<>') });
+		expect(after).toContain(neighbour);
+		expect(after).toContain('<r>new &amp;&lt;&gt;</r>');
+		expect(after).not.toContain('<r>old</r>');
+		expect(findWordListItemRange(after, 1)).toEqual(
+			expect.objectContaining({
+				start: after.indexOf(neighbour),
+				end: after.indexOf(neighbour) + neighbour.length
+			})
+		);
+	});
+
+	it('removes one item without rewriting the rest', () => {
+		const kept = item('keep');
+		const xml = page(`${item('gone')}${kept}${item('tail')}`);
+		const after = applyWordListEditXml(xml, { index: 0, op: 'remove' });
+		expect(after).toBe(page(`${kept}${item('tail')}`));
+		expect(applyWordListEditXml(xml, { index: 1, op: 'remove' })).toBe(
+			page(`${item('gone')}${item('tail')}`)
+		);
+	});
+
+	it('serializes symbol and grammar only on the touched node', () => {
+		const xml = serializeWordListItem({
+			text: {
+				paragraphs: [
+					{
+						sentences: [
+							{
+								runs: ['ok'],
+								image: { library: 'widgit', path: 'hand.emf' }
+							}
+						]
+					}
+				]
+			},
+			image: { library: 'widgit', path: 'hand.emf' },
+			partOfSpeech: 'Verb',
+			grammar: { number: 'singular', person: 'third' }
+		});
+		expect(xml).toBe(
+			'<WordListItem><Text><p><s Image="[widgit]hand.emf"><r>ok</r></s></p></Text><Image>[widgit]hand.emf</Image><PartOfSpeech>Verb</PartOfSpeech><Number>singular</Number><Person>third</Person></WordListItem>'
 		);
 	});
 });

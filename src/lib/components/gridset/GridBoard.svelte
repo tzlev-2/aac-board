@@ -100,7 +100,11 @@
 	});
 
 	const displayedWordList = $derived(
-		displayWordList(page.wordList, page.wordListSorting, ctx.gridSet.language)
+		displayWordList(
+			ctx.visibleWordList?.(page) ?? page.wordList,
+			page.wordListSorting,
+			ctx.gridSet.language
+		)
 	);
 	const paged = $derived(
 		pageWordList(page.cells, displayedWordList, pager?.wordListPage ?? wordListPage)
@@ -189,6 +193,7 @@
 	<div
 		class="grid"
 		data-testid="grid-board"
+		data-wordlist-arm={ctx.wordListArmed ?? undefined}
 		style="
 			grid-template-columns: {columnTemplate};
 			grid-template-rows: {rowTemplate};

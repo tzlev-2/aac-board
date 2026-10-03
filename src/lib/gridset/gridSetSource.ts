@@ -2,7 +2,13 @@ import { inflateSync, strFromU8, strToU8 } from 'fflate';
 import { parseGridSet, type ParseGridSetOptions } from './parse';
 import type { GridSet } from './types';
 import { readZipIndex, rebuildZip, type ZipIndex } from './zipArchive';
-import { applyCellEditXml, type CellColourField } from './xmlEdit';
+import {
+	applyCellEditXml,
+	applyWordListEditXml,
+	type CellColourField,
+	type WordListEdit
+} from './xmlEdit';
+export type { WordListEdit };
 
 export interface GridSetSource {
 	readonly bytes: Uint8Array;
@@ -61,20 +67,37 @@ export function readPageXml(source: GridSetSource, page: string): PageXmlSource 
 }
 
 /** פורש רק דפים שנערכו, פעם אחת לדף, ומשאיר את המקור ללא שינוי. */
-export function writeGridSet(source: GridSetSource, edits: readonly CellEdit[]): Uint8Array {
-	const grouped = new Map<string, CellEdit[]>();
+export function writeGridSet(
+	source: GridSetSource,
+	edits: readonly CellEdit[],
+	wordListEdits: readonly WordListEdit[] = []
+): Uint8Array {
+	const cellByEntry = new Map<string, CellEdit[]>();
+	const wordByEntry = new Map<string, WordListEdit[]>();
+	const pageByEntry = new Map<string, string>();
 	for (const edit of edits) {
 		const name = source.pageEntry.get(edit.page);
 		if (!name) throw new Error(`הדף אינו קיים: ${edit.page}`);
-		const group = grouped.get(name) ?? [];
+		const group = cellByEntry.get(name) ?? [];
 		group.push(edit);
-		grouped.set(name, group);
+		cellByEntry.set(name, group);
+		pageByEntry.set(name, edit.page);
+	}
+	for (const edit of wordListEdits) {
+		const name = source.pageEntry.get(edit.page);
+		if (!name) throw new Error(`הדף אינו קיים: ${edit.page}`);
+		const group = wordByEntry.get(name) ?? [];
+		group.push(edit);
+		wordByEntry.set(name, group);
+		pageByEntry.set(name, edit.page);
 	}
 	const replacements = new Map<string, Uint8Array>();
-	for (const [name, group] of grouped) {
-		const { xml: originalXml, hasBom: bom } = readPageXml(source, group[0].page);
+	for (const [name, page] of pageByEntry) {
+		const { xml: originalXml, hasBom: bom } = readPageXml(source, page);
 		let xml = originalXml;
-		for (const edit of group) xml = applyCellEditXml(xml, edit.x, edit.y, edit);
+		for (const edit of cellByEntry.get(name) ?? [])
+			xml = applyCellEditXml(xml, edit.x, edit.y, edit);
+		for (const edit of wordByEntry.get(name) ?? []) xml = applyWordListEditXml(xml, edit);
 		const encoded = strToU8(xml);
 		const replacement = new Uint8Array(encoded.length + (bom ? 3 : 0));
 		if (bom) replacement.set([0xef, 0xbb, 0xbf]);

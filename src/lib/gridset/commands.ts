@@ -330,6 +330,17 @@ export function withCellContext(
 		navigatePrediction: ctx.navigatePrediction
 			? (action) => ctx.navigatePrediction?.(action)
 			: undefined,
+		get wordListArmed() {
+			return ctx.wordListArmed;
+		},
+		toggleWordListArm: ctx.toggleWordListArm ? (mode) => ctx.toggleWordListArm?.(mode) : undefined,
+		visibleWordList: ctx.visibleWordList
+			? (page) => ctx.visibleWordList?.(page) ?? page?.wordList ?? ctx.page.wordList
+			: undefined,
+		applyWordListTarget: ctx.applyWordListTarget
+			? (index) => ctx.applyWordListTarget?.(index) ?? false
+			: undefined,
+		clearWordListDrafts: ctx.clearWordListDrafts ? () => ctx.clearWordListDrafts?.() : undefined,
 		speak: (text, opts) => ctx.speak(text, opts),
 		stopSpeaking: () => ctx.stopSpeaking(),
 		playSound: (path) => ctx.playSound(path),
@@ -349,7 +360,7 @@ export function withAutoContentItem(
 }
 
 // ── רג'יסטרי הפקודות ─────────────────────────────────────────────────────
-// 22 פקודות אחרי חתך PredictThis.
+// 24 פקודות אחרי חתך WordList arming.
 //
 // 🛑 **הכיסוי נמדד לכל לוח בנפרד, ולא על לוח אחד.** זה עיקר סלייס 13: השער
 // ("≥96%") נמדד עד כה על `org-1` בלבד, ובמדידה לכל לוחות-הארגון התגלה
@@ -642,6 +653,23 @@ export const commandRegistry: Partial<Record<CommandId, CommandHandler>> = {
 			return;
 		}
 		ctx.setPredictionList?.(params.wordlist);
+	},
+
+	/**
+	 * `Prediction.AddToWordList` — arm save. Does not change content.
+	 * A second click on the same command disarms. Target colours are
+	 * runtime-only; `indicatorenabled` is read and unused, like InsertText.
+	 */
+	'Prediction.AddToWordList': (_params, ctx) => {
+		ctx.toggleWordListArm?.('add');
+	},
+
+	/**
+	 * `Prediction.DeleteWord` — arm delete. Distinct from `Action.DeleteWord`,
+	 * which removes one output-bar item.
+	 */
+	'Prediction.DeleteWord': (_params, ctx) => {
+		ctx.toggleWordListArm?.('delete');
 	}
 };
 

@@ -425,6 +425,48 @@ describe('Prediction empty frames', () => {
 		expect(screen.getByTestId('prediction-empty').elements()).toHaveLength(1);
 		expect(runtime.page.wordList[0].text.paragraphs[0].sentences[0].runs[0]).toBe('keep-page');
 	});
+
+	it('arms WordList targets and replaces from output without Activate', async () => {
+		const p = makePage({
+			columns: 3,
+			rows: 1,
+			wordList: [
+				{ text: { paragraphs: [{ sentences: [{ runs: ['filler'] }] }] } },
+				{ text: { paragraphs: [{ sentences: [{ runs: ['keep'] }] }] } }
+			],
+			autoContentCommands: { WordList: [{ id: 'AutoContent.Activate', params: {} }] },
+			cells: [
+				makeCell({ x: 0, y: 0, contentType: 'AutoContent', contentSubType: 'WordList' }),
+				makeCell({ x: 1, y: 0, contentType: 'AutoContent', contentSubType: 'WordList' }),
+				makeCell({
+					x: 2,
+					y: 0,
+					caption: 'save-news',
+					commands: [{ id: 'Prediction.AddToWordList', params: {} }]
+				})
+			]
+		});
+		const runtime = createRuntime(makeCtx(p).gridSet);
+		runtime.output.insert({ text: 'saved' });
+		const screen = render(GridBoard, { page: runtime.page, ctx: runtime, pager: runtime });
+		await tick();
+		await userEvent.click(screen.getByText('save-news'));
+		await tick();
+		expect(runtime.wordListArmed).toBe('add');
+		expect(
+			screen
+				.getByTestId('grid-cell')
+				.elements()
+				.filter((el) => el.dataset.wordlistArm === 'add')
+		).toHaveLength(2);
+		await userEvent.click(screen.getByText('filler'));
+		await tick();
+		expect(runtime.wordListArmed).toBeNull();
+		expect(runtime.output.items.map((item) => item.text)).toEqual(['saved']);
+		expect(runtime.page.wordList[0].text.paragraphs[0].sentences[0].runs[0]).toBe('filler');
+		expect(runtime.visibleWordList()[0].text.paragraphs[0].sentences[0].runs[0]).toBe('saved');
+		await expect.element(screen.getByText('keep')).toBeVisible();
+	});
 });
 
 it('edit overlays include Hidden/Disabled and preserve the top-right span address', async () => {

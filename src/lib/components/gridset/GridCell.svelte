@@ -12,6 +12,7 @@
 	import { untrack } from 'svelte';
 	import type { Cell, RuntimeContext } from '$lib/gridset/types';
 	import { cellCommands, executeCommands } from '$lib/gridset/commands';
+	import { isWordListCell } from '$lib/gridset/wordListPager';
 	import type { SymbolResolver } from '$lib/gridset/symbols';
 	import { VISUAL_DEFAULTS, resolveFontFamily } from '$lib/gridset/visualDefaults';
 	import {
@@ -67,9 +68,20 @@
 	const commands = $derived(cellCommands(cell, ctx.page));
 	const interactive = $derived(!disabled && (isNav || commands.length > 0));
 
+	const wordListArm = $derived(
+		isWordListCell(cell) && slot?.kind === 'item' ? (ctx.wordListArmed ?? null) : null
+	);
+	const armedFill = $derived(
+		wordListArm === 'add' ? '#ebf5ec' : wordListArm === 'delete' ? '#f9e8e6' : null
+	);
+
 	function activate() {
 		if (editing || !interactive) return;
 		if (slot?.kind === 'nav') return onNavigate?.(slot.action);
+		if (isWordListCell(cell) && slot?.kind === 'item' && ctx.wordListArmed) {
+			ctx.applyWordListTarget?.(slot.index);
+			return;
+		}
 		// הפריט נמסר להקשר: `AutoContent.Activate` אינה נושאת פרמטרים, ומה
 		// שמבדיל בין משבצת למשבצת הוא הפריט שבה.
 		// ‏`void` — השרשרת עשויה להכיל `CommandExecution.Wait` ואז היא נמשכת
@@ -233,6 +245,8 @@
 	data-cell-x={cell.x}
 	data-cell-y={cell.y}
 	data-slot-kind={slot?.kind}
+	data-wordlist-arm={wordListArm || undefined}
+	data-slot-index={slot?.kind === 'item' ? slot.index : undefined}
 	tabindex={readable && !interactive ? 0 : undefined}
 	aria-describedby={readable ? inspectionHintId : undefined}
 	data-caption-unfit={readable || undefined}
@@ -240,7 +254,7 @@
 	onclick={interactive ? activate : undefined}
 	style="
 		--x: {cell.x}; --y: {cell.y}; --cspan: {cell.columnSpan}; --rspan: {cell.rowSpan};
-		background: {fillGradient};
+		background: {armedFill ?? fillGradient};
 		color: {cell.style.fontColour};
 		border-color: {cell.style.borderColour};
 		font-family: {resolveFontFamily(cell.style.fontName)};

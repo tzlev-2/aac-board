@@ -18,12 +18,15 @@ import type {
 	Cell,
 	CommandId,
 	FeatureId,
+	Grammar,
 	GridSet,
 	OutputItem,
 	Page,
 	RuntimeContext,
+	Sentence,
 	WordListItem
 } from './types';
+import type { WordListArm, WordListEdit } from './xmlEdit';
 
 /** מתאם-דיבור. מוזרק כדי שהמריץ ייבדק בלי דפדפן. */
 export interface SpeechAdapter {
@@ -125,6 +128,25 @@ export interface RuntimeOptions {
 	onMissingPage?(name: string): void;
 	/** נקרא בפעם הראשונה שכל מזהה-פקודה נתקל בלי handler. */
 	onUnimplemented?(id: CommandId): void;
+	/** WordList draft mutation. Does not write the opened archive. */
+	onWordListEdit?(edit: WordListEdit): void;
+}
+
+export function outputToWordListItem(item: OutputItem): WordListItem | null {
+	if (!item.text && !item.image) return null;
+	const sentence: Sentence = { runs: item.text ? [item.text] : [] };
+	if (item.image) sentence.image = item.image;
+	const word: WordListItem = {
+		text: { paragraphs: [{ sentences: [sentence] }] }
+	};
+	if (item.image) word.image = item.image;
+	if (item.pos) word.partOfSpeech = item.pos;
+	const grammar: Grammar = {};
+	if (item.gender) grammar.gender = item.gender;
+	if (item.number) grammar.number = item.number;
+	if (item.person) grammar.person = item.person;
+	if (Object.keys(grammar).length) word.grammar = grammar;
+	return word;
 }
 
 /**
@@ -240,11 +262,14 @@ export class GridRuntime implements RuntimeContext {
 	#audio: AudioAdapter;
 	#onMissingPage: (name: string) => void;
 	#onUnimplemented?: (id: CommandId) => void;
+	#onWordListEdit?: (edit: WordListEdit) => void;
 
 	#attachment: AbortController | null = null;
 	#wordListPage = $state(0);
 	#predictionList = $state<WordListItem[] | null>(null);
 	#predictionPage = $state(0);
+	#wordListArmed = $state<WordListArm | null>(null);
+	#wordListDrafts = $state<Record<string, WordListItem[]>>({});
 	get wordListPage() {
 		return this.#wordListPage;
 	}
@@ -263,6 +288,39 @@ export class GridRuntime implements RuntimeContext {
 	}
 	navigatePrediction(action: 'next' | 'first') {
 		this.#predictionPage = action === 'next' ? this.#predictionPage + 1 : 0;
+	}
+	get wordListArmed(): WordListArm | null {
+		return this.#wordListArmed;
+	}
+	toggleWordListArm(mode: WordListArm) {
+		this.#wordListArmed = this.#wordListArmed === mode ? null : mode;
+	}
+	visibleWordList(page: Page = this.page): readonly WordListItem[] {
+		return this.#wordListDrafts[page.name] ?? page.wordList;
+	}
+	clearWordListDrafts() {
+		this.#wordListDrafts = {};
+	}
+	applyWordListTarget(index: number): boolean {
+		const armed = this.#wordListArmed;
+		if (!armed) return false;
+		const current = this.visibleWordList();
+		if (index < 0 || index >= current.length) return false;
+		if (armed === 'add') {
+			const item = outputToWordListItem(this.output.items.at(-1) ?? { text: '' });
+			if (!item) return false;
+			const next = [...current];
+			next[index] = item;
+			this.#wordListDrafts = { ...this.#wordListDrafts, [this.page.name]: next };
+			this.#wordListArmed = null;
+			this.#onWordListEdit?.({ page: this.page.name, index, op: 'replace', item });
+			return true;
+		}
+		const next = current.filter((_, i) => i !== index);
+		this.#wordListDrafts = { ...this.#wordListDrafts, [this.page.name]: next };
+		this.#wordListArmed = null;
+		this.#onWordListEdit?.({ page: this.page.name, index, op: 'remove' });
+		return true;
 	}
 	attach() {
 		if (this.#attachment) {
@@ -293,6 +351,7 @@ export class GridRuntime implements RuntimeContext {
 		this.#speech = options.speech ?? ttsSpeechAdapter;
 		this.#audio = options.audio ?? createAudioAdapter();
 		this.#onUnimplemented = options.onUnimplemented;
+		this.#onWordListEdit = options.onWordListEdit;
 		this.#onMissingPage =
 			options.onMissingPage ??
 			((name) => console.warn(`[gridset] Jump.To ליעד שאינו קיים: "${name}"`));
@@ -345,6 +404,7 @@ export class GridRuntime implements RuntimeContext {
 		this.#wordListPage = 0;
 		this.#predictionPage = 0;
 		this.#predictionList = null;
+		this.#wordListArmed = null;
 		this.#pageName = pageName;
 	}
 
@@ -357,6 +417,7 @@ export class GridRuntime implements RuntimeContext {
 		this.#wordListPage = 0;
 		this.#predictionPage = 0;
 		this.#predictionList = null;
+		this.#wordListArmed = null;
 		this.#pageName = previous;
 	}
 
@@ -371,6 +432,7 @@ export class GridRuntime implements RuntimeContext {
 			return;
 		}
 		this.#history = [];
+		this.#wordListArmed = null;
 		if (this.#pageName !== home) {
 			this.#wordListPage = 0;
 			this.#predictionPage = 0;

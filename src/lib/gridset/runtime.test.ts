@@ -297,3 +297,86 @@ describe('Prediction.PredictThis runtime state', () => {
 		expect(rt.unimplemented['Prediction.PredictThis']).toBe(1);
 	});
 });
+
+describe('Prediction WordList arming overlay', () => {
+	function word(text: string) {
+		return { text: { paragraphs: [{ sentences: [{ runs: [text] }] }] } };
+	}
+
+	it('arms and disarms without touching page.wordList', () => {
+		const rt = runtime();
+		const original = [word('one'), word('two')];
+		rt.page.wordList.push(...original);
+		const snapshot = rt.page.wordList;
+		executeCommands(cell(cmd('Prediction.AddToWordList')), rt);
+		expect(rt.wordListArmed).toBe('add');
+		expect(rt.page.wordList).toBe(snapshot);
+		executeCommands(cell(cmd('Prediction.AddToWordList')), rt);
+		expect(rt.wordListArmed).toBeNull();
+		executeCommands(cell(cmd('Prediction.DeleteWord')), rt);
+		expect(rt.wordListArmed).toBe('delete');
+		executeCommands(cell(cmd('Prediction.AddToWordList')), rt);
+		expect(rt.wordListArmed).toBe('add');
+		expect(rt.unimplemented).toEqual({});
+	});
+
+	it('replaces from the last output item onto an isolated draft', () => {
+		const rt = runtime();
+		rt.page.wordList.push(word('old-a'), word('old-b'));
+		const original = rt.page.wordList;
+		rt.output.insert({ text: 'saved', image: { library: 'widgit', path: 'hand.emf' } });
+		executeCommands(cell(cmd('Prediction.AddToWordList')), rt);
+		expect(rt.applyWordListTarget(0)).toBe(true);
+		expect(rt.wordListArmed).toBeNull();
+		expect(rt.page.wordList).toBe(original);
+		expect(rt.page.wordList.map((item) => item.text.paragraphs[0].sentences[0].runs[0])).toEqual([
+			'old-a',
+			'old-b'
+		]);
+		expect(rt.visibleWordList()[0].text.paragraphs[0].sentences[0].runs[0]).toBe('saved');
+		expect(rt.visibleWordList()[1].text.paragraphs[0].sentences[0].runs[0]).toBe('old-b');
+		expect(rt.output.items).toHaveLength(1);
+	});
+
+	it('keeps arming when the output cannot be saved', () => {
+		const rt = runtime();
+		rt.page.wordList.push(word('keep'));
+		executeCommands(cell(cmd('Prediction.AddToWordList')), rt);
+		expect(rt.applyWordListTarget(0)).toBe(false);
+		expect(rt.wordListArmed).toBe('add');
+		expect(rt.visibleWordList()).toEqual(rt.page.wordList);
+	});
+
+	it('deletes onto a draft and hides the item from the visible list', () => {
+		const rt = runtime();
+		rt.page.wordList.push(word('a'), word('b'), word('c'));
+		const original = [...rt.page.wordList];
+		executeCommands(cell(cmd('Prediction.DeleteWord')), rt);
+		expect(rt.applyWordListTarget(1)).toBe(true);
+		expect(
+			rt.visibleWordList().map((item) => item.text.paragraphs[0].sentences[0].runs[0])
+		).toEqual(['a', 'c']);
+		expect(rt.page.wordList).toEqual(original);
+	});
+
+	it('clears arming on navigate/back/home and keeps the draft', () => {
+		const rt = runtime();
+		rt.page.wordList.push(word('keep'));
+		rt.output.insert({ text: 'saved' });
+		executeCommands(cell(cmd('Prediction.AddToWordList')), rt);
+		rt.applyWordListTarget(0);
+		executeCommands(cell(cmd('Prediction.DeleteWord')), rt);
+		executeCommands(cell(cmd('Jump.To', { grid: 'אוכל' })), rt);
+		expect(rt.wordListArmed).toBeNull();
+		expect(
+			rt.visibleWordList(rt.gridSet.pages['בית'])[0].text.paragraphs[0].sentences[0].runs[0]
+		).toBe('saved');
+		rt.back();
+		executeCommands(cell(cmd('Prediction.AddToWordList')), rt);
+		rt.home();
+		expect(rt.wordListArmed).toBeNull();
+		expect(rt.gridSet.pages['בית'].wordList[0].text.paragraphs[0].sentences[0].runs[0]).toBe(
+			'keep'
+		);
+	});
+});

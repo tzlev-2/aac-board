@@ -1,5 +1,15 @@
 # Grid AAC Clone — יומן פיתוח (Walkthrough)
 
+## 2026-10-03 17:33
+
+### B2.3 · דריכת AddToWordList/DeleteWord ושמירת WordList כירורגית
+
+- בדף `org-2/החדשות שלי` בלבד: `Prediction.AddToWordList` / `Prediction.DeleteWord` דורכים מצב ריצה `add`/`delete`. צבעי היעד (`#ebf5ec` / `#f9e8e6`) הם overlay בזמן ריצה על משבצות `item`, לא `CellEdit` ולא `TileColour`. לחיצה שנייה על אותה פקודה מכבה; הפקודה הנגדית מחליפה צבע. לחיצת יעד לפי `slot.index` מחליפה מפריט הפלט האחרון או מוחקת, מכבה דריכה, ואינה מריצה `AutoContent.Activate`. פלט ריק אינו ממציא פריט.
+- הטיוטה חיה ב־`GridRuntime.#wordListDrafts` לפי שם דף. `page.wordList` ו־`GridSet.pages` המקוריים אינם נערכים במקום. `visibleWordList` מציג את ה־overlay. ניווט / Back / Home מאפסים דריכה ושומרים טיוטה. `dirty` / `unsaved` / דיאלוג H1 כוללים `WordListEdit`. אין כתיבה או הורדה בלחיצת יעד.
+- `writeGridSet(source, cellEdits, wordListEdits)` עושה splice XML לפריט שנגע בלבד. בדיקת מקור פרטית על `org-2` ושער Save Copy פיזי הראו שרק `Grids/החדשות שלי/grid.xml` שינה CRC; 136 הרשומות האחרות, תאי הדף ומדיה נשמרו. פתיחת העותק הציגה `בסדר` במשבצת הראשונה; טעינת קובץ הפתיחה החזירה שמונה ממלאים.
+- `bun run check` 0/0. 141 בדיקות Node ממוקדות עברו (3 דולגו). CDP במחשב/360/390 במגע ו־RTL: דריכה, החלפה, מחיקה ל־7, Home, H1 «הישאר». Save Copy: `Browser.downloadProgress=completed` 260021/260021, `DOM.setFileInputFiles` על אותו `filePath` של Chrome, בייטים מ־input נסתר. `unzip -t` מזהיר גם על המקור בגלל שם UTF-8 מקומי מול מרכזי; כל הרשומות OK.
+- מועמד executor בלבד לאימות עצמאי. אין merge, push, deploy או סגירת B2.3. אין GO עצמאי.
+
 ## 2026-10-03 16:35
 
 ### B2.2 · חתך `Prediction.PredictThis` מרשימה מוטמעת
