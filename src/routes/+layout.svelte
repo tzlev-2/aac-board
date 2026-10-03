@@ -86,8 +86,13 @@
 	.application-shell::-webkit-scrollbar {
 		display: none;
 	}
+	.application-shell:has(> :global(.grid-page)) {
+		display: flex;
+		flex-direction: column;
+	}
 	.session-status {
 		padding-inline: 12px;
+		flex: none;
 	}
 	p {
 		margin-block: 4px;

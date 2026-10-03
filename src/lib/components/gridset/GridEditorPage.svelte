@@ -10,7 +10,7 @@
 
 <svelte:head><title>{session.active?.label} — Grid AAC Clone</title></svelte:head>
 
-<div class="grid-page" dir="rtl">
+<div class={['grid-page', editor.editing && 'editing']} dir="rtl">
 	<header>
 		<h1 data-testid="grid-source" tabindex="-1">{session.active?.label}</h1>
 		<a href="/">{messages.selector}</a>
@@ -91,14 +91,17 @@
 		gap: 8px;
 		padding: 12px;
 		box-sizing: border-box;
-		block-size: 100dvh;
-		min-block-size: 500px;
+		/* The shell allocates the space left by its visible session status. */
+		flex: 1;
+		min-block-size: 0;
+		min-inline-size: 0;
 	}
 	header {
 		display: flex;
 		align-items: center;
 		gap: 12px;
 		flex-wrap: wrap;
+		flex: none;
 	}
 	h1 {
 		font-size: 1rem;
@@ -116,16 +119,23 @@
 		gap: 8px;
 		align-items: center;
 		flex-wrap: wrap;
+		flex: none;
 	}
 	.toolbar label {
 		display: flex;
 		align-items: center;
 		gap: 6px;
+		min-inline-size: 0;
+		max-inline-size: 100%;
 	}
 	.toolbar select {
 		max-inline-size: 280px;
+		min-inline-size: 0;
 		min-block-size: 44px;
 		font: inherit;
+	}
+	.toolbar label select {
+		flex: 1;
 	}
 	.settings-link {
 		display: inline-flex;
@@ -174,14 +184,15 @@
 		outline-offset: 2px;
 	}
 	@media (max-width: 720px) {
-		.grid-page {
+		.grid-page.editing {
 			block-size: auto;
 			min-block-size: 100dvh;
+			flex: none;
 		}
 		.workspace {
 			flex-direction: column;
 		}
-		.board {
+		.editing .board {
 			block-size: 55dvh;
 			flex: none;
 		}

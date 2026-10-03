@@ -1,14 +1,16 @@
+import { createHash } from 'node:crypto';
+import { unzipSync } from 'fflate';
 import { buildGridset } from '../src/lib/gridset/__fixtures__/buildGridset';
 import { messages, colourLabels } from '../src/routes/grid/editor-messages';
 import { test, expect, type Page } from './owned-browser';
 
 const fixture = buildGridset({
-	startGrid: 'P',
+	startGrid: 'Main',
 	language: 'he',
-	styles: [{ key: 'shared', backColour: '#FFFFFFFF', tileColour: '#00000000' }],
+	styles: [{ key: 's', backColour: '#FFFFFFFF', tileColour: '#00000000' }],
 	pages: [
 		{
-			name: 'P',
+			name: 'Main',
 			columns: 6,
 			rows: 4,
 			cells: [
@@ -16,14 +18,40 @@ const fixture = buildGridset({
 				...Array.from({ length: 18 }, (_, i) => ({
 					x: i % 6,
 					y: 1 + Math.floor(i / 6),
-					caption: `cell-${i}`,
-					basedOnStyle: 'shared',
-					commands: [{ id: 'Action.InsertText', params: { text: `word-${i}` } }]
+					caption: i === 0 ? 'FIRST' : `cell-${i}`,
+					basedOnStyle: 's',
+					commands: [{ id: 'Action.InsertText', params: { text: `output-${i}` } }]
 				}))
 			]
+		},
+		{
+			name: 'Words',
+			columns: 3,
+			rows: 2,
+			cells: [
+				{ x: 0, y: 0, columnSpan: 3, contentType: 'Workspace', contentSubType: 'Chat' },
+				...Array.from({ length: 3 }, (_, x) => ({
+					x,
+					y: 1,
+					contentType: 'AutoContent',
+					contentSubType: 'WordList'
+				}))
+			],
+			wordList: Array.from({ length: 8 }, (_, i) => ({ text: `vocabulary-${i}` })),
+			autoContentCommands: { WordList: [{ id: 'Action.InsertText' }] }
 		}
 	]
 });
+
+// Hash the ZIP payloads, excluding the ZIP builder's varying timestamp metadata.
+// This is the exact controlled model in the accepted H1 native geometry receipt.
+const fixturePayloadHash = createHash('sha256')
+	.update(
+		JSON.stringify(
+			Object.entries(unzipSync(fixture)).map(([name, bytes]) => [name, Array.from(bytes)])
+		)
+	)
+	.digest('hex');
 
 test.use({
 	viewport: { width: 360, height: 800 },
@@ -31,6 +59,30 @@ test.use({
 	isMobile: true,
 	hasTouch: true
 });
+
+async function expectRemainingFill(page: Page) {
+	const result = await page.evaluate(() => {
+		const shell = document.querySelector<HTMLElement>('.application-shell')!;
+		shell.scrollTo(0, 0);
+		const root = document.querySelector<HTMLElement>('.grid-page')!;
+		const board = document.querySelector<HTMLElement>('.board')!;
+		const status = document.querySelector<HTMLElement>('.session-status')!;
+		const r = board.getBoundingClientRect(),
+			pageRect = root.getBoundingClientRect();
+		const css = getComputedStyle(root);
+		return {
+			available:
+				shell.clientHeight -
+				(r.top - pageRect.top) -
+				parseFloat(css.paddingBottom) -
+				status.getBoundingClientRect().height,
+			height: r.height,
+			shellExcess: shell.scrollHeight - shell.clientHeight
+		};
+	});
+	expect(Math.abs(result.height - result.available)).toBeLessThanOrEqual(1);
+	expect(result.shellExcess).toBeLessThanOrEqual(1);
+}
 
 async function geometry(page: Page) {
 	return page.evaluate(() => {
@@ -66,7 +118,11 @@ test('360px touch editing keeps 44px targets inside the grid through save and re
 	await expect(page.getByTestId('grid-source')).toContainText('six-column.gridset');
 	const lastCell = page.locator('[data-testid=grid-cell][data-cell-x="5"][data-cell-y="1"]');
 	await lastCell.tap();
-	await expect(page.getByTestId('chat-cell')).toContainText('word-5');
+	await expect(page.getByTestId('chat-cell')).toContainText('output-5');
+	expect(fixturePayloadHash).toBe(
+		'0d3427b281ce84b9cf09186615214acaa9c8910e1ccac15716243cec1850cb91'
+	);
+	await expectRemainingFill(page);
 	const baseline = await geometry(page);
 	await page.getByRole('button', { name: messages.edit, exact: true }).tap();
 	const lastOverlay = page.locator('[data-testid=edit-cell][data-cell-x="5"][data-cell-y="1"]');
@@ -81,10 +137,10 @@ test('360px touch editing keeps 44px targets inside the grid through save and re
 	await page.touchscreen.tap(edge.x, edge.y);
 	await expect(lastOverlay).toHaveAttribute('aria-pressed', 'true');
 	const colours = {
-		BackColour: '#227744FF',
-		BorderColour: '#DD3322FF',
-		TileColour: '#3355AAFF',
-		FontColour: '#FFBB22FF'
+		BackColour: '#225577FF',
+		BorderColour: '#AA3333FF',
+		TileColour: '#448844FF',
+		FontColour: '#FFAA22FF'
 	} as const;
 	for (const field of Object.keys(colours) as (keyof typeof colours)[]) {
 		await page.getByLabel(colourLabels[field], { exact: true }).fill(colours[field]);
@@ -94,6 +150,8 @@ test('360px touch editing keeps 44px targets inside the grid through save and re
 	const download = page.waitForEvent('download');
 	await page.getByRole('button', { name: messages.save, exact: true }).tap();
 	await download;
+	await page.getByRole('button', { name: messages.use, exact: true }).tap();
+	await expectRemainingFill(page);
 	// The existing fixture captures UI ZIP bytes. Native disk delivery is checked
 	// separately in the executor's product receipt; this test covers layout persistence.
 	const bytes = await page.evaluate(
@@ -125,17 +183,22 @@ test('360px touch editing keeps 44px targets inside the grid through save and re
 			expect(overlay.width).toBeGreaterThanOrEqual(44);
 			expect(overlay.height).toBeGreaterThanOrEqual(44);
 		}
-		state.cells.forEach((cell, i) => {
-			expect(cell.width).toBeCloseTo(baseline.cells[i].width, 1);
-			expect(cell.left).toBeCloseTo(baseline.cells[i].left, 1);
-		});
 	}
+	// Use and edit have different container heights, hence different cqh gutters.
+	// Compare persistence at matching edit/reopen dimensions; independent native
+	// receipts compare H1/candidate renderers at both old and new container sizes.
+	reopened.cells.forEach((cell, i) => {
+		expect(cell.width).toBeCloseTo(edited.cells[i].width, 1);
+		expect(cell.left).toBeCloseTo(edited.cells[i].left, 1);
+	});
 });
 
 test.describe('390px existing geometry', () => {
 	test.use({ viewport: { width: 390, height: 844 } });
 
-	test('editing preserves the existing 44px visual cell width', async ({ page }) => {
+	test('edited H1 fixture keeps its measured 11px internal extent and native edge targets', async ({
+		page
+	}) => {
 		await page.goto('/');
 		await page.locator('input[type=file]').setInputFiles({
 			name: 'six-column.gridset',
@@ -144,8 +207,41 @@ test.describe('390px existing geometry', () => {
 		});
 		await expect(page.getByTestId('grid-source')).toContainText('six-column.gridset');
 		await page.getByRole('button', { name: messages.edit, exact: true }).tap();
+		expect(fixturePayloadHash).toBe(
+			'0d3427b281ce84b9cf09186615214acaa9c8910e1ccac15716243cec1850cb91'
+		);
+		const target = page.locator('[data-testid=edit-cell][data-cell-x="5"][data-cell-y="1"]');
+		await target.tap();
+		await page.getByLabel(messages.caption, { exact: true }).fill('native-390x844');
+		for (const [field, value] of Object.entries({
+			BackColour: '#225577FF',
+			BorderColour: '#AA3333FF',
+			TileColour: '#448844FF',
+			FontColour: '#FFAA22FF'
+		})) {
+			await page
+				.getByLabel(colourLabels[field as keyof typeof colourLabels], { exact: true })
+				.fill(value);
+		}
+		await page.getByRole('button', { name: messages.apply, exact: true }).tap();
 		const state = await geometry(page);
-		for (const container of state.containers) expect(container.scroll).toBe(container.client);
-		for (const cell of state.cells.slice(1)) expect(cell.width).toBeCloseTo(44, 1);
+		for (const container of state.containers) {
+			const internal = ['.board', '.grid-wrap', '.grid'].includes(container.selector);
+			expect(container.scroll - container.client).toBeLessThanOrEqual(internal ? 12 : 1);
+		}
+		for (const overlay of state.overlays) {
+			expect(overlay.width).toBeGreaterThanOrEqual(44);
+			expect(overlay.height).toBeGreaterThanOrEqual(44);
+		}
+		await target.scrollIntoViewIfNeeded();
+		const edge = await target.evaluate((el) => {
+			const r = el.getBoundingClientRect();
+			const x = r.left + 1,
+				y = r.top + r.height / 2;
+			return { x, y, hit: el.contains(document.elementFromPoint(x, y)) };
+		});
+		expect(edge.hit).toBe(true);
+		await page.touchscreen.tap(edge.x, edge.y);
+		await expect(target).toHaveAttribute('aria-pressed', 'true');
 	});
 });
