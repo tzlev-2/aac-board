@@ -18,21 +18,15 @@ export function searchCaptionFont(
 	if (!Number.isFinite(preferred) || preferred > 96)
 		return { outcome: 'INVALID_PREFERRED_SIZE', size: preferred };
 	if (preferred < CAPTION_FLOOR) return { outcome: 'PREFERRED_BELOW_FLOOR', size: preferred };
-	if (!fits(CAPTION_FLOOR, true)) return { outcome: 'UNFIT_AT_FLOOR', size: preferred };
-	let failed = preferred;
-	for (
-		let coarse = Math.max(CAPTION_FLOOR, preferred - 2);
-		;
-		coarse = Math.max(CAPTION_FLOOR, coarse - 2)
-	) {
-		if (coarse === CAPTION_FLOOR || fits(coarse, true)) {
-			for (let size = failed - 0.25; size > coarse; size -= 0.25) {
-				if (fits(size, true)) return { outcome: 'FITTED', size };
-			}
-			return { outcome: 'FITTED', size: coarse };
-		}
-		failed = coarse;
+	// Font metrics and wrapping are not monotonic. Test every absolute quarter
+	// point below preferred, including 20, rather than inferring from the floor
+	// or coarse brackets. At preferred <= 96 this costs at most 305 reads.
+	for (let size = Math.max(CAPTION_FLOOR, (Math.ceil(preferred * 4) - 1) / 4); ; size -= 0.25) {
+		if (fits(size, true)) return { outcome: 'FITTED', size };
+		if (size === CAPTION_FLOOR) break;
 	}
+	// Exhausted the sampled sizes; this does not prove every real size unfit.
+	return { outcome: 'UNFIT_AT_FLOOR', size: preferred };
 }
 
 type Box = {

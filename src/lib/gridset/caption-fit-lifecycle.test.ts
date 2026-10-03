@@ -88,7 +88,7 @@ function layout() {
 			selectNodeContents() {},
 			getClientRects() {
 				reads++;
-				if (failRange && span.style.fontSize === '20px')
+				if (failRange && span.style.fontSize !== '32px')
 					throw Error('Range failed after trial write');
 				return [span.getBoundingClientRect()];
 			}
