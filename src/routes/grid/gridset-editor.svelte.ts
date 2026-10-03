@@ -37,7 +37,15 @@ function formOf(cell: Cell): CellForm {
 	};
 }
 export function nextFrame(): Promise<void> {
-	return new Promise((resolve) => requestAnimationFrame(() => setTimeout(resolve, 0)));
+	return new Promise((resolve, reject) => {
+		requestAnimationFrame(() => {
+			try {
+				setTimeout(resolve, 0);
+			} catch (e) {
+				reject(e);
+			}
+		});
+	});
 }
 
 /** Layout-owned editor state: archives stay raw; preview replaces individual pages. */
@@ -319,11 +327,25 @@ export function createGridSetEditor() {
 			error = `${messages.saveFailed} ${errorMessage(e)}`;
 			return false;
 		} finally {
-			if (url) {
-				const cleanupUrl = url;
-				setTimeout(() => URL.revokeObjectURL(cleanupUrl), 1000);
+			try {
+				if (url) {
+					const cleanupUrl = url;
+					const release = () => {
+						try {
+							URL.revokeObjectURL(cleanupUrl);
+						} catch {
+							// Release is best effort after a download has already been initiated.
+						}
+					};
+					try {
+						setTimeout(release, 1000);
+					} catch {
+						release();
+					}
+				}
+			} finally {
+				saving = false;
 			}
-			saving = false;
 		}
 	}
 	async function saveCopy() {
