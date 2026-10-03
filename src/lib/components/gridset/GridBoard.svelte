@@ -51,11 +51,13 @@
 	});
 
 	// columnWidths/rowHeights (SizeName|null לכל עמודה/שורה) — null=רגיל=1fr.
-	// בלוחות-הדגימה כולן null, ולכן זה שקול היום ל-repeat(n, 1fr).
+	// Narrow boards can use the gutter for 44px edit targets without letting
+	// their automatic minimum enlarge the tracks. Wider boards keep auto sizing.
 	const columnTemplate = $derived(
-		Array.from({ length: page.columns }, (_, i) => `${sizeNameToFr(page.columnWidths[i])}fr`).join(
-			' '
-		)
+		Array.from(
+			{ length: page.columns },
+			(_, i) => `minmax(var(--column-min, auto), ${sizeNameToFr(page.columnWidths[i])}fr)`
+		).join(' ')
 	);
 	const rowTemplate = $derived(
 		Array.from({ length: page.rows }, (_, i) => `${sizeNameToFr(page.rowHeights[i])}fr`).join(' ')
@@ -216,6 +218,11 @@
 		);
 		padding: var(--gutter);
 		gap: var(--gutter);
+	}
+	@container (inline-size < 360px) {
+		.grid {
+			--column-min: 0px;
+		}
 	}
 	.tile {
 		grid-column: calc(var(--x) + 1) / span var(--cspan);
