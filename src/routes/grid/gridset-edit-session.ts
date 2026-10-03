@@ -6,7 +6,7 @@ import {
 } from '$lib/gridset/gridSetSource';
 import { parsePageXml } from '$lib/gridset/parse';
 import { createStyleResolver } from '$lib/gridset/resolveStyle';
-import type { Page, Style } from '$lib/gridset/types';
+import type { Cell, Page, Style } from '$lib/gridset/types';
 import { applyCellEditXml, type CellColourField } from '$lib/gridset/xmlEdit';
 
 export interface CellAddress {
@@ -28,6 +28,7 @@ export const COLOUR_PROPERTIES = {
 } as const;
 export interface GridSetEditSession {
 	preview(page: string, edits: readonly CellEdit[]): Page;
+	editableCell(address: CellAddress): Cell;
 }
 
 export function validateCellEdit(edit: CellEdit): void {
@@ -96,14 +97,28 @@ export function createGridSetEditSession(
 ): GridSetEditSession {
 	const cache = new Map<string, { input: PageXmlSource; page: Page }>();
 	const resolve = createStyleResolver(styles);
+	function originalPage(name: string) {
+		let cached = cache.get(name);
+		if (!cached) {
+			const input = readPageXml(source, name);
+			cached = { input, page: parsePageXml(name, input.xml, resolve, input.zipDir) };
+			cache.set(name, cached);
+		}
+		return cached;
+	}
+	function editableCell(address: CellAddress): Cell {
+		validateCellEdit(address);
+		const matches = originalPage(address.page).page.cells.filter(
+			(c) => c.x === address.x && c.y === address.y
+		);
+		if (matches.length !== 1) throw new Error(matches.length ? 'ambiguous-cell' : 'missing-cell');
+		if (matches[0].contentType) throw new Error('dynamic-caption');
+		return matches[0];
+	}
 	return {
+		editableCell,
 		preview(name, edits) {
-			let cached = cache.get(name);
-			if (!cached) {
-				const input = readPageXml(source, name);
-				cached = { input, page: parsePageXml(name, input.xml, resolve, input.zipDir) };
-				cache.set(name, cached);
-			}
+			const cached = originalPage(name);
 			let xml = cached.input.xml;
 			for (const edit of edits) {
 				validateCellEdit(edit);

@@ -29,6 +29,13 @@ export const messages = {
 	sourceMissing: 'כדי לערוך ולשמור יש לטעון קובץ .gridset מקורי.',
 	select: 'בחרו תא ברשת לעריכה',
 	caption: 'כתובית',
+	copyCaptionColours: 'העתק כתובית וצבעים',
+	pasteCaptionColours: 'הדבק כתובית וצבעים',
+	clearCaption: 'נקה כתובית',
+	copiedCaptionColours: 'הכתובית והצבעים הועתקו.',
+	pastedCaptionColours: 'הכתובית והצבעים הודבקו בטיוטה.',
+	clearedCaption: 'הכתובית נוקתה בטיוטה.',
+	clipboardNoChange: 'אין שינוי בתא.',
 	apply: 'החל',
 	cancel: 'בטל שינוי זה',
 	stay: 'הישאר',
@@ -56,6 +63,8 @@ export const messages = {
 		'ambiguous-cell': 'במקור יש כמה תאים באותה כתובת.',
 		'missing-cell': 'התא אינו קיים במקור.',
 		'dynamic-caption': 'כתובית של תא דינמי אינה ניתנת לעריכה.',
+		'clipboard-select-cell': 'בחרו תא קיים לעריכת כתובית וצבעים.',
+		'clipboard-empty': 'אין כתובית וצבעים מועתקים להדבקה.',
 		'invalid-grid-root': 'הדף אינו Grid תקין.',
 		'invalid-json': 'מבנה ה־JSON אינו לוח תקין: דרושים דפים תקינים ודף פתיחה קיים.'
 	} as Record<string, string>

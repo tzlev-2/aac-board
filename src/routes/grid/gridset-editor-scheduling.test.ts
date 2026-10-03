@@ -42,6 +42,7 @@ function editorWithDraft() {
 			gridSet,
 			source,
 			editSession: {
+				editableCell: () => page.cells[0],
 				preview: () => ({
 					...page,
 					cells: page.cells.map((cell, index) =>

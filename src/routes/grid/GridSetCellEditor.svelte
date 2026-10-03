@@ -11,10 +11,14 @@
 		error = '',
 		busy = false,
 		hasDraft = false,
+		operationStatus = '',
 		onCaption,
 		onColour,
 		onApply,
-		onCancel
+		onCancel,
+		onCopyCaptionColours,
+		onPasteCaptionColours,
+		onClearCaption
 	}: {
 		cell: Cell;
 		selection: CellAddress;
@@ -22,10 +26,14 @@
 		error?: string;
 		busy?: boolean;
 		hasDraft?: boolean;
+		operationStatus?: string;
 		onCaption: (value: string) => void;
 		onColour: (field: CellColourField, value: string) => void;
 		onApply: () => void;
 		onCancel: () => void;
+		onCopyCaptionColours: () => void;
+		onPasteCaptionColours: () => void;
+		onClearCaption: () => void;
 	} = $props();
 	function validColour(field: CellColourField): string {
 		return /^#[0-9a-f]{8}$/i.test(form.colours[field])
@@ -50,6 +58,19 @@
 
 <aside class="cell-editor" aria-label={messages.edit}>
 	<h2>{cellLabel(selection.page, selection.x, selection.y)}</h2>
+	{#if cell.visibility === 'Hidden' || cell.visibility === 'Disabled'}
+		<p class="hint">{cell.visibility === 'Hidden' ? 'תא מוסתר' : 'תא מושבת'} · עריכה בלבד</p>
+	{/if}
+	<div class="clipboard-actions">
+		<button type="button" disabled={busy} onclick={onCopyCaptionColours}
+			>{messages.copyCaptionColours}</button
+		>
+		<button type="button" disabled={busy} onclick={onPasteCaptionColours}
+			>{messages.pasteCaptionColours}</button
+		>
+		<button type="button" disabled={busy} onclick={onClearCaption}>{messages.clearCaption}</button>
+	</div>
+	{#if operationStatus}<p role="status">{operationStatus}</p>{/if}
 	<label
 		>{messages.caption}
 		<textarea
@@ -171,9 +192,11 @@
 	.colour-tools label {
 		flex: 1;
 	}
-	.actions {
+	.actions,
+	.clipboard-actions {
 		display: flex;
 		gap: 8px;
+		flex-wrap: wrap;
 	}
 	button {
 		min-block-size: 44px;

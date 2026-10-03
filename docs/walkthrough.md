@@ -1,5 +1,14 @@
 # Grid AAC Clone — יומן פיתוח (Walkthrough)
 
+## 2026-10-03 21:43
+
+### סלייס 30 · צילום כתובית וארבעה צבעים, הדבקה וניקוי כתובית
+
+- `gridset-editor.svelte.ts` שומר צילום ערכים בלתי־משתנה מן התא האפקטיבי אחרי החלטת טיוטה. הדבקה לתא קיים אחר כותבת כתובית וארבעה צבעים פתורים כטיוטה; ניקוי כותב כתובית ריקה בלבד. אותה כתובת, הדבקה חוזרת וניקוי כתובית ריקה אינם משנים revision או dirty. מעבר דף שומר את הצילום; פרסום קובץ חדש מאפס אותו.
+- `gridset-edit-session.ts::editableCell` מאמת כתובת יחידה ותא סטטי מול מקור העמוד. `GridSetCellEditor.svelte` מציג פקדים בעלי שמות מפורשים, משוב ותווית למצב Hidden/Disabled דרך שכבת העריכה הקיימת. יעד `xsi:nil` עם כתובית ריקה מקבל צבעים בלי לשכתב את `CaptionAndImage`.
+- `gridset-clipboard.test.ts` מאמת nil, צבע, span ו־shell ב־XML; בדיקות GridSet הקיימות עברו. `check` ו־build עברו. Chrome מבודד עבר ב־1280×900 ובמגע native ב־360×800/390×844: H1 Stay/Apply, כשל Save Copy ששמר טיוטה, הדבקה בין דפים, תאים מוסתרים/מושבתים ודינמיים, no-op והעברת צבעים nil→nil. שלוש הורדות `Browser.downloadProgress=completed` נפתחו מאותו `filePath` דרך input native; CRC, בייטי ZIP מקומיים של רשומות שלא נערכו, פקודות ומדיה נשמרו. בדיקות Vitest browser לא רצו כי Chromium headless אינו מותקן; בדיקת Chrome הישירה כיסתה את המוצר.
+- זהו מועמד executor לענף `slice/30-caption-colour-clipboard`. D4.1 נשארת פתוחה לתוכן תא מלא, מדיה, פקודות, תפריט הקשר ורב־בחירה. אין merge, push או פריסה.
+
 ## 2026-10-03 17:33
 
 ### B2.3 · דריכת AddToWordList/DeleteWord ושמירת WordList כירורגית

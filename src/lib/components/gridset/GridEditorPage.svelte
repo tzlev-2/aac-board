@@ -89,10 +89,14 @@
 					error={editor.draftError}
 					busy={editor.busy}
 					hasDraft={editor.hasDraft}
+					operationStatus={editor.operationStatus}
 					onCaption={editor.caption}
 					onColour={editor.colour}
 					onApply={editor.apply}
 					onCancel={editor.cancel}
+					onCopyCaptionColours={editor.copyCaptionColours}
+					onPasteCaptionColours={editor.pasteCaptionColours}
+					onClearCaption={editor.clearCaption}
 				/>
 			{:else}<aside class="choose-cell">{messages.select}</aside>{/if}
 		{/if}

@@ -67,6 +67,91 @@ it('keeps invalid input separate, removes reverted overrides and asks before sel
 	const output = await openGridSet(writeGridSet(editor.source!, editor.appliedEdits));
 	expect(output.gridSet.pages.P.cells[0].caption).toBe('A');
 });
+it('copies an immutable resolved snapshot across pages and keeps no-op revisions stable', async () => {
+	const editor = await loaded();
+	const source = editor.gridSet.pages.P.cells[0];
+	editor.select(editor.runtime!.page, source);
+	editor.caption('draft source');
+	editor.copyCaptionColours();
+	expect(editor.pending).toBe('draft');
+	await editor.resolvePending('stay');
+	expect(editor.clipboard).toBeNull();
+	editor.copyCaptionColours();
+	await editor.resolvePending('apply');
+	expect(editor.clipboard?.caption).toBe('draft source');
+	expect(editor.clipboard?.colours.BackColour).toBe('#11223380');
+	const initialRevision = editor.unsaved;
+	editor.pasteCaptionColours();
+	expect(editor.hasDraft).toBe(false);
+	expect(editor.unsaved).toBe(initialRevision);
+	editor.caption('later source');
+	editor.apply();
+	editor.navigate('Q');
+	editor.select(editor.runtime!.page, editor.runtime!.page.cells[0]);
+	editor.pasteCaptionColours();
+	expect(editor.form?.caption).toBe('draft source');
+	expect(editor.form?.colours.BackColour).toBe('#11223380');
+	expect(editor.hasDraft).toBe(true);
+	editor.cancel();
+	expect(editor.gridSet.pages.Q.cells[0].caption).toBe('Q');
+	editor.pasteCaptionColours();
+	editor.apply();
+	const count = editor.appliedEdits.length;
+	editor.pasteCaptionColours();
+	expect(editor.hasDraft).toBe(false);
+	expect(editor.appliedEdits).toHaveLength(count);
+	const saved = await openGridSet(writeGridSet(editor.source!, editor.appliedEdits));
+	expect(saved.gridSet.pages.Q.cells[0].caption).toBe('draft source');
+	expect(saved.gridSet.pages.P.cells[0].caption).toBe('later source');
+});
+
+it('preserves nil on empty paste and clear while allowing colours on hidden and disabled cells', async () => {
+	const editor = createGridSetEditor();
+	const input = buildGridset({
+		startGrid: 'P',
+		language: 'he',
+		styles: [{ key: 'base', backColour: '#11223380' }],
+		pages: [
+			{
+				name: 'P',
+				columns: 5,
+				rows: 1,
+				cells: [
+					{ x: 0, y: 0, caption: null, basedOnStyle: 'base' },
+					{ x: 1, y: 0, caption: null, visibility: 'Hidden' },
+					{ x: 2, y: 0, caption: 'disabled', visibility: 'Disabled', columnSpan: 2 },
+					{ x: 4, y: 0, contentType: 'AutoContent' }
+				]
+			}
+		]
+	});
+	await editor.loadFile(new File([new Uint8Array(input)], 'nil.gridset'));
+	editor.mode(true);
+	editor.select(editor.runtime!.page, editor.runtime!.page.cells[0]);
+	editor.copyCaptionColours();
+	editor.select(editor.runtime!.page, editor.runtime!.page.cells[1]);
+	editor.clearCaption();
+	expect(editor.hasDraft).toBe(false);
+	editor.pasteCaptionColours();
+	expect(editor.hasDraft).toBe(true);
+	expect(editor.gridSet.pages.P.cells[1].caption).toBeUndefined();
+	editor.apply();
+	editor.select(editor.runtime!.page, editor.runtime!.page.cells[2]);
+	editor.clearCaption();
+	expect(editor.gridSet.pages.P.cells[2].caption).toBe('');
+	editor.apply();
+	editor.select(editor.runtime!.page, editor.runtime!.page.cells[3]);
+	editor.copyCaptionColours();
+	expect(editor.operationStatus).toContain('דינמי');
+	const output = writeGridSet(editor.source!, editor.appliedEdits);
+	const xml = new TextDecoder().decode(
+		(await import('fflate')).unzipSync(output)['Grids/P/grid.xml']
+	);
+	expect(xml.match(/xsi:nil="true"/g)).toHaveLength(2);
+	expect(xml).toContain('ColumnSpan="2"');
+	expect(xml).toContain('<Visibility>Hidden</Visibility>');
+	expect(xml).toContain('<Visibility>Disabled</Visibility>');
+});
 it('publishes only the latest load and retains source/model/edits on failed replacement', async () => {
 	const editor = createGridSetEditor();
 	let release!: (r: Response) => void;

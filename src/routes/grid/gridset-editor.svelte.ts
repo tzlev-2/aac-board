@@ -29,6 +29,9 @@ export interface CellForm {
 	caption: string;
 	colours: Record<CellColourField, string>;
 }
+export interface CaptionColourClipboard extends CellForm {
+	readonly source: CellAddress;
+}
 function formOf(cell: Cell): CellForm {
 	return {
 		caption: cell.caption ?? '',
@@ -68,6 +71,8 @@ export function createGridSetEditor() {
 	let selection = $state.raw<CellAddress | null>(null);
 	let baseline: CellForm | null = null;
 	let form = $state.raw<CellForm | null>(null);
+	let clipboard = $state.raw<CaptionColourClipboard | null>(null);
+	let operationStatus = $state('');
 	let pending = $state.raw<{
 		kind: 'draft' | 'load';
 		run: () => void;
@@ -87,6 +92,7 @@ export function createGridSetEditor() {
 		form = null;
 		draft = null;
 		draftError = '';
+		operationStatus = '';
 	}
 	function requestAction(run: () => void) {
 		if (busy || pending) return;
@@ -97,17 +103,114 @@ export function createGridSetEditor() {
 		if (!editing) return;
 		requestAction(() => {
 			try {
-				if (page.cells.filter((c) => c.x === cell.x && c.y === cell.y).length !== 1)
-					throw new Error('ambiguous-cell');
+				const address = { page: page.name, x: cell.x, y: cell.y };
+				validateCellEdit(address);
+				if (!page.cells.includes(cell)) throw new Error('missing-cell');
+				const matches =
+					gridSet.pages[address.page]?.cells.filter(
+						(c) => c.x === address.x && c.y === address.y
+					) ?? [];
+				if (matches.length !== 1)
+					throw new Error(matches.length ? 'ambiguous-cell' : 'missing-cell');
 				selection = { page: page.name, x: cell.x, y: cell.y };
-				baseline = formOf(cell);
+				baseline = formOf(matches[0]);
 				form = baseline;
 				draft = null;
 				draftError = '';
 				error = '';
+				operationStatus = '';
 			} catch (e) {
 				error = errorMessage(e);
 			}
+		});
+	}
+	function selectedEditable(): { address: CellAddress; cell: Cell } {
+		if (!editing || !selection || !session) throw new Error('clipboard-select-cell');
+		const address = { ...selection };
+		session.editableCell(address);
+		const matches =
+			gridSet.pages[address.page]?.cells.filter((c) => c.x === address.x && c.y === address.y) ??
+			[];
+		if (matches.length !== 1) throw new Error(matches.length ? 'ambiguous-cell' : 'missing-cell');
+		if (matches[0].contentType) throw new Error('dynamic-caption');
+		return { address, cell: matches[0] };
+	}
+	function operation(run: () => void) {
+		if (busy || pending) return;
+		requestAction(() => {
+			try {
+				run();
+			} catch (e) {
+				operationStatus = errorMessage(e);
+			}
+		});
+	}
+	function copyCaptionColours() {
+		operation(() => {
+			const { address, cell } = selectedEditable();
+			const values = formOf(cell);
+			clipboard = {
+				source: address,
+				caption: values.caption,
+				colours: { ...values.colours }
+			};
+			operationStatus = messages.copiedCaptionColours;
+		});
+	}
+	function stageOperation(patch: CellEdit, status: string) {
+		if (!session || !selection) return;
+		const address = { ...selection };
+		validateCellEdit(patch);
+		const effective = upsertCellEdit(appliedEdits, patch);
+		const candidate = session.preview(address.page, effective);
+		const matches = candidate.cells.filter((c) => c.x === address.x && c.y === address.y);
+		if (matches.length !== 1) throw new Error(matches.length ? 'ambiguous-cell' : 'missing-cell');
+		gridSet.pages[address.page] = candidate;
+		form = formOf(matches[0]);
+		draft = patch;
+		draftError = '';
+		operationStatus = status;
+	}
+	function pasteCaptionColours() {
+		operation(() => {
+			const { address, cell } = selectedEditable();
+			if (!clipboard) throw new Error('clipboard-empty');
+			if (
+				clipboard.source.page === address.page &&
+				clipboard.source.x === address.x &&
+				clipboard.source.y === address.y
+			) {
+				operationStatus = messages.clipboardNoChange;
+				return;
+			}
+			const current = formOf(cell);
+			if (
+				current.caption === clipboard.caption &&
+				COLOUR_FIELDS.every(
+					(field) =>
+						current.colours[field].toUpperCase() === clipboard!.colours[field].toUpperCase()
+				)
+			) {
+				operationStatus = messages.clipboardNoChange;
+				return;
+			}
+			// An empty caption must leave a nil target nil; resolved colour values still transfer.
+			const patch: CellEdit = {
+				...address,
+				colours: { ...clipboard.colours }
+			};
+			if (clipboard.caption || cell.caption !== undefined) patch.caption = clipboard.caption;
+			stageOperation(patch, messages.pastedCaptionColours);
+		});
+	}
+	function clearCaption() {
+		operation(() => {
+			const { address, cell } = selectedEditable();
+			if (!cell.caption) {
+				operationStatus = messages.clipboardNoChange;
+				return;
+			}
+			stageOperation({ ...address, caption: '' }, messages.clearedCaption);
 		});
 	}
 	function updateForm(next: CellForm) {
@@ -251,6 +354,8 @@ export function createGridSetEditor() {
 		lastDownloadRevision = 0;
 		editing = false;
 		downloaded = '';
+		clipboard = null;
+		operationStatus = '';
 		resetSelection();
 		gridSet = opened.gridSet;
 		runtime = createRuntime(gridSet, { onWordListEdit: recordWordListEdit });
@@ -429,6 +534,12 @@ export function createGridSetEditor() {
 		get form() {
 			return form;
 		},
+		get clipboard() {
+			return clipboard;
+		},
+		get operationStatus() {
+			return operationStatus;
+		},
 		get hasDraft() {
 			return hasDraft;
 		},
@@ -454,6 +565,9 @@ export function createGridSetEditor() {
 		select,
 		caption,
 		colour,
+		copyCaptionColours,
+		pasteCaptionColours,
+		clearCaption,
 		apply,
 		cancel,
 		resolvePending,
