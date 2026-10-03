@@ -268,6 +268,7 @@ export class GridRuntime implements RuntimeContext {
 	}
 	#pageName = $state('');
 	#history = $state<string[]>([]);
+	#backRevision = 0;
 	#unimplemented = $state<Record<CommandId, number>>({});
 
 	constructor(gridSet: GridSet, options: RuntimeOptions = {}) {
@@ -301,6 +302,11 @@ export class GridRuntime implements RuntimeContext {
 		return this.#history;
 	}
 
+	/** Successful Back revokes only continuations currently suspended at a positive Wait. */
+	get backRevision(): number {
+		return this.#backRevision;
+	}
+
 	/** תוכן החוצץ כמחרוזת אחת — מה ש-`Action.Speak` מקריא. */
 	get outputText(): string {
 		return this.output.text;
@@ -329,6 +335,7 @@ export class GridRuntime implements RuntimeContext {
 		if (this.#history.length === 0) return;
 		const previous = this.#history[this.#history.length - 1];
 		this.#history = this.#history.slice(0, -1);
+		this.#backRevision++;
 		this.#wordListPage = 0;
 		this.#pageName = previous;
 	}

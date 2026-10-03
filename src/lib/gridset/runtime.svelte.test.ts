@@ -7,11 +7,13 @@
  * `$state`, פס-הפלט יישאר ריק בלי שום שגיאה. זו המלכודת שהקובץ הזה סוגר.
  */
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { flushSync } from 'svelte';
 import { createRuntime, type SpeechAdapter } from './runtime.svelte';
-import { executeCommands } from './commands';
-import type { Cell, GridSet, Page, ResolvedStyle } from './types';
+import { executeCommands, executeCommandChain, withCellContext } from './commands';
+import { buildPopupBackFixture } from './__fixtures__/popupBack';
+import { openGridSet } from './gridSetSource';
+import type { Cell, GridSet, Page, ResolvedStyle, CommandInvocation } from './types';
 
 const STYLE: ResolvedStyle = {
 	backColour: '#FFFFFFFF',
@@ -216,5 +218,275 @@ describe('CommandExecution.Wait במריץ החי', () => {
 		release?.();
 		await chain;
 		expect(rt.page.name).toBe('אוכל');
+	});
+});
+
+// C6: held promises establish the boundary without elapsed-time assertions.
+const insert = (text: string): CommandInvocation => ({ id: 'Action.InsertText', params: { text } });
+const jump = (grid: string): CommandInvocation => ({ id: 'Jump.To', params: { grid } });
+const wait = (cancellable?: string, waittime = '00:00:02'): CommandInvocation => ({
+	id: 'CommandExecution.Wait',
+	params: { waittime, ...(cancellable === undefined ? {} : { cancellable }) }
+});
+function held() {
+	let release!: () => void;
+	const milliseconds: number[] = [];
+	return {
+		milliseconds,
+		release: () => release(),
+		delay: (ms: number) => {
+			milliseconds.push(ms);
+			return new Promise<void>((resolve) => {
+				release = resolve;
+			});
+		}
+	};
+}
+async function backRuntime() {
+	const { gridSet } = await openGridSet(buildPopupBackFixture());
+	gridSet.media = new Map([...gridSet.media!, ['owned.wav', new Uint8Array([82, 73, 70, 70])]]);
+	const speech = { speak: vi.fn(), stop: vi.fn() };
+	const audio = { play: vi.fn(), dispose: vi.fn() };
+	const rt = createRuntime(gridSet, { speech, audio });
+	return { rt, speech, audio };
+}
+function commandsCell(commands: CommandInvocation[]): Cell {
+	return { ...cell('unused'), commands };
+}
+const sound: CommandInvocation = {
+	id: 'SpeechPlaySound',
+	params: { filedata: { data: '.wav', embeddedPath: 'owned.wav' } }
+};
+
+describe('C6 successful Back across positive Wait', () => {
+	it.each(['1', '0', undefined])(
+		'D1/D2: skips the whole suffix for cancellable=%s, retaining prefix and attachment',
+		async (flag) => {
+			const { rt, speech, audio } = await backRuntime();
+			rt.navigate('Q');
+			rt.navigate('R');
+			rt.navigateWordList('next');
+			const attachment = rt.attach();
+			const pause = held();
+			const chain = executeCommands(
+				commandsCell([
+					insert('held'),
+					{ id: 'Action.Speak', params: {} },
+					sound,
+					wait(flag),
+					insert('late-before'),
+					{ id: 'Action.Speak', params: {} },
+					sound,
+					jump('P'),
+					insert('late-after'),
+					{ id: 'Action.Speak', params: {} },
+					sound
+				]),
+				rt,
+				undefined,
+				{ delay: pause.delay, isCurrent: attachment.valid }
+			);
+			expect(rt.outputText).toBe('held');
+			expect(pause.milliseconds).toEqual([2000]);
+			rt.activate(commandsCell([{ id: 'Jump.Back', params: {} }]));
+			expect(rt.pageName).toBe('Q');
+			expect(rt.history).toEqual(['P']);
+			expect(rt.wordListPage).toBe(0);
+			pause.release();
+			await chain;
+			expect(rt.pageName).toBe('Q');
+			expect(rt.history).toEqual(['P']);
+			expect(rt.outputText).toBe('held');
+			expect(speech.speak).toHaveBeenCalledTimes(1);
+			expect(audio.play).toHaveBeenCalledTimes(1);
+			expect(audio.dispose).not.toHaveBeenCalled();
+			expect(attachment.valid()).toBe(true);
+			expect(rt.backRevision).toBe(1);
+			attachment.detach();
+		}
+	);
+
+	it('D2: popup Back cancels a sentinel even when the pending jump targets the current page', async () => {
+		const { rt } = await backRuntime();
+		rt.navigate('Q');
+		expect(rt.page.selfClosing).toBe(true);
+		const pause = held();
+		const chain = executeCommandChain([insert('held'), wait(), jump('P'), insert('sentinel')], rt, {
+			delay: pause.delay
+		});
+		rt.back();
+		pause.release();
+		await chain;
+		expect(rt.pageName).toBe('P');
+		expect(rt.history).toEqual([]);
+		expect(rt.outputText).toBe('held');
+	});
+
+	it('D3: no Back completes normally; missing, zero and negative Wait preserve synchronous suffixes', async () => {
+		const { rt, speech } = await backRuntime();
+		const pause = held();
+		const chain = executeCommandChain(
+			[insert('prefix'), wait(), jump('Q'), insert('suffix'), { id: 'Action.Speak', params: {} }],
+			rt,
+			{ delay: pause.delay }
+		);
+		expect(rt.pageName).toBe('P');
+		expect(rt.outputText).toBe('prefix');
+		pause.release();
+		await chain;
+		expect(rt.pageName).toBe('Q');
+		expect(rt.outputText).toBe('prefix suffix');
+		expect(speech.speak).toHaveBeenCalledTimes(1);
+		for (const raw of ['', '0', '-1']) {
+			const delay = vi.fn();
+			const sync = executeCommandChain(
+				[
+					wait(undefined, raw),
+					{ id: 'Jump.Back', params: {} },
+					insert(raw || 'missing'),
+					jump('R')
+				],
+				rt,
+				{ delay }
+			);
+			expect(rt.pageName).toBe('R');
+			expect(rt.outputText).toContain(raw || 'missing');
+			expect(delay).not.toHaveBeenCalled();
+			await sync;
+		}
+	});
+
+	it('D3: To, Back and Home complete their synchronous suffix before awaiting; each later Wait snapshots afresh', async () => {
+		const { rt } = await backRuntime();
+		const to = rt.activate(commandsCell([jump('Q'), insert('to')]));
+		expect(rt.pageName).toBe('Q');
+		expect(rt.outputText).toBe('to');
+		await to;
+		const back = rt.activate(
+			commandsCell([{ id: 'Jump.Back', params: {} }, insert('back'), jump('R')])
+		);
+		expect(rt.pageName).toBe('R');
+		expect(rt.history).toEqual(['P']);
+		expect(rt.outputText).toBe('to back');
+		await back;
+		const home = rt.activate(commandsCell([{ id: 'Jump.Home', params: {} }, insert('home')]));
+		expect(rt.pageName).toBe('P');
+		expect(rt.history).toEqual([]);
+		expect(rt.outputText).toBe('to back home');
+		await home;
+		rt.navigate('Q');
+		const first = held();
+		const second = held();
+		let pauses = 0;
+		const twice = executeCommandChain(
+			[wait(), { id: 'Jump.Back', params: {} }, insert('own-back'), wait(), jump('R')],
+			rt,
+			{ delay: (ms) => (++pauses === 1 ? first.delay(ms) : second.delay(ms)) }
+		);
+		first.release();
+		await Promise.resolve();
+		expect(rt.pageName).toBe('P');
+		expect(rt.outputText).toContain('own-back');
+		expect(pauses).toBe(2);
+		second.release();
+		await twice;
+		expect(rt.pageName).toBe('R');
+		const own = held();
+		const afterOwnBack = executeCommandChain(
+			[{ id: 'Jump.Back', params: {} }, insert('before-wait'), wait(), jump('Q')],
+			rt,
+			{ delay: own.delay }
+		);
+		own.release();
+		await afterOwnBack;
+		expect(rt.pageName).toBe('Q');
+	});
+
+	it('D4: To/Home/self/missing and empty-history Back do not revoke; a successful Back cannot be undone by re-entry', async () => {
+		const { rt } = await backRuntime();
+		const pause = held();
+		const chain = executeCommandChain([wait(), insert('survives')], rt, { delay: pause.delay });
+		rt.back();
+		rt.navigate('Q');
+		rt.navigate('Q');
+		rt.navigate('MISSING');
+		rt.home();
+		expect(rt.backRevision).toBe(0);
+		pause.release();
+		await chain;
+		expect(rt.outputText).toBe('survives');
+		rt.navigate('Q');
+		const stale = held();
+		const canceled = executeCommandChain([wait(), insert('revived')], rt, { delay: stale.delay });
+		rt.back();
+		rt.navigate('Q');
+		stale.release();
+		await canceled;
+		expect(rt.pageName).toBe('Q');
+		expect(rt.outputText).toBe('survives');
+		expect(rt.backRevision).toBe(1);
+	});
+
+	it('D5: revokes every held chain, isolates runtimes and allows newly activated chains', async () => {
+		const { rt } = await backRuntime();
+		const { rt: other } = await backRuntime();
+		rt.navigate('Q');
+		const a = held(),
+			b = held(),
+			independent = held();
+		const one = executeCommandChain([wait(), insert('old-one')], rt, { delay: a.delay });
+		const two = executeCommands(commandsCell([wait(), insert('old-two')]), rt, undefined, {
+			delay: b.delay
+		});
+		const isolated = executeCommandChain([wait(), insert('other')], other, {
+			delay: independent.delay
+		});
+		rt.back();
+		const next = held();
+		const fresh = executeCommandChain([wait(), insert('new')], rt, { delay: next.delay });
+		b.release();
+		await two;
+		a.release();
+		await one;
+		independent.release();
+		await isolated;
+		next.release();
+		await fresh;
+		expect(rt.outputText).toBe('new');
+		expect(other.outputText).toBe('other');
+		expect(other.backRevision).toBe(0);
+	});
+
+	it('D6: real AutoContent/item context forwards the original receiver and Runtime.activate uses the same revision', async () => {
+		const { rt } = await backRuntime();
+		rt.navigate('Q');
+		const original = rt.gridSet.pages.Q.cells.find((c) => c.contentSubType === 'WordList')!;
+		rt.page.autoContentCommands.WordList = [
+			{ id: 'AutoContent.Activate', params: {} },
+			wait(),
+			insert('late')
+		];
+		const item = rt.page.wordList[0];
+		const wrapper = withCellContext(rt, original, item);
+		const pause = held();
+		const chain = executeCommands(original, rt, item, { delay: pause.delay });
+		expect(wrapper.backRevision).toBe(0);
+		expect(rt.outputText).toBe('Q-מילה-0');
+		rt.back();
+		expect(wrapper.backRevision).toBe(1);
+		pause.release();
+		await chain;
+		expect(rt.outputText).toBe('Q-מילה-0');
+		rt.navigate('Q');
+		vi.useFakeTimers();
+		try {
+			const activated = rt.activate(commandsCell([wait(), insert('activate-late')]));
+			rt.back();
+			await vi.runAllTimersAsync();
+			await activated;
+			expect(rt.outputText).toBe('Q-מילה-0');
+		} finally {
+			vi.useRealTimers();
+		}
 	});
 });

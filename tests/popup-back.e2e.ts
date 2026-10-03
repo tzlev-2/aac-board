@@ -1,7 +1,10 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
-import { unzipSync, strFromU8 } from 'fflate';
-import { buildPopupBackFixture } from '../src/lib/gridset/__fixtures__/popupBack';
+import { unzipSync, strFromU8, strToU8, zipSync } from 'fflate';
+import {
+	buildPopupBackFixture,
+	buildPopupBackWaitFixture
+} from '../src/lib/gridset/__fixtures__/popupBack';
 import { messages, colourLabels } from '../src/routes/grid/editor-messages';
 import { test, expect, type Page } from './owned-browser';
 
@@ -364,41 +367,229 @@ test('Space, Back cell, ordinary history, direct SelfClosing start, selector res
 	await expect(back(page)).toHaveCount(0);
 });
 
-test('delayed Wait after toolbar Back matches the existing Back-cell behavior', async ({
+// Positive Wait is held and explicitly released; these checks use no elapsed-time threshold.
+async function holdWait(page: Page) {
+	await page.evaluate(() => {
+		const original = window.setTimeout.bind(window);
+		const held: Array<() => void> = [];
+		const audio: string[] = [],
+			pauses: string[] = [];
+		HTMLMediaElement.prototype.play = function () {
+			audio.push(this.src);
+			return Promise.resolve();
+		};
+		HTMLMediaElement.prototype.pause = function () {
+			pauses.push(this.src);
+		};
+		window.setTimeout = ((callback: TimerHandler, milliseconds?: number, ...args: unknown[]) => {
+			if (milliseconds === 2000 && typeof callback === 'function') {
+				held.push(() => callback(...args));
+				return 0;
+			}
+			return original(callback, milliseconds, ...args);
+		}) as typeof window.setTimeout;
+		Object.assign(window, {
+			c6Held: held,
+			c6Audio: audio,
+			c6AudioPauses: pauses,
+			c6ReleaseWait: async () => {
+				for (const callback of held.splice(0)) callback();
+				await Promise.resolve();
+				await Promise.resolve();
+			}
+		});
+	});
+}
+async function heldCount(page: Page) {
+	return page.evaluate(() => (window as unknown as { c6Held: unknown[] }).c6Held.length);
+}
+async function releaseWait(page: Page) {
+	await page.evaluate(() =>
+		(window as unknown as { c6ReleaseWait: () => Promise<void> }).c6ReleaseWait()
+	);
+}
+async function sideEffects(page: Page) {
+	return page.evaluate(() => {
+		const w = window as unknown as {
+			c6Speech: string[];
+			c6Audio: string[];
+			c6AudioPauses: string[];
+		};
+		return { speech: [...w.c6Speech], audio: [...w.c6Audio], pauses: [...w.c6AudioPauses] };
+	});
+}
+async function openWait(page: Page, flag?: string, startGrid = 'P', waittime?: string | null) {
+	await page.goto('/');
+	let bytes = buildPopupBackWaitFixture(flag, startGrid);
+	if (waittime !== undefined) {
+		const files = unzipSync(bytes);
+		for (const name of ['Q', 'R']) {
+			const path = `Grids/${name}/grid.xml`;
+			files[path] = strToU8(
+				strFromU8(files[path]).replace(
+					'<Parameter Key="waittime">00:00:02</Parameter>',
+					waittime === null ? '' : `<Parameter Key="waittime">${waittime}</Parameter>`
+				)
+			);
+		}
+		bytes = zipSync(files);
+	}
+	const name = `delay-${flag ?? 'missing'}.gridset`;
+	writeFileSync(`${artifacts}/${name}`, bytes);
+	await page
+		.locator('input[type=file]')
+		.setInputFiles({ name, mimeType: 'application/zip', buffer: Buffer.from(bytes) });
+	await expect(page.getByTestId('grid-source')).toBeVisible();
+	await holdWait(page);
+}
+
+test('D1/D2: held Wait loses the entire suffix after toolbar and Back-cell, including popup sentinel and every flag', async ({
 	page
 }) => {
 	const observations = [];
-	for (const control of ['toolbar', 'cell']) {
-		await open(page);
-		await cell(page, 0).click();
-		await cell(page, 1).click();
-		await at(page, 'R');
-		await cell(page, 2).click(); // InsertText -> Wait -> Jump.To(P)
-		await expect(chat(page)).toContainText('המתנה');
-		if (control === 'toolbar') await back(page).click();
-		else await cell(page, 0).click();
-		await at(page, 'Q');
-		await at(page, 'P'); // pending chain survives either manual Back
-		await expect(chat(page)).toContainText('המתנה');
-		await expect(back(page)).toBeVisible();
-		observations.push({
-			control,
-			immediatePage: 'Q',
-			afterWaitPage: 'P',
-			outputPreserved: true,
-			delayedChainOverridesBack: true
-		});
+	for (const flag of ['1', '0', undefined]) {
+		for (const control of ['toolbar', 'cell', 'popup']) {
+			await openWait(page, flag);
+			await cell(page, 0).click();
+			if (control !== 'popup') await cell(page, 1).click();
+			await cell(page, 2).click();
+			expect(await heldCount(page)).toBe(1);
+			await expect(chat(page)).toHaveText('המתנה');
+			const prefix = await sideEffects(page);
+			expect(prefix.speech).toEqual(['המתנה']);
+			expect(prefix.audio).toHaveLength(1);
+			expect(prefix.pauses).toHaveLength(0);
+			if (control === 'cell') await cell(page, 0).click();
+			else await back(page).click();
+			const destination = control === 'popup' ? 'P' : 'Q';
+			await at(page, destination);
+			await releaseWait(page);
+			await at(page, destination);
+			await expect(chat(page)).toHaveText('המתנה');
+			expect(await sideEffects(page)).toEqual(prefix);
+			await expect(back(page)).toHaveCount(control === 'popup' ? 0 : 1);
+			if (control !== 'popup') {
+				await back(page).click();
+				await at(page, 'P');
+				await expect(back(page)).toHaveCount(0);
+			}
+			observations.push({
+				flag: flag ?? 'missing',
+				control,
+				beforeAndAfterRelease: destination,
+				suffixSuppressed: true,
+				prefixRetained: true
+			});
+		}
 	}
 	writeFileSync(
-		`${artifacts}/delayed-back.json`,
+		`${artifacts}/delayed-back-repaired.json`,
 		JSON.stringify(
 			{
 				observations,
-				policyDecisionRequired: true,
-				executorDisposition: 'REVISE_DELAYED_CHAIN_POLICY; runtime behavior unchanged'
+				acceptance: 'PASS_EXECUTOR_ONLY',
+				originalCandidate: 'c4bf1ba remains historical REVISE/FAIL'
 			},
 			null,
 			2
 		)
 	);
 });
+
+test('D3/D4/D5: no Back, no-history Back, multiple held chains and fresh activation preserve the bounded policy', async ({
+	page
+}) => {
+	await openWait(page);
+	await cell(page, 0).click();
+	await cell(page, 1).click();
+	await cell(page, 2).click();
+	await releaseWait(page);
+	await at(page, 'P');
+	await expect(chat(page)).toContainText('מאוחר-לפני');
+	await expect(chat(page)).toContainText('מאוחר-אחרי');
+	expect((await sideEffects(page)).speech).toHaveLength(3);
+	expect((await sideEffects(page)).audio).toHaveLength(3);
+	// Without history, the existing Back-cell cannot revoke a suspended suffix.
+	await openWait(page, undefined, 'R');
+	await expect(back(page)).toHaveCount(0);
+	await cell(page, 2).click();
+	await cell(page, 0).click();
+	await releaseWait(page);
+	await at(page, 'P');
+	await expect(chat(page)).toContainText('מאוחר-אחרי');
+	// Missing, zero and negative waits retain the original synchronous effects.
+	for (const waittime of [null, '0', '-1']) {
+		await openWait(page, undefined, 'P', waittime);
+		await cell(page, 0).click();
+		await cell(page, 2).click();
+		expect(await heldCount(page)).toBe(0);
+		await at(page, 'P');
+		await expect(chat(page)).toContainText('מאוחר-אחרי');
+	}
+	// Two previously suspended suffixes are both revoked, even after returning to their origin.
+	await openWait(page);
+	await cell(page, 0).click();
+	await cell(page, 1).click();
+	await cell(page, 2).click();
+	await cell(page, 2).click();
+	expect(await heldCount(page)).toBe(2);
+	await back(page).click();
+	await at(page, 'Q');
+	await cell(page, 1).click();
+	await at(page, 'R');
+	await releaseWait(page);
+	await at(page, 'R');
+	await expect(chat(page)).not.toContainText('מאוחר');
+	await back(page).click();
+	await at(page, 'Q');
+	// A new activation after the successful Back owns a fresh Wait checkpoint.
+	await cell(page, 2).click();
+	expect(await heldCount(page)).toBe(1);
+	await releaseWait(page);
+	await at(page, 'P');
+	await expect(chat(page)).toContainText('מאוחר-אחרי');
+	writeFileSync(
+		`${artifacts}/native-boundary.json`,
+		JSON.stringify(
+			{ noBackCompletes: true, multipleOldSuffixesSuppressed: true, newActivationCompletes: true },
+			null,
+			2
+		)
+	);
+});
+
+for (const viewport of [
+	{ width: 360, height: 800 },
+	{ width: 390, height: 844 }
+]) {
+	test.describe(`${viewport.width}px delayed touch`, () => {
+		test.use({ viewport, isMobile: true, hasTouch: true });
+		test('held popup and ordinary Back remain effective after release by touch', async ({
+			page
+		}) => {
+			const observations = [];
+			for (const control of ['toolbar', 'cell', 'popup']) {
+				await openWait(page);
+				await cell(page, 0).tap();
+				if (control !== 'popup') await cell(page, 1).tap();
+				await cell(page, 2).tap();
+				expect(await heldCount(page)).toBe(1);
+				const prefix = await sideEffects(page);
+				if (control === 'cell') await cell(page, 0).tap();
+				else await back(page).tap();
+				const destination = control === 'popup' ? 'P' : 'Q';
+				await at(page, destination);
+				await releaseWait(page);
+				await at(page, destination);
+				await expect(chat(page)).toHaveText('המתנה');
+				expect(await sideEffects(page)).toEqual(prefix);
+				await expect(back(page)).toHaveCount(control === 'popup' ? 0 : 1);
+				observations.push({ control, destination, suffixSuppressed: true });
+			}
+			writeFileSync(
+				`${artifacts}/mobile-delay-${viewport.width}.json`,
+				JSON.stringify({ viewport, touch: true, observations }, null, 2)
+			);
+		});
+	});
+}

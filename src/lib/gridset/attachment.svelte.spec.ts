@@ -45,6 +45,18 @@ it('permanently cancels a delayed actual cell chain on detach, preserving synchr
 	expect(runtime.outputText).toBe('');
 	expect(a.valid()).toBe(false);
 	expect(b.valid()).toBe(true);
+	let releaseFresh!: () => void;
+	const fresh = executeCommands(gridSet.pages.P.cells[0], runtime, undefined, {
+		isCurrent: b.valid,
+		delay: () =>
+			new Promise<void>((resolve) => {
+				releaseFresh = resolve;
+			})
+	});
+	releaseFresh();
+	await fresh;
+	expect(runtime.outputText).toBe('late');
+	runtime.output.clear();
 	const cell = {
 		...gridSet.pages.P.cells[0],
 		commands: [{ id: 'Action.InsertText', params: { text: 'now' } }]

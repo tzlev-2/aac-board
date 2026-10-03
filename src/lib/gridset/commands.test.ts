@@ -896,3 +896,26 @@ describe('AutoContent.Activate', () => {
 		expect(ctx.autoContentItem).toBeUndefined();
 	});
 });
+
+it('C6 legacy contexts without Back revision retain their suspended suffix through cell wrapping', async () => {
+	const ctx = fakeContext();
+	let release!: () => void;
+	const chain = executeCommands(
+		cell(
+			cmd('CommandExecution.Wait', { waittime: '2' }),
+			cmd('Action.InsertText', { text: 'legacy' })
+		),
+		ctx,
+		undefined,
+		{
+			delay: () =>
+				new Promise<void>((resolve) => {
+					release = resolve;
+				})
+		}
+	);
+	ctx.back();
+	release();
+	await chain;
+	expect(ctx.log).toEqual(['back', 'insert:legacy']);
+});

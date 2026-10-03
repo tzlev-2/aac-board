@@ -126,6 +126,7 @@ it('Back guards a retained runtime, preserves draft decisions and applied edits,
 	editor.back();
 	expect(editor.selection).toBe(initialSelection);
 	expect(editor.canGoBack).toBe(false);
+	expect(runtime.backRevision).toBe(0);
 	editor.navigate('Q');
 	editor.select(runtime.page, runtime.page.cells[0]);
 	editor.caption('applied Q');
@@ -135,20 +136,24 @@ it('Back guards a retained runtime, preserves draft decisions and applied edits,
 	editor.setLoading(true);
 	editor.back();
 	expect(back).not.toHaveBeenCalled();
+	expect(runtime.backRevision).toBe(0);
 	expect(editor.pending).toBeNull();
 	editor.setLoading(false);
 	editor.back();
 	expect(editor.pending).toBe('draft');
 	editor.back();
 	expect(back).not.toHaveBeenCalled();
+	expect(runtime.backRevision).toBe(0);
 	await editor.resolvePending('stay');
 	expect(runtime.pageName).toBe('Q');
 	expect(runtime.history).toEqual(['P']);
 	expect(editor.form).toBe(form);
+	expect(runtime.backRevision).toBe(0);
 	expect(editor.selection).toBe(selection);
 	editor.back();
 	await editor.resolvePending('apply');
 	expect(back).toHaveBeenCalledTimes(1);
+	expect(runtime.backRevision).toBe(1);
 	expect(editor.runtime).toBe(runtime);
 	expect(editor.gridSet).toBe(model);
 	expect(editor.selection).toBeNull();
@@ -160,6 +165,7 @@ it('Back guards a retained runtime, preserves draft decisions and applied edits,
 	editor.back();
 	await editor.resolvePending('cancel');
 	expect(back).toHaveBeenCalledTimes(2);
+	expect(runtime.backRevision).toBe(2);
 	expect(model.pages.Q.cells[0].caption).toBe('applied Q');
 	editor.navigate('Q');
 	editor.select(runtime.page, runtime.page.cells[0]);
@@ -168,6 +174,7 @@ it('Back guards a retained runtime, preserves draft decisions and applied edits,
 	await editor.resolvePending('apply');
 	expect(editor.pending).toBe('draft');
 	expect(back).toHaveBeenCalledTimes(2);
+	expect(runtime.backRevision).toBe(2);
 	await editor.resolvePending('stay');
 	editor.cancel();
 	editor.caption('stale history');
@@ -175,6 +182,7 @@ it('Back guards a retained runtime, preserves draft decisions and applied edits,
 	runtime.home();
 	await editor.resolvePending('apply');
 	expect(back).toHaveBeenCalledTimes(2);
+	expect(runtime.backRevision).toBe(2);
 	// Accepted draft was applied, but an exhausted history must not reset selection.
 	expect(editor.selection).not.toBeNull();
 	expect(editor.canGoBack).toBe(false);

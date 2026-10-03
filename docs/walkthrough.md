@@ -1,5 +1,17 @@
 # Grid AAC Clone — יומן פיתוח (Walkthrough)
 
+## 2026-10-03 16:56
+
+### C6 · קדימות חזרה על המשך Wait — תיקון צר, ממתין לאימות עצמאי
+
+- `GridRuntime.backRevision` ב־`runtime.svelte.ts` עולה רק כאשר `back()` צורכת history שאינה ריקה. `RuntimeContext.backRevision?` ב־`types.ts` אופציונלי, ו־`withCellContext` ב־`commands.ts` מעביר getter למקבל המקורי. `executeCommandChain` משווה snapshot מיד סביב await של Wait חיובי בלבד; שינוי מונה משליך את כל ההמשך שטרם בוצע. אין בדיקה בין פקודות סינכרוניות ואין await נוסף.
+- זו מדיניות clone מפורשת לכל `cancellable=1/0/omitted`; לא טענה לנאמנות Grid או SelfClosing. ניווט To/Home/selector, attachment, resolver והפעלת שרשרת חדשה אינם משנים את המונה. Empty-history Back, פתיחת dialog ו־Stay/Escape/invalid/blocked אינם מבטלים המשך. Prefix output, שינויים שהוחלו ודיבור/שמע שכבר הופעלו נשמרים.
+- `runtime.svelte.test.ts` מוסיף כיסוי אמיתי ל־D1–D6: suffix מלא עם טקסט/דיבור/שמע לפני ואחרי jump, popup עם sentinel, flags, no-await, own Back ואז Wait נוסף, מספר שרשראות, runtime נפרד, re-entry, AutoContent/item ו־`Runtime.activate`. `commands.test.ts` מאמת context ישן ללא המונה; `attachment.svelte.spec.ts` מאמת detach ישן ו־held chain חדש; `gridset-editor.svelte.spec.ts` מאמת את נקודת הביצוע המוגנת.
+- `__fixtures__/popupBack.ts` מוסיף variant XML ZIP מקורי עם WAV שקט שנוצר כאן ו־sentinels. ה־fixture המקורי נשאר זהה. `tests/popup-back.e2e.ts` מחליף characterization של הכשל בבדיקת חזרה יציבה עם Wait מוחזק ושחרור מפורש, כולל שני הפקדים ו־popup, שלושת flags, no-Back, empty-history/no-await, ריבוי שרשראות, re-entry והפעלה חדשה. עברו שש בדיקות native ממוקדות ועוד שתי בדיקות touch ב־360/390. שלוש הורדות UI Save Copy הושלמו לדיסק, נפתחו מאותם נתיבי Chrome ועברו CRC/data; היסטוריה/טיוטה/session/פלט נשמרו כמתוכנן.
+- check ללא שגיאות/אזהרות, build רגיל ו־94 בדיקות ממוקדות עברו. ESLint על שאר הקבצים ועל runtime עם החרגת כלל יחיד עבר; ESLint/autofixer מלאים מצאו את אותה אזהרת Map קיימת ב־audio cache בשורה 59 גם בבסיס `c4bf1ba`. ה־cache לא שונה; autofixer על כל המחלקה שהשתנתה מחזיר אפס issues/suggestions.
+- הקלט המחייב הוא parent delay repair decision SHA256 `40a19ce20929f628933d6d4cbda2e7c4999eb0719ea7ee3f304adf9f0549ebaa` והסקירה החתומה `f30f46d8…` / `e8ff08d8…`. המועמד הראשון `c4bf1ba` נשאר **REVISE/FAIL היסטורי**; לא הוכשר בדיעבד. חבילת תיקון חדשה בלבד ב־`/home/user/projects/aac-migration-20261002/orchestrator-c6-20261003/executor-run/delay-repair/`; הקומיט החדש מיועד למאמת עצמאי בעץ בלעדי שלו. C6 פתוחה, root אחראי למסירה רק אחרי GO עצמאי. אין פעולה נדרשת מהמשתמש.
+
+
 ## 2026-10-03 16:22
 
 ### C6 · חזרה גלויה לדף הקודם — מועמד מקומי, REVISE פונקציונלי

@@ -78,3 +78,64 @@ export function buildPopupBackFixture(startGrid = 'P'): Uint8Array {
 		)
 	);
 }
+
+/** Original C6 repair variant: add observable suffix effects and owned silent WAV. */
+export function buildPopupBackWaitFixture(cancellable?: string, startGrid = 'P'): Uint8Array {
+	const files = unzipSync(buildPopupBackFixture(startGrid));
+	const text = (value: string) =>
+		`<Command ID="Action.InsertText"><Parameter Key="text">${value}</Parameter></Command>`;
+	const speak = '<Command ID="Action.Speak" />';
+	const sound =
+		'<Command ID="SpeechPlaySound"><Parameter Key="filedata"><data>.wav</data></Parameter></Command>';
+	const flag =
+		cancellable === undefined ? '' : `<Parameter Key="cancellable">${cancellable}</Parameter>`;
+	const commands = [
+		text('המתנה'),
+		speak,
+		sound,
+		`<Command ID="CommandExecution.Wait"><Parameter Key="waittime">00:00:02</Parameter>${flag}</Command>`,
+		text('מאוחר-לפני'),
+		speak,
+		sound,
+		'<Command ID="Jump.To"><Parameter Key="grid">P</Parameter></Command>',
+		text('מאוחר-אחרי'),
+		speak,
+		sound
+	];
+	// A valid, original silent mono PCM WAV, not a licensed recording.
+	const wav = new Uint8Array(46);
+	const data = new DataView(wav.buffer);
+	wav.set(strToU8('RIFF'), 0);
+	data.setUint32(4, 38, true);
+	wav.set(strToU8('WAVEfmt '), 8);
+	data.setUint32(16, 16, true);
+	data.setUint16(20, 1, true);
+	data.setUint16(22, 1, true);
+	data.setUint32(24, 8000, true);
+	data.setUint32(28, 16000, true);
+	data.setUint16(32, 2, true);
+	data.setUint16(34, 16, true);
+	wav.set(strToU8('data'), 36);
+	data.setUint32(40, 2, true);
+	for (const name of ['Q', 'R']) {
+		const path = `Grids/${name}/grid.xml`;
+		files[path] = strToU8(
+			strFromU8(files[path]).replace(
+				/(<Cell X="2" Y="1">[\s\S]*?<Commands>)[\s\S]*?(<\/Commands>)/,
+				`$1${commands.join('')}$2`
+			)
+		);
+		for (const index of [2, 6, 10]) files[`Grids/${name}/2-1-${index}-filedata.wav`] = wav;
+	}
+	files['C6-delay-provenance.txt'] = strToU8(
+		'Original repair variant: owned silent WAV, prefix and complete suffix sentinels; no licensed assets.'
+	);
+	return zipSync(
+		Object.fromEntries(
+			Object.entries(files).map(([name, bytes]) => [
+				name,
+				[bytes, { mtime: new Date('2020-01-01T00:00:00Z') }]
+			])
+		)
+	);
+}

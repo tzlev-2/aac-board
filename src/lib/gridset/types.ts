@@ -108,7 +108,8 @@ export interface CommandPause {
 	/**
 	 * ‏`cancellable` כפי שהוא ב-XML (‏`1` בכל 44 המופעים ב-org-1..org-4).
 	 * 🛑 **לא-מאומת מול Grid** — מה מבטל את ההמתנה (לחיצה? פקודה? סריקה?)
-	 * לא נמדד, ולכן הערך נשמר ואינו נצרך. אין להמציא מנגנון ביטול.
+	 * לא נמדד. הערך נשמר; מדיניות ה-clone מבטלת המשך שהושהה אחרי Back
+	 * מוצלח בכל ערכי הדגל, בלי לטעון שזה פירוש הדגל ב-Grid.
 	 */
 	cancellable: boolean;
 }
@@ -320,6 +321,8 @@ export interface RuntimeContext {
 	readonly gridSet: GridSet;
 	readonly page: Page;
 	readonly features: ReadonlySet<FeatureId>;
+	/** Optional per-runtime count of successful Back operations; legacy contexts may omit it. */
+	readonly backRevision?: number;
 
 	/**
 	 * 🔑 הפריט שהמשבצת מציגה כרגע — מה ש-`AutoContent.Activate` מכניסה

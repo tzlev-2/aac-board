@@ -307,6 +307,9 @@ export function withCellContext(
 		get features() {
 			return ctx.features;
 		},
+		get backRevision() {
+			return ctx.backRevision;
+		},
 		get output() {
 			return ctx.output;
 		},
@@ -486,7 +489,8 @@ export const commandRegistry: Partial<Record<CommandId, CommandHandler>> = {
 	 * דף "מצלמה") — שם ה-`Wait` היא **ראשונה** בשרשרת.
 	 *
 	 * ‏`cancellable=1` ב-44 מ-44 — **לעולם לא נמדד `0`**, ולא נמדד מה מבטל
-	 * את ההמתנה. הערך נקרא, נמסר, ו**אינו נצרך**. ראו `CommandPause`.
+	 * את ההמתנה. הערך נשמר; קדימות Back בזמן השהיה היא מדיניות clone
+	 * מפורשת לכל ערכי הדגל, ולא טענה על התנהגות Grid. ראו `CommandPause`.
 	 */
 	'CommandExecution.Wait': (params) => ({
 		pauseMs: parseWaitTimeMs(paramToText(params.waittime)),
@@ -637,7 +641,8 @@ export interface ExecuteOptions {
 
 /**
  * מריץ שרשרת-פקודות. ‏handler שמחזיר `'halt'` מפסיק את השרשרת; ‏handler
- * שמחזיר `CommandPause` **משהה את המשך השרשרת** ואז ממשיך.
+ * שמחזיר `CommandPause` **משהה את המשך השרשרת**; Back מוצלח בזמן השהיה
+ * חיובית משליך את כל ההמשך לפי מדיניות ה-clone.
  *
  * פקודה בלי handler נספרת ב-`ctx.reportUnimplemented` והשרשרת ממשיכה:
  * לעולם לא זורקים, ולעולם לא שותקים.
@@ -667,7 +672,12 @@ export async function executeCommandChain(
 		}
 		const result: CommandResult = handler(inv.params, ctx);
 		if (result === 'halt') return;
-		if (isCommandPause(result) && result.pauseMs > 0) await delay(result.pauseMs);
+		if (isCommandPause(result) && result.pauseMs > 0) {
+			const backRevision = ctx.backRevision;
+			await delay(result.pauseMs);
+			// Successful Back during this pause discards the entire unexecuted suffix.
+			if (ctx.backRevision !== backRevision) return;
+		}
 	}
 }
 
