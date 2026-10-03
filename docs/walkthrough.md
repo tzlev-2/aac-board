@@ -1,5 +1,17 @@
 # Grid AAC Clone — יומן פיתוח (Walkthrough)
 
+## 2026-10-03 16:22
+
+### C6 · חזרה גלויה לדף הקודם — מועמד מקומי, REVISE פונקציונלי
+
+- `GridEditorPage.svelte` מציג ״חזרה לדף הקודם״ בשימוש ובעריכה כאשר `editor.canGoBack` אמת בלבד. הכפתור חסום ב־busy/pending, בגודל מינימלי 44×44 וב־RTL; `goBack` מעביר פוקוס לכותרת כשהצעד האחרון מסיר את הכפתור. `editor-messages.ts` נושא את התווית.
+- `gridset-editor.svelte.ts` מוסיף `back` דרך `requestAction`: בדיקת runtime/history חוזרת בזמן ביצוע, קריאת `runtime.back` יחידה ואז `resetSelection` רק בפעולה שאושרה. Apply משמר appliedEdits ו־unsaved, Stay/Escape משמרים דף/history/form, Cancel משליך רק draft מפורש. החזרה היא לדף שנצפה קודם; איפוס WordList ל־0 ושימור runtime/model/output הם המדיניות הקיימת.
+- `__fixtures__/popupBack.ts` מייצר ZIP סינתטי מקורי ודטרמיניסטי P/Q/R, עם הזרקת `SelfClosing=1` ל־XML של Q בלבד, מילה ללא תא Back ב־Q ותא `Jump.Back` נפרד ב־R. אין תוכן מורשה או PII. `tests/popup-back.e2e.ts` ו־`gridset-editor.svelte.spec.ts` מכסים את המתאם והזרימות הממוקדות.
+- check ללא שגיאות/אזהרות, build רגיל, ESLint ו־112 בדיקות ממוקדות עברו. Chrome native נבדק ב־1280×900, 360×800 ו־390×844 עם מגע בשתי מידות הטלפון; Enter/Space, פוקוס, החלטות draft, busy/pending, ניווט רגיל/מקונן, selector resume/replacement, כשל שמירה ו־WordList/output/TTS נבדקו. שלוש הורדות Save Copy הגיעו לדיסק של Chrome, נפתחו מאותו נתיב דרך file input, הועתקו מבייטי קובץ הדיסק לתוצרים ועברו CRC ושימור שאר entries. מקור ה־ZIP לא השתנה.
+- **REVISE לפי P4:** `tests/popup-back.e2e.ts` מתעד R→Back→Q ומאוחר יותר `Wait→Jump.To(P)` שמחליף את החזרה. אותה תוצאה נצפתה בכפתור ובתא Back. בדיקת characterization ירוקה אינה קבלת המוצר; מריץ הפקודות/attachment/epoch לא הורחבו. ההורה יכריע scope ממוקד, ואחריו אימות עצמאי בעץ נפרד. C6 פתוחה; H5 חסומה חיצונית לפי ההקשר שנמסר.
+- חבילת הראיות והניסיונות המדויקים: `/home/user/projects/aac-migration-20261002/orchestrator-c6-20261003/executor-run/`. הסלייס מקומי ב־`slice/26-c6-popup-back`; אין merge/push/deploy או סגירת פנקס. אין פעולה נדרשת מהמשתמש.
+
+
 ## 2026-10-03 14:42
 
 ### H2 · קורא כיתוב מלא לפני הפעלת תא

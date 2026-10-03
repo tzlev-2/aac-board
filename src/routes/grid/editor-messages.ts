@@ -25,6 +25,7 @@ export const messages = {
 	edit: 'עריכה',
 	use: 'שימוש',
 	page: 'דף',
+	back: 'חזרה לדף הקודם',
 	sourceMissing: 'כדי לערוך ולשמור יש לטעון קובץ .gridset מקורי.',
 	select: 'בחרו תא ברשת לעריכה',
 	caption: 'כתובית',

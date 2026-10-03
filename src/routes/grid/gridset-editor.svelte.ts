@@ -259,6 +259,15 @@ export function createGridSetEditor() {
 			resetSelection();
 		});
 	}
+	function back() {
+		if (!runtime?.history.length) return;
+		requestAction(() => {
+			// A draft decision can outlive a history change. Use the retained runtime now.
+			if (busy || !runtime?.history.length) return;
+			runtime.back();
+			resetSelection();
+		});
+	}
 	async function load(
 		loader: () => Promise<{ gridSet: GridSet; source: GridSetSource | null }>,
 		name: string,
@@ -375,6 +384,9 @@ export function createGridSetEditor() {
 		get runtime() {
 			return runtime;
 		},
+		get canGoBack() {
+			return Boolean(runtime?.history.length);
+		},
 		runtimeReady: (value: GridRuntime) => {
 			if (value.gridSet === gridSet && (!runtime || runtime === value)) runtime = value;
 		},
@@ -435,6 +447,7 @@ export function createGridSetEditor() {
 		resolvePending,
 		mode,
 		navigate,
+		back,
 		loadFile,
 		loadUrl,
 		saveCopy

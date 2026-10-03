@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { tick } from 'svelte';
 	import GridSetView from '$lib/components/gridset/GridSetView.svelte';
 	import GridSetCellEditor from '../../../routes/grid/GridSetCellEditor.svelte';
 	import { applicationSession } from '$lib/gridset/application-session.svelte';
@@ -6,6 +7,15 @@
 	const session = applicationSession();
 	const editor = session.editor;
 	const pages = $derived(Object.keys(editor.gridSet.pages));
+	async function goBack(event: MouseEvent) {
+		const button = event.currentTarget as HTMLButtonElement;
+		const focused = document.activeElement === button;
+		const heading = button.closest('.grid-page')?.querySelector<HTMLElement>('h1');
+		editor.back();
+		await tick();
+		if (focused && !button.isConnected && document.activeElement === document.body)
+			heading?.focus();
+	}
 </script>
 
 <svelte:head><title>{session.active?.label} — Grid AAC Clone</title></svelte:head>
@@ -29,6 +39,11 @@
 			disabled={!editor.source || editor.busy}
 			onclick={() => editor.mode(true)}>{messages.edit}</button
 		>
+		{#if editor.canGoBack}
+			<button type="button" disabled={editor.busy || Boolean(editor.pending)} onclick={goBack}
+				>{messages.back}</button
+			>
+		{/if}
 		{#if editor.editing}
 			<label
 				>{messages.page}<select
@@ -144,6 +159,7 @@
 	}
 	button {
 		min-block-size: 44px;
+		min-inline-size: 44px;
 		padding-inline: 10px;
 		border: 1px solid #9bb;
 		border-radius: 6px;
