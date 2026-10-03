@@ -200,64 +200,65 @@ export function fitCaption(span: HTMLElement, preferredCss: string) {
 }
 
 /** Observe fixed boxes, never the span resized by our own font write. */
-export function observeCaptionFit(span: HTMLElement, preferredCss: string): () => void {
+export function observeCaptionFit(
+	span: HTMLElement,
+	preferredCss: string,
+	afterFit: () => void = () => {}
+): () => void {
 	const parent = span.closest<HTMLElement>('.button-cell');
 	const cell = span.closest<HTMLElement>('[data-testid=grid-cell]');
 	if (!parent || !cell) return () => {};
 	let disposed = false,
-		frame = 0,
 		generation = 0,
 		previousKey = '';
-	const schedule = () => {
-		if (disposed || frame) return;
-		frame = requestAnimationFrame(() => {
-			frame = 0;
-			if (disposed || !span.isConnected) return;
-			const cs = getComputedStyle(span),
-				p = contentBox(parent),
-				c = contentBox(cell);
-			const key = JSON.stringify([
-				span.textContent,
-				preferredCss,
-				cs.fontFamily,
-				cs.fontWeight,
-				cs.fontStyle,
-				cs.letterSpacing,
-				cs.wordSpacing,
-				cs.direction,
-				cs.writingMode,
-				p.width,
-				p.height,
-				c.width,
-				c.height,
-				generation
-			]);
-			if (key === previousKey) return;
+	const refresh = () => {
+		if (disposed || !span.isConnected) return;
+		const cs = getComputedStyle(span),
+			p = contentBox(parent),
+			c = contentBox(cell);
+		const key = JSON.stringify([
+			span.textContent,
+			preferredCss,
+			cs.fontFamily,
+			cs.fontWeight,
+			cs.fontStyle,
+			cs.letterSpacing,
+			cs.wordSpacing,
+			cs.direction,
+			cs.writingMode,
+			p.width,
+			p.height,
+			c.width,
+			c.height,
+			generation
+		]);
+		if (key !== previousKey) {
 			previousKey = key;
 			fitCaption(span, preferredCss);
-		});
+		}
+		// A stable fit key does not imply stable tile origin or gradient.
+		afterFit();
 	};
 	const fontsChanged = () => {
 		generation++;
-		schedule();
+		refresh();
 	};
-	const observer = new ResizeObserver(schedule);
+	const observer = new ResizeObserver(refresh);
 	observer.observe(parent);
 	observer.observe(cell);
-	window.addEventListener('resize', schedule);
-	window.visualViewport?.addEventListener('resize', schedule);
+	window.addEventListener('resize', refresh);
+	window.visualViewport?.addEventListener('resize', refresh);
 	document.fonts.addEventListener('loadingdone', fontsChanged);
 	document.fonts.addEventListener('loadingerror', fontsChanged);
 	void document.fonts.ready.then(() => {
 		if (!disposed) fontsChanged();
 	});
-	schedule();
+	refresh();
 	return () => {
 		disposed = true;
 		observer.disconnect();
-		if (frame) cancelAnimationFrame(frame);
-		window.removeEventListener('resize', schedule);
-		window.visualViewport?.removeEventListener('resize', schedule);
+		window.removeEventListener('resize', refresh);
+		window.visualViewport?.removeEventListener('resize', refresh);
 		document.fonts.removeEventListener('loadingdone', fontsChanged);
 		document.fonts.removeEventListener('loadingerror', fontsChanged);
 		span.style.fontSize = preferredCss;

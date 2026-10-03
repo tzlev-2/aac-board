@@ -1,11 +1,6 @@
 <script lang="ts">
 	import { observeCaptionFit } from '$lib/gridset/caption-fit';
-	import {
-		fontPresentation,
-		fontPresentationGradient,
-		scheduleFontCaption,
-		cancelFontCaption
-	} from '$lib/gridset/fontColourPresentation';
+	import { fontPresentation, fontPresentationGradient } from '$lib/gridset/fontColourPresentation';
 	import type { CellRendererProps } from './cellRenderers';
 	import type { SymbolResolution } from '$lib/gridset/symbols';
 	import {
@@ -27,14 +22,6 @@
 	);
 	const captionMaxBlock = $derived(captionOnly ? undefined : captionBelowSymbolMaxBlockCss());
 
-	let captionElement = $state<HTMLSpanElement>();
-	function fitCaptionOnly(span: HTMLSpanElement) {
-		const preferred = captionFontSize;
-		// Reused cells and applied drafts update primitive text/style eligibility.
-		void cell.caption;
-		void cell.style.fontName;
-		if (captionOnly) return observeCaptionFit(span, preferred);
-	}
 	// ערכי primitive מונעים הקמת observers מחדש כשדף אחר משתמש באותו סגנון.
 	const presentationFont = $derived(cell.style.fontColour);
 	const presentationBack = $derived(cell.style.backColour);
@@ -42,15 +29,19 @@
 	const presentation = $derived(
 		fontPresentation(presentationFont, presentationBack, captionOnly, presentationDisabled)
 	);
-	$effect(() => {
-		const span = captionElement,
-			model = presentation;
-		if (!span || !model.eligible) return;
+	function presentCaption(span: HTMLSpanElement) {
+		const model = presentation,
+			preferred = captionFontSize,
+			only = captionOnly;
+		// Primitive inputs rerun the owner after caption/draft/font updates.
+		void cell.caption;
+		void cell.style.fontName;
 		const tile = span.closest<HTMLElement>('[data-testid="grid-cell"]');
 		if (!tile) return;
 		const forced = matchMedia('(forced-colors: active)');
 		const expectedBackground = document.createElement('span').style;
-		expectedBackground.backgroundImage = `linear-gradient(to bottom, rgb(${model.stops[0].join(', ')}), rgb(${model.stops[1].join(', ')}) 50%, rgb(${model.stops[2].join(', ')}))`;
+		if (model.eligible)
+			expectedBackground.backgroundImage = `linear-gradient(to bottom, rgb(${model.stops[0].join(', ')}), rgb(${model.stops[1].join(', ')}) 50%, rgb(${model.stops[2].join(', ')}))`;
 		let disposed = false;
 		const clear = () => {
 			for (const property of [
@@ -66,8 +57,9 @@
 				span.style.removeProperty(property);
 		};
 		const measure = () => {
-			if (disposed) return;
+			if (disposed || !span.isConnected) return;
 			if (
+				!model.eligible ||
 				forced.matches ||
 				!CSS.supports('background-clip', 'text') ||
 				!CSS.supports('background-image', 'linear-gradient(to bottom in srgb, black, white)')
@@ -110,7 +102,7 @@
 			)
 				return clear;
 			return () => {
-				if (disposed) return;
+				if (disposed || !span.isConnected) return;
 				clear();
 				span.style.backgroundImage = gradient;
 				span.style.backgroundSize = `${width - left - right}px ${height}px`;
@@ -122,27 +114,39 @@
 				span.style.webkitTextFillColor = 'transparent';
 			};
 		};
-		const schedule = () => {
-			if (!disposed) scheduleFontCaption(measure);
+		// Read and commit in this turn, after fitting has installed its final
+		// (or restored preferred) font. No geometry closure crosses a frame.
+		const paint = () => {
+			if (disposed || !span.isConnected) return;
+			try {
+				measure()?.();
+			} catch {
+				clear();
+			}
 		};
-		const observer = new ResizeObserver(schedule);
+		const stopFit = only ? observeCaptionFit(span, preferred, paint) : undefined;
+		const observer = new ResizeObserver(paint);
 		observer.observe(span);
 		observer.observe(tile);
-		forced.addEventListener('change', schedule);
-		window.addEventListener('resize', schedule);
-		document.fonts.addEventListener('loadingdone', schedule);
-		void document.fonts.ready.then(schedule);
-		schedule();
+		forced.addEventListener('change', paint);
+		window.addEventListener('resize', paint);
+		window.visualViewport?.addEventListener('resize', paint);
+		document.fonts.addEventListener('loadingdone', paint);
+		document.fonts.addEventListener('loadingerror', paint);
+		void document.fonts.ready.then(paint);
+		if (!only) paint();
 		return () => {
 			disposed = true;
 			observer.disconnect();
-			cancelFontCaption(measure);
-			forced.removeEventListener('change', schedule);
-			window.removeEventListener('resize', schedule);
-			document.fonts.removeEventListener('loadingdone', schedule);
+			stopFit?.();
+			forced.removeEventListener('change', paint);
+			window.removeEventListener('resize', paint);
+			window.visualViewport?.removeEventListener('resize', paint);
+			document.fonts.removeEventListener('loadingdone', paint);
+			document.fonts.removeEventListener('loadingerror', paint);
 			clear();
 		};
-	});
+	}
 
 	const iconBoxW = `${(VISUAL_DEFAULTS.iconBoxWidthRatio * 100).toFixed(3)}%`;
 	const iconTopPad = `${(((VISUAL_DEFAULTS.iconTopRatio * 217) / 277) * 100).toFixed(3)}%`;
@@ -169,8 +173,7 @@
 {#snippet caption()}
 	{#if cell.caption}
 		<span
-			bind:this={captionElement}
-			{@attach fitCaptionOnly}
+			{@attach presentCaption}
 			class="caption"
 			class:caption-only={captionOnly}
 			data-testid="cell-caption"

@@ -1,5 +1,17 @@
 # Grid AAC Clone — יומן פיתוח (Walkthrough)
 
+## 2026-10-03 12:50
+
+### H2 · התאמת כתב וציור צבע במחזור משותף — REVISE מוצר
+
+- `ButtonCell.svelte` מחבר attachment יחיד `presentCaption` לכתובית. הוא מחזיק התאמה, מדידת הצבע, כתיבה מיידית וניקוי. `observeCaptionFit` ב־`caption-fit.ts` מפעיל callback סינכרוני אחרי כתב סופי או מועדף ששוחזר; גם מפתח התאמה ללא שינוי מצייר ממיקום עדכני. התראות תיבות קבועות מתאימות ישירות, והתראות span/אריח מציירות בלבד, ללא RAF נוסף או חיפוש כתב. גודל מועדף, טקסט ושם גופן הם dependencies מפורשים של ה־attachment.
+- נוסחת FontColour, עצירות/גרדיאנט, `GridBoard`, כל ספי ההתאמה, מודל `FontSize` ו־XML נשמרו. מסלולי forced-colors/unsupported מחזירים לציור המקור. כשל מדידה משחזר כתב מועדף לפני הציור ושומר diagnostic; cleanup מנתק observers/listeners ומונע כתיבה מ־font promise או callback ישן.
+- `caption-fit-lifecycle.test.ts` מוסיף חמש רגרסיות משמעותיות: התאמה/שחזור/ציור לפני חזרת ההתראה, מיקום חדש ללא התאמה חוזרת, כשל Range אחרי גודל ביניים, font completion/error ו־unmount/ready מאוחר, וניתוק span. כל חמש נכשלות מול המתזמן הישן. 23 בדיקות ממוקדות עברו, check עם אפס שגיאות/אזהרות, build רגיל ו־ESLint ממוקד עברו. רגרסיית Chrome native בדקה גם alpha בפועל בשני סדרי התראות, כשל ושחזור, unsupported ו־callbacks אחרי unmount.
+- QA במחשב וב־360×800, 390×844, 844×390, 768×1024: 410 בדיקות זרימת מוצר עברו, חמש הורדות פיזיות ופתיחת אותם קבצים עברו CRC ושימור entries לא קשורים ו־FontSize. שמונה השוואות רנדרר עברו; הגאומטריה/סגנון הסופי וכל פיקסלי PNG native זהים למועמד הקודם, ולכן הוכחת alpha המקורית קשורה מחדש למקור הנוכחי. עברו גם עברית, font loading/restoration, סיבוב, Apply/Cancel, שחרור observers ו־Chat ריק/סמל/ארוך.
+- **REVISE; ללא GO מוצר:** grow/shrink, גופן וסטטוס הורדה/שגיאה/הסרה אמיתיים נבדקו מול רנדרר H1 בהקצאה תואמת; גם pending/removal נבדקו בהקצאת edit תואמת. לא נצפתה החמרה בדגימות, אך screencast של שינויי תמונה אינו מוכיח משך כל פריים מוצג. אין הקלה בסף או הכשרה בדיעבד של כשלי העבר. ניסיונות harness לא שלמים והשוואות pending בהקצאה לא תואמת נשמרו ואינם ראיות PASS.
+- התוצרים, מקור הבסיס, replay והכרעת המוצר ב־`/home/user/projects/aac-migration-20261002/orchestrator-h2-20261003/transient-executor-run`. המועמד מיועד לאימות עצמאי בעץ אישי. GUI משוחרר לאחר cleanup; ללא ילדים, subscriptions, מיזוג, דחיפה או פריסה. אין פעולה נדרשת מהמשתמש.
+
+
 ## 2026-10-03 11:19
 
 ### H2 · התאמת כתב מותנית לכתובית — REVISE בגבול FontColour שקוף
