@@ -23,8 +23,8 @@ export interface CellRendererProps {
 	 */
 	symbols?: SymbolResolver | null;
 	/**
-	 * מה מוצג בתא `AutoContent/WordList` בעמוד הנוכחי — מחושב ברמת הדף
-	 * ב-`wordListPager`, כי העימוד תלוי בכל תאי-הדף ולא בתא בודד.
+	 * מה מוצג בתא `AutoContent/WordList` או `Prediction` בעמוד הנוכחי —
+	 * מחושב ברמת הדף ב-`wordListPager`, כי העימוד תלוי בכל תאי-הדף.
 	 */
 	slot?: WordListSlot;
 }
@@ -39,7 +39,8 @@ export function cellRendererKey(cell: Pick<Cell, 'contentType' | 'contentSubType
 export const cellRenderers: Record<string, CellRendererComponent> = {
 	default: ButtonCell,
 	'Workspace/Chat': ChatCell,
-	'AutoContent/WordList': WordListCell
+	'AutoContent/WordList': WordListCell,
+	'AutoContent/Prediction': WordListCell
 };
 
 export function resolveCellRenderer(cell: Cell): CellRendererComponent {

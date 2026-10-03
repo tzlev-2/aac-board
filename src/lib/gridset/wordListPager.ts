@@ -126,6 +126,20 @@ export function isWordListCell(cell: Cell): boolean {
 	return cell.contentType === 'AutoContent' && cell.contentSubType === 'WordList';
 }
 
+/** האם התא הוא תא-`Prediction` שהעימוד של `PredictThis` חל עליו. */
+export function isPredictionCell(cell: Cell): boolean {
+	return cell.contentType === 'AutoContent' && cell.contentSubType === 'Prediction';
+}
+
+/**
+ * תא-`WordList` בלי פריט **אינו מצויר**. תא-`Prediction` בלי פריט **נשאר
+ * מסגרת גלויה** — עוגן `eng-15`. העתקת כלל WordList לחיזוי הייתה מסתירה
+ * את המסגרות הריקות שנמדדו.
+ */
+export function hidesEmptyWordListSlot(cell: Cell, slot: WordListSlot | undefined): boolean {
+	return isWordListCell(cell) && slot?.kind === 'empty';
+}
+
 /**
  * 🛑 **המלכודת המסוכנת ביותר כאן.** ‏`parse.ts` מחזיר תאים בסדר-המסמך,
  * ו-**‏54 מ-146 דפי ה-`WordList` (‏37%) שומרים אותם בסדר שאינו `(y,x)`**.
@@ -136,17 +150,19 @@ export function orderWordListCells(cells: Cell[]): Cell[] {
 	return cells.filter(isWordListCell).sort((a, b) => a.y - b.y || a.x - b.x);
 }
 
+export function orderPredictionCells(cells: Cell[]): Cell[] {
+	return cells.filter(isPredictionCell).sort((a, b) => a.y - b.y || a.x - b.x);
+}
+
 /**
- * מחשב מה מוצג בכל תא-`WordList` בעמוד נתון.
- *
- * @param pageIndex עמוד מבוסס-0. מקוצץ לטווח החוקי.
+ * אותו אלגוריתם `(y,x)` + `C−1` + `עוד`/`חזור` ל-WordList ול-Prediction.
+ * ההבדל היחיד הוא אילו תאים נכנסים ל-`order`; הסתרת ריקים היא של הרינדור.
  */
-export function pageWordList(
-	cells: Cell[],
+function pageAutoContentCells(
+	order: Cell[],
 	items: readonly WordListItem[],
 	pageIndex = 0
 ): WordListPage {
-	const order = orderWordListCells(cells);
 	const slots = new Map<Cell, WordListSlot>();
 	const cellCount = order.length;
 
@@ -177,9 +193,30 @@ export function pageWordList(
 			continue;
 		}
 		const item = items[start + i];
-		// תא בלי פריט **אינו מצויר** — לא קופסה ריקה ולא placeholder.
 		slots.set(cell, item ? { kind: 'item', item, index: start + i } : { kind: 'empty' });
 	}
 
 	return { slots, pageCount, capacity };
+}
+
+/**
+ * מחשב מה מוצג בכל תא-`WordList` בעמוד נתון.
+ *
+ * @param pageIndex עמוד מבוסס-0. מקוצץ לטווח החוקי.
+ */
+export function pageWordList(
+	cells: Cell[],
+	items: readonly WordListItem[],
+	pageIndex = 0
+): WordListPage {
+	return pageAutoContentCells(orderWordListCells(cells), items, pageIndex);
+}
+
+/** עימוד תאי `AutoContent/Prediction` מתוך רשימת `PredictThis`, לא מ-`page.wordList`. */
+export function pagePrediction(
+	cells: Cell[],
+	items: readonly WordListItem[],
+	pageIndex = 0
+): WordListPage {
+	return pageAutoContentCells(orderPredictionCells(cells), items, pageIndex);
 }

@@ -350,6 +350,17 @@ export interface RuntimeContext {
 	back(): void;
 	home(): void;
 
+	/**
+	 * Transient `Prediction.PredictThis` list for the current page.
+	 * `null`/`undefined` = no command applied yet. `[]` = explicit empty
+	 * replacement. Never writes `page.wordList`. Optional on legacy test
+	 * contexts; `GridRuntime` always exposes it.
+	 */
+	readonly predictionList?: readonly WordListItem[] | null;
+	setPredictionList?(items: readonly WordListItem[]): void;
+	readonly predictionPage?: number;
+	navigatePrediction?(action: 'next' | 'first'): void;
+
 	output: {
 		insert(item: OutputItem): void;
 		insertLetter(letter: string): void;

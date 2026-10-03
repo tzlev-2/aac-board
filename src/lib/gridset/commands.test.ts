@@ -717,9 +717,8 @@ describe('executeCommands', () => {
 		expect(ctx.log).toEqual([]);
 	});
 
-	it('הרג׳יסטרי מחזיק בדיוק את עשרים ואחת הפקודות', () => {
-		// ‏21 = ‏15 (עד סלייס 11) + ‏6 (סלייס 13: `Action.InsertCellText` ·
-		// ‏`SpeechPlaySound` · ארבע `Settings.Rest*`).
+	it('הרג׳יסטרי מחזיק בדיוק את עשרים ושתיים הפקודות', () => {
+		// ‏22 = ‏21 אחרי סלייס 13 + `Prediction.PredictThis`.
 		expect(Object.keys(commandRegistry).sort()).toEqual([
 			'Action.Clear',
 			'Action.DeleteLetter',
@@ -736,6 +735,7 @@ describe('executeCommands', () => {
 			'Jump.Back',
 			'Jump.Home',
 			'Jump.To',
+			'Prediction.PredictThis',
 			'Settings.RequiredFeature',
 			'Settings.RestAll',
 			'Settings.RestEyeGaze',
@@ -894,6 +894,61 @@ describe('AutoContent.Activate', () => {
 		ctx.page.autoContentCommands = { WordList: [cmd('AutoContent.Activate')] };
 		executeCommands(autoCell('WordList'), ctx, wordItem('חולצה'));
 		expect(ctx.autoContentItem).toBeUndefined();
+	});
+});
+
+describe('Prediction.PredictThis', () => {
+	it('an embedded array replaces the transient list and leaves page.wordList', () => {
+		const ctx = fakeContext();
+		const kept = wordItem('keep-page');
+		ctx.page.wordList = [kept];
+		const applied: WordListItem[][] = [];
+		ctx.setPredictionList = (items) => {
+			applied.push([...items]);
+		};
+		const payload = [wordItem('abseil'), wordItem('amble')];
+		executeCommands(cell(cmd('Prediction.PredictThis', { wordlist: payload })), ctx);
+		expect(applied).toEqual([payload]);
+		expect(ctx.page.wordList).toEqual([kept]);
+		expect(ctx.unimplemented).toEqual({});
+	});
+
+	it('empty array is a valid empty replacement, not unsupported', () => {
+		const ctx = fakeContext();
+		const applied: number[] = [];
+		ctx.setPredictionList = (items) => {
+			applied.push(items.length);
+		};
+		executeCommands(cell(cmd('Prediction.PredictThis', { wordlist: [] })), ctx);
+		expect(applied).toEqual([0]);
+		expect(ctx.unimplemented).toEqual({});
+	});
+
+	it('missing or wrong-type payload is unsupported and invents nothing', () => {
+		const payloads: Record<string, ParamValue>[] = [
+			{},
+			{ wordlist: 'abseil' },
+			{ wordlist: rich('amble') }
+		];
+		for (const params of payloads) {
+			const ctx = fakeContext();
+			ctx.setPredictionList = () => {
+				throw new Error('must not invent a list');
+			};
+			executeCommands(cell(cmd('Prediction.PredictThis', params)), ctx);
+			expect(ctx.unimplemented['Prediction.PredictThis']).toBe(1);
+			expect(ctx.buffer).toEqual([]);
+		}
+	});
+
+	it('PredictConjugations stays unimplemented', () => {
+		const ctx = fakeContext();
+		ctx.setPredictionList = () => {
+			throw new Error('must not invent a list');
+		};
+		executeCommands(cell(cmd('Prediction.PredictConjugations')), ctx);
+		expect(ctx.unimplemented['Prediction.PredictConjugations']).toBe(1);
+		expect(ctx.buffer).toEqual([]);
 	});
 });
 

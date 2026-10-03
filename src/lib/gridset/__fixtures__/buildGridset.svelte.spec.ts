@@ -122,6 +122,41 @@ describe('buildGridset', () => {
 		expect(doc.querySelector('Parameter[Key="feature"]')?.textContent).toBe('TouchAccess');
 	});
 
+	it('PredictThis command parameter writes WordList Items, not page WordList', () => {
+		const files = unzipSync(
+			buildGridset({
+				pages: [
+					{
+						name: 'Actions',
+						columns: 2,
+						rows: 1,
+						wordList: [{ text: 'keep-page' }],
+						cells: [
+							{
+								x: 0,
+								y: 0,
+								caption: 'Body actions',
+								commands: [
+									{
+										id: 'Prediction.PredictThis',
+										params: { wordlist: [{ text: 'abseil' }, { text: 'amble' }] }
+									}
+								]
+							}
+						]
+					}
+				]
+			})
+		);
+		const xml = strFromU8(files['Grids/Actions/grid.xml']);
+		const doc = parseXml(xml);
+		expect(doc.querySelector('Grid > WordList WordListItem r')?.textContent).toBe('keep-page');
+		const payload = [
+			...doc.querySelectorAll('Command[ID="Prediction.PredictThis"] WordListItem r')
+		].map((el) => el.textContent);
+		expect(payload).toEqual(['abseil', 'amble']);
+	});
+
 	it('guardNoParam — בלי <Parameter> כלל (56/126, 44%)', () => {
 		const files = unzipSync(buildGridset(fixtures.guardNoParam));
 		const doc = parseXml(strFromU8(files['Grids/guardNoParam/grid.xml']));

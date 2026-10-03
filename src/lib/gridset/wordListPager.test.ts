@@ -5,25 +5,56 @@
  * מיפוי 1:1 נכון.
  */
 import { describe, it, expect } from 'vitest';
-import { pageWordList, orderWordListCells, isWordListCell, displayWordList } from './wordListPager';
+import {
+	pageWordList,
+	pagePrediction,
+	orderWordListCells,
+	orderPredictionCells,
+	isWordListCell,
+	isPredictionCell,
+	hidesEmptyWordListSlot,
+	displayWordList
+} from './wordListPager';
+import {
+	B104_BODY_DOCUMENTED,
+	B104_BODY_PAGE1,
+	B104_BODY_PAGE2
+} from './__fixtures__/predictThisSource';
 import type { Cell, WordListItem } from './types';
 
 const style = {
-	backColour: '#FFFFFFFF', fontColour: '#000000FF', borderColour: '#FFFFFF00',
-	fontName: 'Booster', fontSize: 24, backgroundShape: 1, tileColour: '#00000000'
+	backColour: '#FFFFFFFF',
+	fontColour: '#000000FF',
+	borderColour: '#FFFFFF00',
+	fontName: 'Booster',
+	fontSize: 24,
+	backgroundShape: 1,
+	tileColour: '#00000000'
 };
 
 /** תא-`WordList` ב-(x,y). */
 const wl = (x: number, y: number): Cell => ({
-	x, y, columnSpan: 1, rowSpan: 1, commands: [],
-	contentType: 'AutoContent', contentSubType: 'WordList', style
+	x,
+	y,
+	columnSpan: 1,
+	rowSpan: 1,
+	commands: [],
+	contentType: 'AutoContent',
+	contentSubType: 'WordList',
+	style
 });
 const word = (t: string): WordListItem => ({
 	text: { paragraphs: [{ sentences: [{ runs: [t] }] }] }
 });
 const words = (...t: string[]) => t.map(word);
-const textOf = (s: ReturnType<typeof pageWordList>['slots'] extends Map<Cell, infer S> ? S : never) =>
-	s.kind === 'item' ? s.item.text.paragraphs[0].sentences[0].runs[0] : s.kind === 'nav' ? s.label : '';
+const textOf = (
+	s: ReturnType<typeof pageWordList>['slots'] extends Map<Cell, infer S> ? S : never
+) =>
+	s.kind === 'item'
+		? s.item.text.paragraphs[0].sentences[0].runs[0]
+		: s.kind === 'nav'
+			? s.label
+			: '';
 
 describe('Sorting display projection', () => {
 	it('sorts the whole list before paging, retaining source item identity and media', () => {
@@ -69,7 +100,10 @@ describe('סדר המילוי', () => {
 	it('ממיין לפי (y,x) ולא לפי סדר-המערך', () => {
 		const docOrder = [wl(2, 1), wl(5, 3), wl(2, 4), wl(3, 3)];
 		expect(orderWordListCells(docOrder).map((c) => [c.y, c.x])).toEqual([
-			[1, 2], [3, 3], [3, 5], [4, 2]
+			[1, 2],
+			[3, 3],
+			[3, 5],
+			[4, 2]
 		]);
 	});
 
@@ -83,7 +117,7 @@ describe('סדר המילוי', () => {
 });
 
 describe('קבלה · org-1/בגדים — N = C', () => {
-	const cells = Array.from({ length: 11 }, (_, i) => wl(i % 4 + 2, Math.floor(i / 4) + 1));
+	const cells = Array.from({ length: 11 }, (_, i) => wl((i % 4) + 2, Math.floor(i / 4) + 1));
 	const items = words(...Array.from({ length: 11 }, (_, i) => `פריט${i + 1}`));
 
 	it('11 מילים, עמוד יחיד, ו🛑 אין תא-ניווט', () => {
@@ -97,7 +131,7 @@ describe('קבלה · org-1/בגדים — N = C', () => {
 });
 
 describe('קבלה · org-1/גוף - פנים — N < C', () => {
-	const cells = Array.from({ length: 12 }, (_, i) => wl(i % 4 + 2, Math.floor(i / 4) + 1));
+	const cells = Array.from({ length: 12 }, (_, i) => wl((i % 4) + 2, Math.floor(i / 4) + 1));
 	const items = words(...Array.from({ length: 10 }, (_, i) => `פריט${i + 1}`));
 
 	it('10 מילים, 2 תאים ריקים, אין ניווט', () => {
@@ -164,7 +198,7 @@ describe('🔑 קבלה · org-2/ארצות — N > C, וסדר-מסמך ≠ (y,
 });
 
 describe('גבולות', () => {
-	const cells = Array.from({ length: 11 }, (_, i) => wl(i % 4 + 2, Math.floor(i / 4) + 1));
+	const cells = Array.from({ length: 11 }, (_, i) => wl((i % 4) + 2, Math.floor(i / 4) + 1));
 
 	it('🔑 הגבול חד: N=C אין ניווט, N=C+1 יש', () => {
 		const exact = pageWordList(cells, words(...Array(11).fill('x')));
@@ -231,5 +265,79 @@ describe('כיתוב ואייקון תא-הניווט — אומתו מול Grid
 		// לחפש `autocells_next.wmf` בתוך ה-ZIP (הוא לא שם — הוא נשלח עם Grid).
 		expect(nav.image.library).not.toBe('');
 		expect(nav.image.embeddedPath).toBeUndefined();
+	});
+});
+
+describe('Prediction pager — documented b104/Actions Body extract', () => {
+	const pred = (x: number, y: number): Cell => ({
+		x,
+		y,
+		columnSpan: 1,
+		rowSpan: 1,
+		commands: [],
+		contentType: 'AutoContent',
+		contentSubType: 'Prediction',
+		style
+	});
+	// Measured Actions cells, stored out of (y,x) document order on purpose.
+	const cells = [
+		pred(5, 3),
+		pred(2, 2),
+		pred(4, 2),
+		pred(3, 3),
+		pred(5, 2),
+		pred(2, 3),
+		pred(3, 2),
+		pred(4, 3)
+	];
+	const items = words(...B104_BODY_DOCUMENTED);
+
+	it('fills by (y,x) and does not consume WordList cells or page.wordList', () => {
+		expect(isPredictionCell(wl(0, 0))).toBe(false);
+		expect(isWordListCell(cells[0])).toBe(false);
+		expect(orderPredictionCells([wl(0, 0), ...cells]).map((c) => [c.y, c.x])).toEqual([
+			[2, 2],
+			[2, 3],
+			[2, 4],
+			[2, 5],
+			[3, 2],
+			[3, 3],
+			[3, 4],
+			[3, 5]
+		]);
+		expect(pageWordList(cells, items).pageCount).toBe(0);
+	});
+
+	it('page 1 is the seven measured Body verbs plus עוד', () => {
+		const { slots, capacity, pageCount } = pagePrediction(cells, items, 0);
+		expect(capacity).toBe(7);
+		expect(pageCount).toBe(3);
+		expect([...slots.values()].map(textOf)).toEqual([...B104_BODY_PAGE1, 'עוד']);
+	});
+
+	it('page 2 is the seven measured verbs plus עוד', () => {
+		expect([...pagePrediction(cells, items, 1).slots.values()].map(textOf)).toEqual([
+			...B104_BODY_PAGE2,
+			'עוד'
+		]);
+	});
+
+	it('N <= C keeps empty slots and has no nav; WordList hide rule does not apply', () => {
+		const short = words('abseil', 'amble');
+		const { slots } = pagePrediction(cells, short, 0);
+		const kinds = [...slots.values()].map((s) => s.kind);
+		expect(kinds.filter((k) => k === 'item')).toHaveLength(2);
+		expect(kinds.filter((k) => k === 'empty')).toHaveLength(6);
+		expect(kinds).not.toContain('nav');
+		for (const [cell, slot] of slots) {
+			expect(hidesEmptyWordListSlot(cell, slot)).toBe(false);
+		}
+		expect(hidesEmptyWordListSlot(wl(0, 0), { kind: 'empty' })).toBe(true);
+	});
+
+	it('empty array pages to visible empty frames without nav', () => {
+		const { slots, pageCount } = pagePrediction(cells, [], 0);
+		expect(pageCount).toBe(1);
+		expect([...slots.values()].every((s) => s.kind === 'empty')).toBe(true);
 	});
 });

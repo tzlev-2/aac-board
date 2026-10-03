@@ -15,7 +15,13 @@
 		gutterRatioForCellSpacing,
 		verticalFillGradient
 	} from '$lib/gridset/visualMeasured';
-	import { pageWordList, displayWordList } from '$lib/gridset/wordListPager';
+	import {
+		pageWordList,
+		pagePrediction,
+		displayWordList,
+		hidesEmptyWordListSlot,
+		isPredictionCell
+	} from '$lib/gridset/wordListPager';
 	import GridCell from './GridCell.svelte';
 	import { cellLabel } from '../../../routes/grid/editor-messages';
 
@@ -35,7 +41,12 @@
 		editing?: boolean;
 		selection?: { page: string; x: number; y: number } | null;
 		onSelectCell?: (page: Page, cell: Cell) => void;
-		pager?: { readonly wordListPage: number; navigateWordList(action: 'next' | 'first'): void };
+		pager?: {
+			readonly wordListPage: number;
+			navigateWordList(action: 'next' | 'first'): void;
+			readonly predictionPage?: number;
+			navigatePrediction?(action: 'next' | 'first'): void;
+		};
 		isCurrent?: () => boolean;
 	} = $props();
 
@@ -77,11 +88,15 @@
 	// The retained runtime owns the visible subpage. Standalone boards keep
 	// their existing local pager and reset when the logical page changes.
 	let wordListPage = $state(0);
+	let predictionPage = $state(0);
 	const pageName = $derived(page.name);
 	$effect(() => {
 		// Reading pageName tracks navigation while same-name preview keeps the pager.
 		void pageName;
-		if (!pager) wordListPage = 0;
+		if (!pager) {
+			wordListPage = 0;
+			predictionPage = 0;
+		}
 	});
 
 	const displayedWordList = $derived(
@@ -90,18 +105,31 @@
 	const paged = $derived(
 		pageWordList(page.cells, displayedWordList, pager?.wordListPage ?? wordListPage)
 	);
+	const predictionPaged = $derived(
+		pagePrediction(page.cells, ctx.predictionList ?? [], pager?.predictionPage ?? predictionPage)
+	);
 
 	function navigate(action: 'next' | 'first') {
 		if (pager) pager.navigateWordList(action);
 		else wordListPage = action === 'next' ? wordListPage + 1 : 0;
 	}
 
+	function navigatePrediction(action: 'next' | 'first') {
+		if (pager?.navigatePrediction) pager.navigatePrediction(action);
+		else predictionPage = action === 'next' ? predictionPage + 1 : 0;
+	}
+
 	/**
-	 * תא-`WordList` בלי פריט **אינו מצויר** — לא קופסה ריקה ולא placeholder;
-	 * זה רקע-לוח נקי, כפי שנמדד. תא שאינו `WordList` אינו במפה ולכן עובר.
+	 * תא-`WordList` בלי פריט **אינו מצויר**. תא-`Prediction` בלי פריט **נשאר
+	 * מסגרת גלויה** — לא מעתיקים את כלל WordList לחיזוי.
 	 */
 	const drawnCells = $derived(
-		editing ? page.cells : visibleCells.filter((cell) => paged.slots.get(cell)?.kind !== 'empty')
+		editing
+			? page.cells
+			: visibleCells.filter((cell) => {
+					const slot = predictionPaged.slots.get(cell) ?? paged.slots.get(cell);
+					return !hidesEmptyWordListSlot(cell, slot);
+				})
 	);
 
 	const uid = $props.id();
@@ -182,7 +210,7 @@
 			{/if}
 			<GridCell
 				{isCurrent}
-				inspectionScope={paged}
+				inspectionScope={{ word: paged, pred: predictionPaged }}
 				inspectionHintId={hintId}
 				onReadCaption={readCaption}
 				onCaptionAvailability={captionAvailability}
@@ -190,8 +218,8 @@
 				{ctx}
 				{symbols}
 				{editing}
-				slot={paged.slots.get(cell)}
-				onNavigate={navigate}
+				slot={predictionPaged.slots.get(cell) ?? paged.slots.get(cell)}
+				onNavigate={isPredictionCell(cell) ? navigatePrediction : navigate}
 			/>
 			{#if editing}
 				<button

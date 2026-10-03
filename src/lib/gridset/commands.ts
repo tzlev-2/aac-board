@@ -318,6 +318,18 @@ export function withCellContext(
 		navigate: (name) => ctx.navigate(name),
 		back: () => ctx.back(),
 		home: () => ctx.home(),
+		get predictionList() {
+			return ctx.predictionList;
+		},
+		setPredictionList: ctx.setPredictionList
+			? (items) => ctx.setPredictionList?.(items)
+			: undefined,
+		get predictionPage() {
+			return ctx.predictionPage;
+		},
+		navigatePrediction: ctx.navigatePrediction
+			? (action) => ctx.navigatePrediction?.(action)
+			: undefined,
 		speak: (text, opts) => ctx.speak(text, opts),
 		stopSpeaking: () => ctx.stopSpeaking(),
 		playSound: (path) => ctx.playSound(path),
@@ -337,7 +349,7 @@ export function withAutoContentItem(
 }
 
 // ── רג'יסטרי הפקודות ─────────────────────────────────────────────────────
-// 21 פקודות אחרי סלייס 13.
+// 22 פקודות אחרי חתך PredictThis.
 //
 // 🛑 **הכיסוי נמדד לכל לוח בנפרד, ולא על לוח אחד.** זה עיקר סלייס 13: השער
 // ("≥96%") נמדד עד כה על `org-1` בלבד, ובמדידה לכל לוחות-הארגון התגלה
@@ -617,7 +629,20 @@ export const commandRegistry: Partial<Record<CommandId, CommandHandler>> = {
 	/** ‏3,092 בקורפוס · ‏0 בלוחות-הארגון. */
 	'Settings.RestPointer': () => {},
 	/** ‏2,762 בקורפוס · ‏0 בלוחות-הארגון. */
-	'Settings.RestSwitch': () => {}
+	'Settings.RestSwitch': () => {},
+
+	/**
+	 * `Prediction.PredictThis` — החלפת מצב חיזוי זמני מרשימה מוטמעת.
+	 * מערך (כולל ריק) מחליף את הרשימה ומאפס עמוד. חסר/טיפוס לא-מערך מדווח
+	 * unsupported בלי להמציא מילים. אינו כותב ל-`page.wordList`.
+	 */
+	'Prediction.PredictThis': (params, ctx) => {
+		if (!Array.isArray(params.wordlist)) {
+			ctx.reportUnimplemented('Prediction.PredictThis');
+			return;
+		}
+		ctx.setPredictionList?.(params.wordlist);
+	}
 };
 
 /** מזהי הפקודות שיש להן handler. */

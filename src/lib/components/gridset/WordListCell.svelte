@@ -7,9 +7,9 @@
 	 * מיקום-הכתובית, קופסת-הסמל, הגופן — תחול בלי כפילות.
 	 *
 	 * שלושת המצבים באים מ-`wordListPager`, שמחשב אותם ברמת הדף:
-	 *   item  · מילה מ-`page.wordList`
+	 *   item  · מילה מ-`page.wordList` או מ-`PredictThis`
 	 *   nav   · "עוד" / "חזור" — 🛑 **תא מסונתז**, אינו ב-XML
-	 *   empty · **אינו מצויר כלל** — ‏GridBoard מסנן אותו קודם
+	 *   empty · WordList מסונן ב-GridBoard; Prediction נשאר מסגרת גלויה
 	 */
 	import type { CellRendererProps } from './cellRenderers';
 	import { richTextToString } from '$lib/gridset/richText';
@@ -43,4 +43,6 @@
 
 {#if slot?.kind === 'item' || slot?.kind === 'nav'}
 	<ButtonCell cell={derivedCell} {ctx} {symbols} />
+{:else if cell.contentSubType === 'Prediction'}
+	<div data-testid="prediction-empty"></div>
 {/if}

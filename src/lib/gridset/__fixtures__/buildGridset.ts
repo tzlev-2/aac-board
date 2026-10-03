@@ -54,6 +54,9 @@ function richTextXml(value: FixtureRichText): string {
 
 function paramValueXml(value: FixtureParamValue): string {
 	if (typeof value === 'string') return escapeXml(value);
+	if (Array.isArray(value)) {
+		return `<WordList><Items>${value.map(wordListItemXml).join('')}</Items></WordList>`;
+	}
 	return richTextXml(value);
 }
 

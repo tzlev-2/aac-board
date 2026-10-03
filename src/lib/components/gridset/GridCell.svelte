@@ -232,6 +232,7 @@
 	data-testid="grid-cell"
 	data-cell-x={cell.x}
 	data-cell-y={cell.y}
+	data-slot-kind={slot?.kind}
 	tabindex={readable && !interactive ? 0 : undefined}
 	aria-describedby={readable ? inspectionHintId : undefined}
 	data-caption-unfit={readable || undefined}

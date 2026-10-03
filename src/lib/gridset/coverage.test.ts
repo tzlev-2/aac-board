@@ -49,10 +49,10 @@ describe('טבלת השימוש — שלוש רמות', () => {
 describe('computeCoverage', () => {
 	it('שמונה-עשרה פקודות מתוך 66', () => {
 		const report = computeCoverage();
-		// ‏🛑 ‏18 ולא 21. ברג׳יסטרי יש 21 handlers, אבל שלושה מהם
-		// (`Settings.RestEyeGaze` · `RestPointer` · `RestSwitch`) **אינם
-		// מופיעים כלל** בארבעת לוחות-הדגימה, ולכן אינם נספרים כאן. הם
-		// יושבים ב-`report.extra`, וראו הטסט שמסביר למה זה תקין.
+		// ‏🛑 ‏18 ולא 22. ברג׳יסטרי יש 22 handlers, אבל ארבעה מהם
+		// (`Settings.RestEyeGaze` · `RestPointer` · `RestSwitch` ·
+		// `Prediction.PredictThis`) **אינם מופיעים כלל** בארבעת לוחות-הדגימה,
+		// ולכן אינם נספרים כאן. הם יושבים ב-`report.extra`.
 		expect(report.implementedCount).toBe(18);
 		expect(report.usedCount).toBe(66);
 	});
@@ -99,11 +99,10 @@ describe('computeCoverage', () => {
 		expect(report.extra).toEqual([
 			'Settings.RestEyeGaze',
 			'Settings.RestPointer',
-			'Settings.RestSwitch'
+			'Settings.RestSwitch',
+			'Prediction.PredictThis'
 		]);
-		expect(report.implementedCount + report.extra.length).toBe(
-			Object.keys(commandRegistry).length
-		);
+		expect(report.implementedCount + report.extra.length).toBe(Object.keys(commandRegistry).length);
 	});
 
 	it('החסרות ממוינות מהנפוצה לנדירה', () => {

@@ -21,7 +21,8 @@ import type {
 	GridSet,
 	OutputItem,
 	Page,
-	RuntimeContext
+	RuntimeContext,
+	WordListItem
 } from './types';
 
 /** מתאם-דיבור. מוזרק כדי שהמריץ ייבדק בלי דפדפן. */
@@ -242,11 +243,26 @@ export class GridRuntime implements RuntimeContext {
 
 	#attachment: AbortController | null = null;
 	#wordListPage = $state(0);
+	#predictionList = $state<WordListItem[] | null>(null);
+	#predictionPage = $state(0);
 	get wordListPage() {
 		return this.#wordListPage;
 	}
 	navigateWordList(action: 'next' | 'first') {
 		this.#wordListPage = action === 'next' ? this.#wordListPage + 1 : 0;
+	}
+	get predictionList() {
+		return this.#predictionList;
+	}
+	get predictionPage() {
+		return this.#predictionPage;
+	}
+	setPredictionList(items: readonly WordListItem[]) {
+		this.#predictionList = [...items];
+		this.#predictionPage = 0;
+	}
+	navigatePrediction(action: 'next' | 'first') {
+		this.#predictionPage = action === 'next' ? this.#predictionPage + 1 : 0;
 	}
 	attach() {
 		if (this.#attachment) {
@@ -327,6 +343,8 @@ export class GridRuntime implements RuntimeContext {
 		if (pageName === this.#pageName) return;
 		this.#history = [...this.#history, this.#pageName];
 		this.#wordListPage = 0;
+		this.#predictionPage = 0;
+		this.#predictionList = null;
 		this.#pageName = pageName;
 	}
 
@@ -337,6 +355,8 @@ export class GridRuntime implements RuntimeContext {
 		this.#history = this.#history.slice(0, -1);
 		this.#backRevision++;
 		this.#wordListPage = 0;
+		this.#predictionPage = 0;
+		this.#predictionList = null;
 		this.#pageName = previous;
 	}
 
@@ -351,7 +371,11 @@ export class GridRuntime implements RuntimeContext {
 			return;
 		}
 		this.#history = [];
-		if (this.#pageName !== home) this.#wordListPage = 0;
+		if (this.#pageName !== home) {
+			this.#wordListPage = 0;
+			this.#predictionPage = 0;
+			this.#predictionList = null;
+		}
 		this.#pageName = home;
 	}
 

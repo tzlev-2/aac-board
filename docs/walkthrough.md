@@ -1,5 +1,16 @@
 # Grid AAC Clone — יומן פיתוח (Walkthrough)
 
+## 2026-10-03 16:35
+
+### B2.2 · חתך `Prediction.PredictThis` מרשימה מוטמעת
+
+- `Prediction.PredictThis` מחליף מצב חיזוי זמני ב־`GridRuntime` (`predictionList` / `predictionPage`) בנפרד מ־`page.wordList`. מערך, כולל ריק, הוא החלפה תקינה ומאפס עמוד ל־0. פרמטר חסר או שאינו מערך מדווח `reportUnimplemented` בלי להמציא מילים. `ChangeWordList` לא מומש: ב־`b104/Actions` די ב־`PredictThis` ל־Body/Food.
+- תאי `AutoContent/Prediction` משתמשים באותו עימוד `(y,x)` + `C−1` + `עוד`/`חזור`, אבל מסגרת ריקה נשארת גלויה. תאי WordList הריקים עדיין מוסתרים. הפעלת פריט עוברת ב־`AutoContent.Activate` הקיים. מצב החיזוי אינו נכתב לקובץ; ניווט דף מאפס אותו (מדיניות clone, לא מדידת Grid).
+- מקור הקבלה: `b104.gridset` הפרטי (`corpus-116/bundled`). בדיקת מקור דלגה־אם־חסר אימתה 84 פעלים ב־Body והעמודים המתועדים. ה־fixture הסינתטי נושא רק את 21 המילים שפורסמו ב־`engines-runtime-source.md` §ב3–ב4, בלי נכסי Smartbox.
+- 143 בדיקות Node ממוקדות עברו, כולל שלוש בדיקות המקור הפרטי. `check` 0/0, build עבר, ESLint לקבצים ששונו עבר מלבד אזהרת `Map` הקיימת ב־`runtime.svelte.ts:60` שלא נגענו בה. Vitest browser לא רץ: Chromium headless חסר, ואין `playwright install`.
+- CDP ב־1280/360/390 עם מגע במובייל: פתיחה עם 8 מסגרות ריקות, Body=`abseil…breathe`+`עוד`, עמוד 2 מתועד, הפעלת `amble` לפס הפלט, מערך ריק=מסגרות ריקות, חסר מטען/`PredictConjugations` בלי הצעות, Food עם מסגרת עודפת גלויה. `b104/Actions` האמיתי הציג את עמוד 1 שנמדד ב־`eng-11`. Save Copy: הורדת Chrome הושלמה; נתיב ההורדה של Chrome אינו קריא במרחב הזה, ולכן נשמרו בייטי ה־blob (1341, כגודל ההורדה), נפתחו מחדש, `unzip -t` עבר, `keep-page` ומטעני הפקודה נשמרו, מצב Body לא נכתב לקובץ.
+- מועמד executor בלבד לאימות עצמאי. B2.2 / B2 / חיזוי ברירת מחדל / LTR / `ChangeWordList` נשארים פתוחים. אין merge, push או deploy.
+
 ## 2026-10-03 18:01
 
 ### C7 · היטל מיון אלפביתי לרשימת מילים

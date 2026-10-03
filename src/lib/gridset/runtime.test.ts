@@ -255,3 +255,45 @@ describe('פקודות לא-ממומשות', () => {
 		expect(rt.coverageReport()).toContain('Calculator.Add×1');
 	});
 });
+
+describe('Prediction.PredictThis runtime state', () => {
+	function word(text: string) {
+		return { text: { paragraphs: [{ sentences: [{ runs: [text] }] }] } };
+	}
+
+	it('stores a separate list, resets the page, and leaves page.wordList', () => {
+		const rt = runtime();
+		const kept = word('keep-page');
+		rt.page.wordList.push(kept);
+		rt.navigatePrediction('next');
+		expect(rt.predictionPage).toBe(1);
+		executeCommands(
+			cell(cmd('Prediction.PredictThis', { wordlist: [word('abseil'), word('amble')] })),
+			rt
+		);
+		expect(rt.predictionList?.map((item) => item.text.paragraphs[0].sentences[0].runs[0])).toEqual([
+			'abseil',
+			'amble'
+		]);
+		expect(rt.predictionPage).toBe(0);
+		expect(rt.page.wordList).toEqual([kept]);
+		expect(rt.unimplemented).toEqual({});
+	});
+
+	it('empty array is a valid empty list; navigate clears the transient state', () => {
+		const rt = runtime();
+		executeCommands(cell(cmd('Prediction.PredictThis', { wordlist: [] })), rt);
+		expect(rt.predictionList).toEqual([]);
+		executeCommands(cell(cmd('Jump.To', { grid: 'אוכל' })), rt);
+		expect(rt.predictionList).toBeNull();
+		expect(rt.predictionPage).toBe(0);
+		expect(rt.gridSet.pages['בית'].wordList).toEqual([]);
+	});
+
+	it('missing payload reports unsupported and does not invent suggestions', () => {
+		const rt = runtime();
+		executeCommands(cell(cmd('Prediction.PredictThis')), rt);
+		expect(rt.predictionList).toBeNull();
+		expect(rt.unimplemented['Prediction.PredictThis']).toBe(1);
+	});
+});

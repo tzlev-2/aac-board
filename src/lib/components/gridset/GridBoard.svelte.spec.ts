@@ -15,6 +15,7 @@ import GridBoard from './GridBoard.svelte';
 import { cellRendererKey, resolveCellRenderer } from './cellRenderers';
 import ButtonCell from './ButtonCell.svelte';
 import ChatCell from './ChatCell.svelte';
+import WordListCell from './WordListCell.svelte';
 import UnsupportedCell from './UnsupportedCell.svelte';
 
 const style: ResolvedStyle = {
@@ -335,6 +336,94 @@ describe('cellRenderers registry', () => {
 	it('סוג לא רשום נופל ל-UnsupportedCell', () => {
 		const cell = makeCell({ contentType: 'LiveCell', contentSubType: 'Camera' });
 		expect(resolveCellRenderer(cell)).toBe(UnsupportedCell);
+	});
+
+	it('AutoContent/Prediction uses the WordList renderer', () => {
+		const cell = makeCell({ contentType: 'AutoContent', contentSubType: 'Prediction' });
+		expect(cellRendererKey(cell)).toBe('AutoContent/Prediction');
+		expect(resolveCellRenderer(cell)).toBe(WordListCell);
+	});
+});
+
+describe('Prediction empty frames', () => {
+	function predictionCell(x: number, y: number): Cell {
+		return makeCell({
+			x,
+			y,
+			contentType: 'AutoContent',
+			contentSubType: 'Prediction'
+		});
+	}
+
+	it('keeps visible empty Prediction frames and still hides empty WordList cells', async () => {
+		const p = makePage({
+			columns: 4,
+			rows: 2,
+			wordList: [{ text: { paragraphs: [{ sentences: [{ runs: ['keep'] }] }] } }],
+			autoContentCommands: { Prediction: [{ id: 'AutoContent.Activate', params: {} }] },
+			cells: [
+				predictionCell(0, 0),
+				predictionCell(1, 0),
+				makeCell({
+					x: 2,
+					y: 0,
+					contentType: 'AutoContent',
+					contentSubType: 'WordList'
+				}),
+				makeCell({
+					x: 3,
+					y: 0,
+					contentType: 'AutoContent',
+					contentSubType: 'WordList'
+				})
+			]
+		});
+		const runtime = createRuntime(makeCtx(p).gridSet);
+		const screen = render(GridBoard, { page: p, ctx: runtime, pager: runtime });
+		await tick();
+		expect(screen.getByTestId('prediction-empty').elements()).toHaveLength(2);
+		expect(screen.getByTestId('grid-cell').elements()).toHaveLength(3);
+		await expect.element(screen.getByText('keep')).toBeVisible();
+	});
+
+	it('PredictThis fills frames from the command payload without changing page.wordList', async () => {
+		const p = makePage({
+			columns: 4,
+			rows: 2,
+			wordList: [{ text: { paragraphs: [{ sentences: [{ runs: ['keep-page'] }] }] } }],
+			autoContentCommands: { Prediction: [{ id: 'AutoContent.Activate', params: {} }] },
+			cells: [
+				predictionCell(0, 0),
+				predictionCell(1, 0),
+				predictionCell(2, 0),
+				makeCell({
+					x: 0,
+					y: 1,
+					caption: 'Body actions',
+					commands: [
+						{
+							id: 'Prediction.PredictThis',
+							params: {
+								wordlist: [
+									{ text: { paragraphs: [{ sentences: [{ runs: ['abseil'] }] }] } },
+									{ text: { paragraphs: [{ sentences: [{ runs: ['amble'] }] }] } }
+								]
+							}
+						}
+					]
+				})
+			]
+		});
+		const runtime = createRuntime(makeCtx(p).gridSet);
+		const screen = render(GridBoard, { page: p, ctx: runtime, pager: runtime });
+		await tick();
+		expect(screen.getByTestId('prediction-empty').elements()).toHaveLength(3);
+		await userEvent.click(screen.getByText('Body actions'));
+		await tick();
+		await expect.element(screen.getByText('abseil')).toBeVisible();
+		await expect.element(screen.getByText('amble')).toBeVisible();
+		expect(screen.getByTestId('prediction-empty').elements()).toHaveLength(1);
+		expect(runtime.page.wordList[0].text.paragraphs[0].sentences[0].runs[0]).toBe('keep-page');
 	});
 });
 

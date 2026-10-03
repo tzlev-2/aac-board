@@ -296,7 +296,8 @@ export function formatCoverageReport(report: CoverageReport): string {
 	];
 
 	// 🛑 שורת-הרמות אינה קישוט: היא ההבדל בין "‏91.8% מכוסה" לבין לדעת
-	// ש-`page` עומד על 0/4 ושאף תא-`Prediction` לא יעבוד.
+	// ש-`page` עומד על 0/4. `PredictThis` אינו במכנה org-* ולכן כיסוי
+	// הארגון אינו סוגר Prediction.
 	lines.push(
 		'לפי רמה: ' +
 			COMMAND_LEVELS.map((level) => {

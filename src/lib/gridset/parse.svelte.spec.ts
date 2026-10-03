@@ -364,6 +364,52 @@ describe('מלכודת 6 — הדף מחזיק מנועים', () => {
 		expect(page.wordList).toEqual([]);
 		expect(page.cells[0].commands[0].params.wordlist).toHaveLength(1);
 	});
+
+	it('Prediction.PredictThis reads an embedded WordList without writing page.wordList', async () => {
+		const page = await parseSinglePage(
+			grid({
+				extra: `<WordList><Items><WordListItem><Text><s><r>keep-page</r></s></Text></WordListItem></Items></WordList>`,
+				cells: cell(
+					'X="0"',
+					`<Commands><Command ID="Prediction.PredictThis">` +
+						`<Parameter Key="wordlist"><WordList><Items>` +
+						`<WordListItem><Text><s><r>abseil</r></s></Text><PartOfSpeech>Verb</PartOfSpeech></WordListItem>` +
+						`<WordListItem><Text><s><r>amble</r></s></Text></WordListItem>` +
+						`</Items></WordList></Parameter></Command></Commands>`
+				)
+			})
+		);
+		expect(page.wordList.map((item) => richTextToString(item.text))).toEqual(['keep-page']);
+		const payload = page.cells[0].commands[0].params.wordlist;
+		expect(Array.isArray(payload)).toBe(true);
+		expect((payload as WordListItem[]).map((item) => richTextToString(item.text))).toEqual([
+			'abseil',
+			'amble'
+		]);
+	});
+
+	it('PredictThis with empty Items is an empty array, not a missing parameter', async () => {
+		const page = await parseSinglePage(
+			grid({
+				cells: cell(
+					'X="0"',
+					`<Commands><Command ID="Prediction.PredictThis">` +
+						`<Parameter Key="wordlist"><WordList><Items /></WordList></Parameter></Command></Commands>`
+				)
+			})
+		);
+		expect(page.wordList).toEqual([]);
+		expect(page.cells[0].commands[0].params.wordlist).toEqual([]);
+	});
+
+	it('PredictThis without a wordlist parameter leaves the key absent', async () => {
+		const page = await parseSinglePage(
+			grid({
+				cells: cell('X="0"', `<Commands><Command ID="Prediction.PredictThis" /></Commands>`)
+			})
+		);
+		expect(page.cells[0].commands[0].params.wordlist).toBeUndefined();
+	});
 });
 
 // ── מלכודת 7 ─────────────────────────────────────────────────────────────

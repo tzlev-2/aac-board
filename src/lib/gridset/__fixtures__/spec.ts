@@ -21,7 +21,7 @@ export type FixtureRichText =
 	| { shape: 'r'; runs: string[] }
 	| { shape: 'd/p/s/r'; sentences: FixtureSentence[] };
 
-export type FixtureParamValue = string | FixtureRichText;
+export type FixtureParamValue = string | FixtureRichText | FixtureWordListItem[];
 
 export interface FixtureCommand {
 	id: string;
