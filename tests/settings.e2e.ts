@@ -22,9 +22,9 @@ for (const [provider, model] of [
 		await expect(select).toHaveValue(model);
 		await expect(page.getByTestId('attribution')).toContainText('ARASAAC');
 		await expect(page.locator('a[href="/sets"]')).toHaveCount(0);
-		await page.getByRole('link', { name: 'חזרה ללוח' }).click();
+		await page.getByRole('link', { name: 'חזרה לבחירת יישום' }).click();
 		await expect(page).toHaveURL(/\/$/);
-		await expect(page.getByTestId('grid-board')).toBeVisible();
+		await expect(page.locator('input[type=file]')).toBeVisible();
 	});
 }
 

@@ -24,7 +24,9 @@
 		symbols = null,
 		editing = false,
 		selection = null,
-		onSelectCell
+		onSelectCell,
+		pager,
+		isCurrent
 	}: {
 		page: Page;
 		ctx: RuntimeContext;
@@ -32,6 +34,8 @@
 		editing?: boolean;
 		selection?: { page: string; x: number; y: number } | null;
 		onSelectCell?: (page: Page, cell: Cell) => void;
+		pager?: { readonly wordListPage: number; navigateWordList(action: 'next' | 'first'): void };
+		isCurrent?: () => boolean;
 	} = $props();
 
 	// Hidden אינו מרונדר כלל — לא רק מוסתר חזותית.
@@ -69,25 +73,23 @@
 
 	const gutterK = $derived(gutterRatioForCellSpacing(ctx.gridSet.cellSpacing));
 
-	/**
-	 * עימוד ה-`WordList` — פאזה 3א, נמדד מ-Grid האמיתי
-	 * (`derived/wordlist-overflow.md`).
-	 *
-	 * 🛑 **המצב מקומי ונשכח:** ‏`page` הוא של המופע הנוכחי של הדף, לא של
-	 * הלוח. יציאה וחזרה ⇒ עמוד 0. **אין להחזיק אותו ב-store גלובלי.**
-	 */
+	// The retained runtime owns the visible subpage. Standalone boards keep
+	// their existing local pager and reset when the logical page changes.
 	let wordListPage = $state(0);
 	const pageName = $derived(page.name);
 	$effect(() => {
 		// Reading pageName tracks navigation while same-name preview keeps the pager.
 		void pageName;
-		wordListPage = 0;
+		if (!pager) wordListPage = 0;
 	});
 
-	const paged = $derived(pageWordList(page.cells, page.wordList, wordListPage));
+	const paged = $derived(
+		pageWordList(page.cells, page.wordList, pager?.wordListPage ?? wordListPage)
+	);
 
 	function navigate(action: 'next' | 'first') {
-		wordListPage = action === 'next' ? wordListPage + 1 : 0;
+		if (pager) pager.navigateWordList(action);
+		else wordListPage = action === 'next' ? wordListPage + 1 : 0;
 	}
 
 	/**
@@ -149,6 +151,7 @@
 				></div>
 			{/if}
 			<GridCell
+				{isCurrent}
 				{cell}
 				{ctx}
 				{symbols}

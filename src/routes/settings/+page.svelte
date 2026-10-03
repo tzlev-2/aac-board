@@ -1,5 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { applicationSession } from '$lib/gridset/application-session.svelte';
+	const session = applicationSession();
 	import { messages } from './settings-messages';
 	import { settingsStore } from '$lib/stores/settings.svelte';
 	import { speak, getModelsForProvider, getVoicesForProvider } from '$lib/services/tts';
@@ -85,7 +87,11 @@
 
 <div class="settings-page">
 	<header class="settings-header">
-		<a href="/" class="back-btn" aria-label={messages.back}>
+		<a
+			href={session.active ? '/board' : '/'}
+			class="back-btn"
+			aria-label={session.active ? messages.back : messages.backSelector}
+		>
 			<svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
 				<path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z" />
 			</svg>

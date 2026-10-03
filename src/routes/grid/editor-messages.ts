@@ -1,5 +1,15 @@
 import type { CellColourField } from '$lib/gridset/xmlEdit';
 export const messages = {
+	selectorTitle: 'בחירת יישום — Grid AAC Clone',
+	selector: 'בחירת יישום',
+	licensedSamples: 'יישומים לדוגמה',
+	imports: 'יישומים מיובאים בסשן זה',
+	imported: 'ייבוא',
+	resume: 'חזרה ליישום הנוכחי',
+	emptyBoard: 'בחרו יישום כדי לפתוח לוח.',
+	compatibility: 'מעבר לבחירת יישום או ללוח הנוכחי',
+	navigationFailed: 'היישום מוכן, אך המעבר ללוח נכשל. אפשר לחזור ליישום הנוכחי.',
+	saveContinue: 'שמור עותק ואז המשך',
 	settings: 'הגדרות',
 	load: 'טעינת לוח — גררו קובץ .gridset לכאן, או בחרו:',
 	samples: [
@@ -22,11 +32,11 @@ export const messages = {
 	cancel: 'בטל שינוי זה',
 	stay: 'הישאר',
 	draftDecision: 'יש שינוי בתא הנבחר. כיצד להמשיך?',
-	loadDecision: 'יש שינויים שלא הורדו. לטעון לוח אחר?',
-	discardLoad: 'טען והשלך שינויים',
+	loadDecision: 'יש שינויים שלא הורדו. כיצד להמשיך?',
+	discardLoad: 'השלך שינויים והמשך',
 	dirty: 'יש שינויים',
 	clean: 'ללא שינויים',
-	downloaded: 'הוכן עותק להורדה:',
+	downloaded: 'הוכן עותק וההורדה החלה:',
 	dynamicCaption: 'הכיתוב בתא זה נגזר מתוכן דינמי. אפשר לערוך צבעים בלבד.',
 	actionLetterCaption:
 		'בתא זה Grid 3 מציג את האות שבפקודת Action.Letter. שינוי הכתובית אינו משנה את האות המוצגת.',

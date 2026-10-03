@@ -3,7 +3,12 @@
 SvelteKit 5 AAC application for opening `.gridset` boards, navigating and speaking,
 editing cell captions and colors, and downloading an edited ZIP copy.
 
-`/` renders the Clone directly. `/grid` is a compatibility entry to the same view.
+`/` offers licensed sample applications and file import. Selection opens `/board`.
+`/grid` is a compatibility entry to the active board or the selector. The layout
+retains the current runtime, output, visible WordList subpage and editor draft
+across selector/board/settings visits. Imports and editing sessions live in memory;
+a clean reload may lose them. Switching applications offers stay, discard or
+download a copy first. Failed imports and copy preparation retain active edits.
 `/settings` provides voice/provider/model, rate, pitch, theme and ARASAAC attribution.
 The retired Board/sets screens are removed; stored legacy user data is preserved.
 

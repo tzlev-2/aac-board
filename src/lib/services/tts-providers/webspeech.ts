@@ -1,5 +1,7 @@
 import type { SpeakOptions, TtsProvider, TtsVoice } from './types';
 
+let currentUtterance: SpeechSynthesisUtterance | null = null;
+
 /**
  * Web Speech API provider — uses the browser's built-in speechSynthesis.
  * Always available (fallback provider).
@@ -35,7 +37,7 @@ export const webSpeechProvider: TtsProvider = {
 	},
 
 	async speak(text: string, opts: SpeakOptions): Promise<void> {
-		if (!this.isAvailable()) return;
+		if (!this.isAvailable() || opts.signal?.aborted) return;
 		window.speechSynthesis.cancel();
 		return new Promise<void>((resolve) => {
 			const utterance = new SpeechSynthesisUtterance(text);
@@ -45,14 +47,19 @@ export const webSpeechProvider: TtsProvider = {
 			const voices = window.speechSynthesis.getVoices();
 			const preferred = opts.voiceId ? voices.find((v) => v.voiceURI === opts.voiceId) : null;
 			utterance.voice = preferred ?? voices.find((v) => v.lang.startsWith('he')) ?? null;
-			utterance.onend = () => resolve();
-			utterance.onerror = () => resolve();
-			if (opts.signal) {
-				opts.signal.addEventListener('abort', () => {
-					window.speechSynthesis.cancel();
-					resolve();
-				});
-			}
+			currentUtterance = utterance;
+			const abort = () => {
+				if (currentUtterance === utterance) window.speechSynthesis.cancel();
+				cleanup();
+			};
+			const cleanup = () => {
+				opts.signal?.removeEventListener('abort', abort);
+				if (currentUtterance === utterance) currentUtterance = null;
+				resolve();
+			};
+			utterance.onend = cleanup;
+			utterance.onerror = cleanup;
+			opts.signal?.addEventListener('abort', abort, { once: true });
 			window.speechSynthesis.speak(utterance);
 		});
 	},

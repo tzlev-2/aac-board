@@ -124,3 +124,17 @@ test('offline fallback strips the redirected flag of clean-URL static hosting', 
 	expect(fallback.redirected).toBe(false);
 	expect(await fallback.text()).toBe('offline HTML');
 });
+
+test('/board keeps network-first current shell fallback and never caches a 404', async () => {
+	const w = worker();
+	await w.cache('aac-board-candidate').put('/offline.html', new Response('offline'));
+	w.fetch.mockResolvedValue(new Response('current board shell'));
+	expect(await (await w.navigate('/board')).text()).toBe('current board shell');
+	w.fetch.mockRejectedValue(new Error('offline'));
+	expect(await (await w.navigate('/board')).text()).toBe('current board shell');
+	w.fetch.mockResolvedValue(new Response('missing', { status: 404 }));
+	expect((await w.navigate('/board')).status).toBe(404);
+	expect(
+		await (await w.cache('aac-board-candidate').match('https://clone.test/board'))!.text()
+	).toBe('current board shell');
+});

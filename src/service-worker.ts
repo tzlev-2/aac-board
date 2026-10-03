@@ -11,7 +11,7 @@ const CACHE_PREFIX = 'aac-board-';
 const CACHE = `${CACHE_PREFIX}${version}`;
 const OFFLINE = '/offline.html';
 const PRECACHE = [...build, ...files];
-const CLONE_ROUTES = new Set(['/', '/grid', '/settings']);
+const CLONE_ROUTES = new Set(['/', '/board', '/grid', '/settings']);
 
 self.addEventListener('install', (event) => {
 	event.waitUntil(

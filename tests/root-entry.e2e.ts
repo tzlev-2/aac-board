@@ -3,6 +3,7 @@ import { unzipSync, strFromU8 } from 'fflate';
 import { buildGridset } from '../src/lib/gridset/__fixtures__/buildGridset';
 import { readZipIndex } from '../src/lib/gridset/zipArchive';
 import { crc32 } from '../src/lib/gridset/crc32';
+import { messages } from '../src/routes/grid/editor-messages';
 import { test, expect, saveUIBlob } from './owned-browser';
 
 const fixture = buildGridset({
@@ -80,7 +81,9 @@ for (const viewport of [
 			page.on('pageerror', (e) => errors.push(e.message));
 			await page.goto('/');
 			await expect(page).toHaveURL(/\/$/);
-			await expect(page.getByTestId('grid-source')).toContainText('org-1.gridset');
+			await expect(
+				page.getByRole('heading', { name: messages.selector, exact: true })
+			).toBeVisible();
 			await page.locator('input[type=file]').setInputFiles({
 				name: 'root-probe.gridset',
 				mimeType: 'application/octet-stream',
@@ -117,6 +120,7 @@ for (const viewport of [
 			const xml = Object.entries(unpacked).find(([name]) => name === 'Grids/P/grid.xml')![1];
 			expect(strFromU8(xml)).toContain('edited root');
 			for (const value of Object.values(colors)) expect(strFromU8(xml)).toContain(value);
+			await page.getByRole('link', { name: messages.selector, exact: true }).click();
 			await page.locator('input[type=file]').setInputFiles(path);
 			await expect(page.getByTestId('grid-source')).toContainText('root-probe-edited.gridset');
 			await page.getByRole('button', { name: 'עריכה', exact: true }).click();
@@ -151,8 +155,8 @@ test('removed routes return 404; grid remains compatible', async ({ page, reques
 	])
 		expect((await request.get(path)).status()).toBe(404);
 	await page.goto('/grid');
-	await expect(page).toHaveURL(/\/grid$/);
-	await expect(page.getByTestId('grid-source')).toContainText('org-1.gridset');
+	await expect(page).toHaveURL(/\/$/);
+	await expect(page.getByRole('heading', { name: messages.selector, exact: true })).toBeVisible();
 });
 
 test('worker upgrade keeps unrelated caches and IDB, offline root cannot resurrect legacy HTML', async ({
@@ -200,10 +204,10 @@ test('worker upgrade keeps unrelated caches and IDB, offline root cannot resurre
 		)
 	).toBe('user cache');
 	await page.reload();
-	await expect(page.getByTestId('grid-source')).toContainText('org-1.gridset');
+	await expect(page.getByRole('heading', { name: messages.selector, exact: true })).toBeVisible();
 	await context.setOffline(true);
 	await page.reload();
-	await expect(page.getByTestId('grid-source')).toContainText('org-1.gridset');
+	await expect(page.getByRole('heading', { name: messages.selector, exact: true })).toBeVisible();
 	await page.goto('/s/old');
 	await expect(page.getByText('אין חיבור לאינטרנט', { exact: true })).toBeVisible();
 	await expect(page.getByText('LEGACY BOARD')).toHaveCount(0);
@@ -227,7 +231,7 @@ test('worker upgrade keeps unrelated caches and IDB, offline root cannot resurre
 
 test('runtime reads current TTS preferences for each speak action', async ({ page }) => {
 	await page.goto('/');
-	await expect(page.getByTestId('grid-source')).toContainText('org-1.gridset');
+	await expect(page.getByRole('heading', { name: messages.selector, exact: true })).toBeVisible();
 	await page.locator('input[type=file]').setInputFiles({
 		name: 'speech.gridset',
 		mimeType: 'application/octet-stream',
@@ -279,13 +283,14 @@ test('PCS requests stay same-origin; missing local R2 is reported without claimi
 	expect(valid.status()).toBe(404);
 	expect(await valid.text()).toContain('הסמל אינו בדלי');
 	await page.goto('/');
-	await expect(page.getByTestId('grid-source')).toContainText('org-1.gridset');
+	await expect(page.getByRole('heading', { name: messages.selector, exact: true })).toBeVisible();
 	const calls: string[] = [];
 	page.on('request', (r) => {
 		if (r.url().includes('/img/pcs/')) calls.push(r.url());
 	});
 	await page.getByRole('button', { name: /^לוח עם סמלי PCS/ }).click();
-	await expect(page.getByTestId('grid-source')).toContainText('org-3.gridset');
+	await expect(page).toHaveURL(/\/board$/);
+	await expect(page.getByTestId('grid-source')).toContainText(messages.samples[2]);
 	await expect.poll(() => calls.length).toBeGreaterThan(0);
 	for (const url of calls) expect(new URL(url).origin).toBe(new URL(page.url()).origin);
 	await page.getByText('לאכול', { exact: true }).click();

@@ -1,5 +1,33 @@
 # Grid AAC Clone — יומן פיתוח (Walkthrough)
 
+## 2026-10-03 08:48
+
+### סלייס 24 — בורר יישומי H1 ומעבר בטוח ללוח
+
+#### מה בוצע?
+
+- `src/routes/+page.svelte` הוא בורר דגימות וייבוא; `src/routes/board/+page.svelte` מציג לוח רק אחרי בחירה. `src/routes/grid/+page.svelte` הוא כניסת תאימות עם החלפה ב־history; כניסה טרייה אינה טוענת דגימה. `README.md` מתאר את מסלולי המוצר ואת הסשן בזיכרון.
+- `src/lib/gridset/application-session.svelte.ts` נוצר לכל root layout דרך context. `selectApplication` מחזיר תוצאה לפי intent, מכין ומאמת קלט לפני החלטה או פרסום, מבדיל imports באותו שם, ומאפשר resume בלי טעינה. ניווט שהתקבל מבטל כוונה ישנה; רק goto מורשה ל־`/board` מוחרג. כשל goto שומר את היישום ומציג אפשרות חזרה.
+- `src/routes/grid/gridset-editor.svelte.ts` מפריד `unsaved` מ־`dirty`. החלטת החלפה או יציאה מציעה הישארות, השלכה ושמירת עותק ואז המשך. הכנת ZIP/Blob ותחילת הורדה קודמות לשינוי טיוטה, baseline ו־revision; כשל משאיר אותם. `EditorDecision.svelte` מציג שגיאה בתוך הדיאלוג ומחזיר focus למפעיל או ל־heading קיים.
+- `GridSetView.svelte`, `GridBoard.svelte` ו־`runtime.svelte.ts` שומרים runtime, פלט, היסטוריה ותת־דף WordList בין ביקורים. לכל attachment יש resolver חדש ושחרור URLs/שמע. `GridCell.svelte` מעביר lifetime לשרשרת הפקודות בפועל; `commands.ts` שומר ביצוע סינכרוני בלי Wait ומפסיק עבודה מאוחרת אחרי detach.
+- `tts.ts` והנגנים צורכים AbortSignal אופציונלי של הלוח; בקשה ישנה אינה מתחילה ניגון או fallback אחרי detach, ושחרור ישן אינו מפסיק ניגון חדש. מזהי פקודות, מדיניות Wait, מנועים והגדרות קול נשמרו.
+- `src/lib/gridset/validate-json.ts` בודק את השדות המקוננים שנצרכים לרינדור. JSON תקין נשאר תצוגה ושימוש ללא ZIP לעריכה. `/settings` חוזר ללוח פעיל או לבורר; `service-worker.ts` מוסיף `/board` לרשימת מסלולי הקלון בלי שינוי מטמונים או נתוני משתמש.
+- `src/routes/+layout.svelte` מחזיק החלטות והגנת יציאה, עם native beforeunload ל־reload/close. מעטפת גלילה הופכת פקדים תחתונים בעורך ובבורר לנגישים תחת `body overflow:hidden`, בלי לשנות את מידות הלוח או נוסחאותיו. heading מקבל focus בכניסה למסלול.
+
+#### בדיקות וקבלה
+
+- `check` עבר ללא שגיאות ואזהרות; build רגיל ו־228 בדיקות server עברו, 12 בדיקות קורפוס היסטוריות דולגו. ה־lockfile והתלויות לא שונו. Bun רשמי 1.3.13 ו־Node 22.23.2.
+- QA רגיל דרך raw CDP בדפדפן Chrome הקיים: שתי דגימות מורשות, ייבוא וזהויות שם כפול, שימור WordList ודף/פלט/טיוטה, החלטות וכשלים, Back במהלך טעינה מושהית, JSON לקריאה, תמונות מוטמעות בלוח ובפלט אחרי remount, settings/legacy IDB ושימור מטמון. בדיקות דיבור מושהה הן בדיקות stub ואינן טענת שמיעה.
+- desktop1280×900 ו־360×800/390×844/844×390/768×1024: עריכת כתובית וארבעת הצבעים, יעדי44 ונקישה בשוליים, הורדות native completed ופתיחה מנתיב הדיסק בדפדפן. ZIP/CRC/XML ושימור רשומות אחרות נבדקו בבייטים שנקראו מהקובץ הפיזי, בלי Blob interception.
+- השוואת GridBoard מ־b80 באותם container sizes ובאותו fixture ערוך נתנה גאומטריה זהה בכל חמש המידות. מדידות shell/grid בשני הצירים נשמרו בדוח; גודל המטרה44 ותיקון360 נשמרו. ב־390 ובטאבלט יש extent פנימי של TileColour בעריכה, זהה ל־b80; אין לטעון היעדר גלישה פנימית. H2 נשארת פתוחה.
+- ריצת Playwright/Vitest client ההיסטורית היא `INCOMPLETE` עקב transport בדפדפן המשותף. ניסיון interception שלא ביסס השהיה הוא `INCOMPLETE`, ולא כשל מוצר. נוספו specs ממוקדים לעתיד; קבלת המוצר הנוכחית נסמכת על server units ועל תרחישי CDP שניתנים לשחזור. Svelte MCP/autofixer לא חשופים בסשן; המהדר ו־svelte-check נבדקו, וחוזי framework נקראו בתיעוד הרשמי.
+
+#### החלטות ארכיטקטורה ומסירה
+
+- מודל application נוסף רק בגבול הסשן; אין singleton SSR, persistence חדש, המרה ל־legacy או הרחבת commands/TTS. קלטים מורשים נשארים מחוץ לגיט.
+- תוצרי הסשן: `/home/user/projects/aac-migration-20261002/orchestrator-h1-20261002/new-executor-run/`. המועמד דורש GO מוצר עצמאי; ההורה אחראי למיזוג, דחיפה, Pages, Access וקבלה חיה. אין merge/push/deploy בסשן זה, ואין סגירת H1/H2/H3/H4 לפני הגייטים הנדרשים.
+
+
 ## 2026-10-03 06:56
 
 ### סלייס 23 — תיקון גלישה אופקית בעריכת לוח ב־360px

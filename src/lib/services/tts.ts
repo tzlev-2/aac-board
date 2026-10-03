@@ -90,6 +90,8 @@ const PROXIED_PROVIDERS = new Set<TtsProviderId>(['elevenlabs', 'gemini']);
 export interface SpeakDeps {
 	/** Override the TTS settings (default: read from localStorage). */
 	settings?: TtsSettings;
+	/** Cancels speech owned by a detached board attachment. */
+	signal?: AbortSignal;
 	/** Override the fetch function (default: globalThis.fetch). */
 	fetchFn?: typeof globalThis.fetch;
 	/** Override the proxy base URL (default: import.meta.env.VITE_PROXY_URL). */
@@ -100,6 +102,7 @@ export interface SpeakDeps {
 
 /** Speak a single text string using the active provider, falling back to Web Speech on error. */
 export async function speak(text: string, lang = 'he-IL', deps?: SpeakDeps): Promise<void> {
+	if (deps?.signal?.aborted) return;
 	const settings = deps?.settings ?? getTtsSettings();
 	const provider = getProvider(settings.provider);
 
@@ -119,17 +122,29 @@ export async function speak(text: string, lang = 'he-IL', deps?: SpeakDeps): Pro
 				proxyUrl: deps?.proxyUrl,
 				store: deps?.store
 			});
-			await playAudioBlob(blob, { rate: settings.rate, pitch: settings.pitch, lang });
+			if (deps?.signal?.aborted) return;
+			await playAudioBlob(blob, {
+				rate: settings.rate,
+				pitch: settings.pitch,
+				lang,
+				signal: deps?.signal
+			});
 			return;
 		} catch (e) {
+			if (deps?.signal?.aborted) return;
 			console.warn(
 				`[tts] proxy cache for "${settings.provider}" failed — falling back to webspeech`,
 				e
 			);
 		}
 		// Fallback to Web Speech on proxy failure
-		if (webSpeechProvider.isAvailable()) {
-			await webSpeechProvider.speak(text, { rate: settings.rate, pitch: settings.pitch, lang });
+		if (!deps?.signal?.aborted && webSpeechProvider.isAvailable()) {
+			await webSpeechProvider.speak(text, {
+				rate: settings.rate,
+				pitch: settings.pitch,
+				lang,
+				signal: deps?.signal
+			});
 		}
 		return;
 	}
@@ -143,20 +158,27 @@ export async function speak(text: string, lang = 'he-IL', deps?: SpeakDeps): Pro
 				modelId: modelId || undefined,
 				rate: settings.rate,
 				pitch: settings.pitch,
-				lang
+				lang,
+				signal: deps?.signal
 			});
 			return;
 		} catch (e) {
+			if (deps?.signal?.aborted) return;
 			console.warn(`[tts] provider "${settings.provider}" failed — falling back to webspeech`, e);
 		}
 	}
 
 	// Fallback to Web Speech
-	if (settings.provider !== 'webspeech' && webSpeechProvider.isAvailable()) {
+	if (
+		!deps?.signal?.aborted &&
+		settings.provider !== 'webspeech' &&
+		webSpeechProvider.isAvailable()
+	) {
 		await webSpeechProvider.speak(text, {
 			rate: settings.rate,
 			pitch: settings.pitch,
-			lang
+			lang,
+			signal: deps?.signal
 		});
 	}
 }

@@ -2,6 +2,7 @@ export const messages = {
 	previewText: 'שלום, זה ניסיון קול',
 	browser: 'דפדפן',
 	back: 'חזרה ללוח',
+	backSelector: 'חזרה לבחירת יישום',
 	title: 'הגדרות — Grid AAC Clone',
 	heading: 'הגדרות',
 	voiceHeading: 'הגדרות קול',

@@ -98,7 +98,7 @@ it('accepts a complete JSON model and rejects a missing start page before replac
 	const editor = await loaded();
 	const identity = editor.gridSet;
 	const source = editor.source;
-	const valid = JSON.parse(JSON.stringify(editor.gridSet));
+	const valid = JSON.parse(JSON.stringify({ ...editor.gridSet, media: undefined }));
 	validateJsonGridSet(valid);
 	editor.loadFile(new File([JSON.stringify(valid)], 'valid.json', { type: 'application/json' }));
 	await expect.poll(() => editor.sourceName).toBe('valid.json');

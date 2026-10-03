@@ -26,8 +26,11 @@ import type {
 
 /** מתאם-דיבור. מוזרק כדי שהמריץ ייבדק בלי דפדפן. */
 export interface SpeechAdapter {
-	speak(text: string, opts?: { lang?: string; auditory?: boolean; wait?: boolean }): void;
-	stop(): void;
+	speak(
+		text: string,
+		opts?: { lang?: string; auditory?: boolean; wait?: boolean; signal?: AbortSignal }
+	): void;
+	stop(signal?: AbortSignal): void;
 }
 
 /**
@@ -89,10 +92,15 @@ export const ttsSpeechAdapter: SpeechAdapter = {
 	speak(text, opts) {
 		// 🛑 `auditory` (משוב פרטי לדובר) אינו נתמך ב-tts.ts היום — הכל יוצא
 		// בערוץ הציבורי. הפיצול לשני ערוצים הוא סלייס נפרד.
-		void import('$lib/services/tts').then(({ speak }) => speak(text, opts?.lang ?? 'he-IL'));
+		void import('$lib/services/tts').then(({ speak }) => {
+			if (!opts?.signal?.aborted)
+				return speak(text, opts?.lang ?? 'he-IL', { signal: opts?.signal });
+		});
 	},
-	stop() {
-		void import('$lib/services/tts').then(({ stopSpeaking }) => stopSpeaking());
+	stop(signal) {
+		void import('$lib/services/tts').then(({ stopSpeaking }) => {
+			if (!signal?.aborted) stopSpeaking();
+		});
 	}
 };
 
@@ -232,6 +240,32 @@ export class GridRuntime implements RuntimeContext {
 	#onMissingPage: (name: string) => void;
 	#onUnimplemented?: (id: CommandId) => void;
 
+	#attachment: AbortController | null = null;
+	#wordListPage = $state(0);
+	get wordListPage() {
+		return this.#wordListPage;
+	}
+	navigateWordList(action: 'next' | 'first') {
+		this.#wordListPage = action === 'next' ? this.#wordListPage + 1 : 0;
+	}
+	attach() {
+		if (this.#attachment) {
+			this.#attachment.abort();
+			this.#audio.dispose?.();
+		}
+		const controller = new AbortController();
+		this.#attachment = controller;
+		return {
+			valid: () => !controller.signal.aborted,
+			detach: () => {
+				controller.abort();
+				if (this.#attachment === controller) {
+					this.#attachment = null;
+					this.#audio.dispose?.();
+				}
+			}
+		};
+	}
 	#pageName = $state('');
 	#history = $state<string[]>([]);
 	#unimplemented = $state<Record<CommandId, number>>({});
@@ -286,6 +320,7 @@ export class GridRuntime implements RuntimeContext {
 		}
 		if (pageName === this.#pageName) return;
 		this.#history = [...this.#history, this.#pageName];
+		this.#wordListPage = 0;
 		this.#pageName = pageName;
 	}
 
@@ -294,6 +329,7 @@ export class GridRuntime implements RuntimeContext {
 		if (this.#history.length === 0) return;
 		const previous = this.#history[this.#history.length - 1];
 		this.#history = this.#history.slice(0, -1);
+		this.#wordListPage = 0;
 		this.#pageName = previous;
 	}
 
@@ -308,6 +344,7 @@ export class GridRuntime implements RuntimeContext {
 			return;
 		}
 		this.#history = [];
+		if (this.#pageName !== home) this.#wordListPage = 0;
 		this.#pageName = home;
 	}
 
@@ -317,11 +354,15 @@ export class GridRuntime implements RuntimeContext {
 	speak(text?: string, opts?: { auditory?: boolean; wait?: boolean }): void {
 		const value = text ?? this.outputText;
 		if (!value.trim()) return;
-		this.#speech.speak(value, { ...opts, lang: this.gridSet.language });
+		this.#speech.speak(value, {
+			...opts,
+			lang: this.gridSet.language,
+			signal: this.#attachment?.signal
+		});
 	}
 
 	stopSpeaking(): void {
-		this.#speech.stop();
+		this.#speech.stop(this.#attachment?.signal);
 	}
 
 	/**
@@ -344,6 +385,8 @@ export class GridRuntime implements RuntimeContext {
 
 	/** משחרר את ה-`blob:` URL-ים של השמע. נקרא בהחלפת לוח, כמו `SymbolResolver.dispose`. */
 	dispose(): void {
+		this.#attachment?.abort();
+		this.#attachment = null;
 		this.#audio.dispose?.();
 	}
 

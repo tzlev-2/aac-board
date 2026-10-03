@@ -29,10 +29,12 @@
 		symbols = null,
 		slot,
 		onNavigate,
-		editing = false
+		editing = false,
+		isCurrent
 	}: {
 		cell: Cell;
 		editing?: boolean;
+		isCurrent?: () => boolean;
 		ctx: RuntimeContext;
 		symbols?: SymbolResolver | null;
 		slot?: WordListSlot;
@@ -63,7 +65,7 @@
 		// שמבדיל בין משבצת למשבצת הוא הפריט שבה.
 		// ‏`void` — השרשרת עשויה להכיל `CommandExecution.Wait` ואז היא נמשכת
 		// אחרי הלחיצה. אין למה להמתין כאן: המצב חי ב-runes ומתעדכן מעצמו.
-		void executeCommands(cell, ctx, slot?.kind === 'item' ? slot.item : undefined);
+		void executeCommands(cell, ctx, slot?.kind === 'item' ? slot.item : undefined, { isCurrent });
 	}
 
 	const fillGradient = $derived(verticalFillGradient(cell.style.backColour));

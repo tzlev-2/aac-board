@@ -627,6 +627,8 @@ export function implementedCommandIds(): CommandId[] {
 const realDelay = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
 export interface ExecuteOptions {
+	/** View attachment lifetime; omitting it preserves existing execution. */
+	isCurrent?: () => boolean;
 	/** הזרקה לבדיקות; ברירת המחדל היא הרג'יסטרי הגלובלי. */
 	registry?: Partial<Record<CommandId, CommandHandler>>;
 	/** ההשהיה שמריצה `CommandExecution.Wait`. ברירת מחדל: `setTimeout`. */
@@ -657,6 +659,7 @@ export async function executeCommandChain(
 	const { registry = commandRegistry, delay = realDelay } = options;
 
 	for (const inv of commands) {
+		if (options.isCurrent && !options.isCurrent()) return;
 		const handler = registry[inv.id];
 		if (!handler) {
 			ctx.reportUnimplemented(inv.id);
@@ -680,5 +683,9 @@ export function executeCommands(
 	item?: WordListItem,
 	options?: ExecuteOptions
 ): Promise<void> {
-	return executeCommandChain(cellCommands(cell, ctx.page), withCellContext(ctx, cell, item), options);
+	return executeCommandChain(
+		cellCommands(cell, ctx.page),
+		withCellContext(ctx, cell, item),
+		options
+	);
 }

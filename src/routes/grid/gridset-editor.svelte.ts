@@ -8,6 +8,9 @@ import type { Cell, GridSet, Page } from '$lib/gridset/types';
 import type { GridRuntime } from '$lib/gridset/runtime.svelte';
 import type { CellColourField } from '$lib/gridset/xmlEdit';
 import { SAMPLE_GRID_SET } from './sampleGridSet';
+import { createRuntime } from '$lib/gridset/runtime.svelte';
+import { validateJsonGridSet } from '$lib/gridset/validate-json';
+export { validateJsonGridSet } from '$lib/gridset/validate-json';
 import {
 	COLOUR_FIELDS,
 	COLOUR_PROPERTIES,
@@ -37,49 +40,9 @@ export function nextFrame(): Promise<void> {
 	return new Promise((resolve) => requestAnimationFrame(() => setTimeout(resolve, 0)));
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-	return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function isJsonPage(value: unknown, name: string): boolean {
-	if (!isRecord(value)) return false;
-	return (
-		value.name === name &&
-		Number.isInteger(value.columns) &&
-		(value.columns as number) > 0 &&
-		Number.isInteger(value.rows) &&
-		(value.rows as number) > 0 &&
-		Array.isArray(value.columnWidths) &&
-		value.columnWidths.length === value.columns &&
-		Array.isArray(value.rowHeights) &&
-		value.rowHeights.length === value.rows &&
-		Array.isArray(value.cells) &&
-		Array.isArray(value.wordList) &&
-		typeof value.predictionSource === 'string' &&
-		isRecord(value.autoContentCommands) &&
-		isRecord(value.background)
-	);
-}
-
-/** JSON is already a display model, so reject malformed data before replacing the live model. */
-export function validateJsonGridSet(value: unknown): asserts value is GridSet {
-	if (
-		!isRecord(value) ||
-		typeof value.startGrid !== 'string' ||
-		value.startGrid.length === 0 ||
-		!isRecord(value.pages) ||
-		!isRecord(value.styles) ||
-		typeof value.language !== 'string' ||
-		!Array.isArray(value.symbolSearchKeys) ||
-		!Object.hasOwn(value.pages, value.startGrid) ||
-		!Object.entries(value.pages).every(([name, page]) => isJsonPage(page, name))
-	)
-		throw new Error('invalid-json');
-}
-
-/** Route-local state: the archive stays raw, only pages of the model are replaced. */
+/** Layout-owned editor state: archives stay raw; preview replaces individual pages. */
 export function createGridSetEditor() {
-	let gridSet = $state<GridSet>(SAMPLE_GRID_SET);
+	let gridSet = $state<GridSet>(structuredClone(SAMPLE_GRID_SET));
 	let source = $state.raw<GridSetSource | null>(null);
 	let session: GridSetEditSession | null = null;
 	let runtime = $state.raw<GridRuntime | null>(null);
@@ -95,13 +58,18 @@ export function createGridSetEditor() {
 	let selection = $state.raw<CellAddress | null>(null);
 	let baseline: CellForm | null = null;
 	let form = $state.raw<CellForm | null>(null);
-	let pending = $state.raw<{ kind: 'draft' | 'load'; run: () => void } | null>(null);
+	let pending = $state.raw<{
+		kind: 'draft' | 'load';
+		run: () => void;
+		settle?: (success: boolean) => void;
+	} | null>(null);
 	let generation = 0;
 	let revision = $state(0);
 	let lastDownloadRevision = $state(0);
 	const busy = $derived(loading || saving);
 	const hasDraft = $derived(Boolean((draft && hasCellPatch(draft)) || draftError));
 	const dirty = $derived(appliedEdits.length > 0 || hasDraft);
+	const unsaved = $derived(hasDraft || revision !== lastDownloadRevision);
 
 	function resetSelection() {
 		selection = null;
@@ -163,45 +131,112 @@ export function createGridSetEditor() {
 	}
 	function apply(): boolean {
 		if (busy || draftError) return false;
-		if (draft && hasCellPatch(draft)) {
-			appliedEdits = upsertCellEdit(appliedEdits, draft);
-			revision++;
+		try {
+			const effective =
+				draft && hasCellPatch(draft) ? upsertCellEdit(appliedEdits, draft) : appliedEdits;
+			const nextBaseline = selection
+				? formOf(
+						gridSet.pages[selection.page].cells.find(
+							(c) => c.x === selection!.x && c.y === selection!.y
+						)!
+					)
+				: null;
+			if (draft && hasCellPatch(draft)) revision++;
+			appliedEdits = effective;
+			draft = null;
+			baseline = nextBaseline;
+			form = nextBaseline;
+			return true;
+		} catch (e) {
+			error = errorMessage(e);
+			return false;
 		}
-		draft = null;
-		if (selection) {
-			baseline = formOf(
-				gridSet.pages[selection.page].cells.find(
-					(c) => c.x === selection!.x && c.y === selection!.y
-				)!
-			);
-			form = baseline;
-		}
-		return true;
 	}
 	function cancel() {
-		if (busy || !selection || !session) return;
+		if (busy || !selection || !session) return false;
 		try {
 			gridSet.pages[selection.page] = session.preview(selection.page, appliedEdits);
 			form = baseline;
 			draft = null;
 			draftError = '';
+			return true;
+		} catch (e) {
+			error = errorMessage(e);
+			return false;
+		}
+	}
+	async function resolvePending(choice: 'apply' | 'cancel' | 'stay' | 'save') {
+		const action = pending;
+		if (!action || saving) return;
+		if (choice === 'stay') {
+			pending = null;
+			action.settle?.(false);
+			return;
+		}
+		try {
+			if (action.kind === 'draft') {
+				if (choice === 'apply' && !apply()) return;
+				if (choice === 'cancel' && !cancel()) return;
+			} else if (choice === 'save' && !(await prepareCopy(() => pending === action))) return;
+			if (pending !== action) return;
+			pending = null;
+			action.settle?.(true);
+			action.run();
 		} catch (e) {
 			error = errorMessage(e);
 		}
 	}
-	function resolvePending(choice: 'apply' | 'cancel' | 'stay') {
+	function confirmReplacement(): Promise<boolean> {
+		if (pending || saving) return Promise.resolve(false);
+		if (!unsaved) return Promise.resolve(true);
+		return new Promise((settle) => {
+			pending = { kind: 'load', run: () => {}, settle };
+		});
+	}
+	function discardChanges(): boolean {
+		try {
+			const pages = appliedEdits
+				.map((e) => e.page)
+				.concat(selection ? [selection.page] : [])
+				.filter((name, index, all) => all.indexOf(name) === index);
+			const replacements = pages.map((name) => [name, session!.preview(name, [])] as const);
+			for (const [name, page] of replacements) gridSet.pages[name] = page;
+			appliedEdits = [];
+			revision = 0;
+			lastDownloadRevision = 0;
+			resetSelection();
+			return true;
+		} catch (e) {
+			error = errorMessage(e);
+			return false;
+		}
+	}
+	function invalidatePending() {
 		const action = pending;
-		if (!action) return;
-		if (choice === 'stay') {
-			pending = null;
-			return;
-		}
-		if (action.kind === 'draft') {
-			if (choice === 'apply' && !apply()) return;
-			if (choice === 'cancel') cancel();
-		}
 		pending = null;
-		action.run();
+		action?.settle?.(false);
+	}
+	function publish(
+		opened: {
+			gridSet: GridSet;
+			source: GridSetSource | null;
+			editSession: GridSetEditSession | null;
+		},
+		name: string
+	) {
+		// All fallible prerequisites belong to staging; the runtime uses this exact reactive model.
+		runtime?.dispose();
+		source = opened.source;
+		session = opened.editSession;
+		sourceName = name;
+		appliedEdits = [];
+		revision = 0;
+		lastDownloadRevision = 0;
+		editing = false;
+		downloaded = '';
+		resetSelection();
+		gridSet = opened.gridSet;
+		runtime = createRuntime(gridSet);
 	}
 	function mode(value: boolean) {
 		if (value && !source) return;
@@ -221,95 +256,94 @@ export function createGridSetEditor() {
 		name: string,
 		prefix: string
 	) {
-		if (saving) return;
+		if (saving || pending) return false;
 		const token = ++generation;
 		loading = true;
 		error = '';
-		await nextFrame();
 		try {
+			await nextFrame();
 			const opened = await loader();
-			const nextSession = opened.source
-				? createGridSetEditSession(opened.source, opened.gridSet.styles)
-				: null;
-			if (token !== generation) return;
-			source = opened.source;
-			session = nextSession;
-			sourceName = name;
-			appliedEdits = [];
-			revision = 0;
-			lastDownloadRevision = 0;
-			editing = false;
-			downloaded = '';
-			resetSelection();
-			runtime = null;
-			gridSet = opened.gridSet;
+			const staged = stageOpened(opened);
+			if (token !== generation) return false;
+			loading = false;
+			if (!(await confirmReplacement()) || token !== generation) return false;
+			publish(staged, name);
+			return true;
 		} catch (e) {
 			if (token === generation) error = `${prefix} ${errorMessage(e)}`;
+			return false;
 		} finally {
 			if (token === generation) loading = false;
 		}
 	}
-	function requestLoad(run: () => void) {
-		if (saving || pending) return;
-		if (hasDraft || revision !== lastDownloadRevision) pending = { kind: 'load', run };
-		else run();
-	}
 	function loadFile(file: File) {
-		requestLoad(() => {
-			void load(
-				async () => {
-					const bytes = new Uint8Array(await file.arrayBuffer());
-					if (bytes[0] === 0x50 && bytes[1] === 0x4b) return openGridSet(bytes);
-					const parsed = JSON.parse(new TextDecoder().decode(bytes));
-					validateJsonGridSet(parsed);
-					return { gridSet: parsed, source: null };
-				},
-				file.name,
-				messages.invalidFile
-			);
-		});
+		return load(() => openFile(file), file.name, messages.invalidFile);
 	}
 	function loadUrl(url: string, name: string) {
-		requestLoad(() => {
-			void load(
-				async () => {
-					const response = await fetch(url);
-					if (!response.ok) throw new Error(String(response.status));
-					return openGridSet(new Uint8Array(await response.arrayBuffer()));
-				},
-				name,
-				messages.loadFailed
-			);
-		});
+		return load(() => openUrl(url), name, messages.loadFailed);
 	}
-	async function saveCopy() {
-		if (!source || busy || draftError || pending) return;
+	async function prepareCopy(valid: () => boolean = () => true): Promise<boolean> {
+		if (!source || saving || draftError) return false;
 		error = '';
-		downloaded = '';
-		if (!apply()) return;
 		saving = true;
-		await nextFrame();
 		let url: string | undefined;
 		try {
-			const bytes = writeGridSet(source, appliedEdits);
+			await nextFrame();
+			if (!valid()) return false;
+			const effective =
+				draft && hasCellPatch(draft) ? upsertCellEdit(appliedEdits, draft) : appliedEdits;
+			// Preview/baseline preparation must succeed before download or any state mutation.
+			const nextBaseline = selection
+				? formOf(
+						gridSet.pages[selection.page].cells.find(
+							(c) => c.x === selection!.x && c.y === selection!.y
+						)!
+					)
+				: null;
+			const bytes = writeGridSet(source, effective);
 			url = URL.createObjectURL(new Blob([new Uint8Array(bytes)], { type: 'application/zip' }));
+			if (!valid()) return false;
 			const anchor = document.createElement('a');
 			anchor.href = url;
 			anchor.download = editedFilename(sourceName);
 			anchor.click();
+			if (draft && hasCellPatch(draft)) revision++;
+			appliedEdits = effective;
+			draft = null;
+			baseline = nextBaseline;
+			form = nextBaseline;
 			downloaded = anchor.download;
 			lastDownloadRevision = revision;
+			return true;
 		} catch (e) {
 			error = `${messages.saveFailed} ${errorMessage(e)}`;
+			return false;
 		} finally {
 			if (url) {
 				const cleanupUrl = url;
-				setTimeout(() => URL.revokeObjectURL(cleanupUrl), 0);
+				setTimeout(() => URL.revokeObjectURL(cleanupUrl), 1000);
 			}
 			saving = false;
 		}
 	}
+	async function saveCopy() {
+		if (busy || pending) return false;
+		return prepareCopy();
+	}
 	return {
+		get unsaved() {
+			return unsaved;
+		},
+		confirmReplacement,
+		invalidatePending,
+		publish,
+		discardChanges,
+		setLoading: (value: boolean) => {
+			loading = value;
+		},
+		setError: (value: string) => {
+			error = value;
+		},
 		get gridSet() {
 			return gridSet;
 		},
@@ -320,7 +354,7 @@ export function createGridSetEditor() {
 			return runtime;
 		},
 		runtimeReady: (value: GridRuntime) => {
-			runtime = value;
+			if (value.gridSet === gridSet && (!runtime || runtime === value)) runtime = value;
 		},
 		get sourceName() {
 			return sourceName;
@@ -382,5 +416,28 @@ export function createGridSetEditor() {
 		loadFile,
 		loadUrl,
 		saveCopy
+	};
+}
+
+export async function openFile(file: File) {
+	const bytes = new Uint8Array(await file.arrayBuffer());
+	if (bytes[0] === 0x50 && bytes[1] === 0x4b) return openGridSet(bytes);
+	const parsed = JSON.parse(new TextDecoder().decode(bytes));
+	validateJsonGridSet(parsed);
+	return { gridSet: parsed, source: null };
+}
+export async function openUrl(url: string) {
+	const response = await fetch(url);
+	if (!response.ok) throw new Error(String(response.status));
+	return openGridSet(new Uint8Array(await response.arrayBuffer()));
+}
+export function stageOpened(opened: { gridSet: GridSet; source: GridSetSource | null }) {
+	if (!Object.hasOwn(opened.gridSet.pages, opened.gridSet.startGrid))
+		throw new Error('invalid-json');
+	return {
+		...opened,
+		editSession: opened.source
+			? createGridSetEditSession(opened.source, opened.gridSet.styles)
+			: null
 	};
 }

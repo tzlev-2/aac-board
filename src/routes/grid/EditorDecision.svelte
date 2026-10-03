@@ -3,15 +3,32 @@
 	let {
 		kind,
 		invalid = false,
+		busy = false,
+		error = '',
 		onChoice
 	}: {
 		kind: 'draft' | 'load';
 		invalid?: boolean;
-		onChoice: (choice: 'apply' | 'cancel' | 'stay') => void;
+		busy?: boolean;
+		error?: string;
+		onChoice: (choice: 'apply' | 'cancel' | 'stay' | 'save') => void;
 	} = $props();
 	function modal(dialog: HTMLDialogElement) {
+		const invoker = document.activeElement;
 		dialog.showModal();
-		return () => dialog.close();
+		return () => {
+			dialog.close();
+			requestAnimationFrame(() => {
+				if (
+					invoker instanceof HTMLElement &&
+					invoker !== document.body &&
+					invoker.isConnected &&
+					!invoker.matches(':disabled, [inert]')
+				)
+					invoker.focus();
+				else document.querySelector<HTMLElement>('h1')?.focus();
+			});
+		};
 	}
 </script>
 
@@ -20,18 +37,25 @@
 	aria-label={kind === 'draft' ? messages.draftDecision : messages.loadDecision}
 	oncancel={(e) => {
 		e.preventDefault();
-		onChoice('stay');
+		if (!busy) onChoice('stay');
 	}}
 >
 	<p>{kind === 'draft' ? messages.draftDecision : messages.loadDecision}</p>
+	{#if error}<p role="alert">{error}</p>{/if}
+	{#if busy}<p role="status">{messages.saving}</p>{/if}
 	{#if kind === 'draft'}
-		<button type="button" disabled={invalid} onclick={() => onChoice('apply')}
+		<button type="button" disabled={invalid || busy} onclick={() => onChoice('apply')}
 			>{messages.apply}</button
 		>
-		<button type="button" onclick={() => onChoice('cancel')}>{messages.cancel}</button>
-	{:else}<button type="button" onclick={() => onChoice('cancel')}>{messages.discardLoad}</button
+		<button type="button" disabled={busy} onclick={() => onChoice('cancel')}
+			>{messages.cancel}</button
+		>
+	{:else}<button type="button" disabled={busy} onclick={() => onChoice('cancel')}
+			>{messages.discardLoad}</button
+		><button type="button" disabled={invalid || busy} onclick={() => onChoice('save')}
+			>{messages.saveContinue}</button
 		>{/if}
-	<button type="button" onclick={() => onChoice('stay')}>{messages.stay}</button>
+	<button type="button" disabled={busy} onclick={() => onChoice('stay')}>{messages.stay}</button>
 </dialog>
 
 <style>

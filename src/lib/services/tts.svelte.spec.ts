@@ -155,3 +155,60 @@ describe('speak() — E1/E2/E3', () => {
 		expect(fetchMock).not.toHaveBeenCalled();
 	});
 });
+
+it('detached board speech cannot play or fall back after a deferred request, or interrupt newer playback', async () => {
+	const { speak } = await import('./tts');
+	const { playAudioBlob, stopCurrentAudio } = await import('./tts-providers/audio-playback');
+	const mock = makeAudioMock();
+	vi.stubGlobal('Audio', mock.constructor);
+	const controller = new AbortController();
+	let release!: (response: Response) => void;
+	const fetch = vi.fn(
+		() =>
+			new Promise<Response>((resolve) => {
+				release = resolve;
+			})
+	);
+	const fallback = vi.spyOn(window.speechSynthesis, 'speak');
+	try {
+		const pending = speak('old board', 'he-IL', {
+			settings: GEMINI_SETTINGS,
+			store: freshStore(),
+			fetchFn: fetch,
+			signal: controller.signal
+		});
+		await expect.poll(() => Boolean(release)).toBe(true);
+		controller.abort();
+		await playAudioBlob(FAKE_BLOB, { rate: 1 });
+		const plays = mock.instance.play.mock.calls.length;
+		const pauses = mock.instance.pause.mock.calls.length;
+		release(new Response('failed', { status: 503 }));
+		await pending;
+		expect(mock.instance.play).toHaveBeenCalledTimes(plays);
+		expect(mock.instance.pause).toHaveBeenCalledTimes(pauses);
+		expect(fallback).not.toHaveBeenCalled();
+	} finally {
+		stopCurrentAudio();
+		vi.unstubAllGlobals();
+		vi.restoreAllMocks();
+	}
+});
+it('owned blob playback revokes its URL immediately on stop and releases abort listeners', async () => {
+	const { playAudioBlob, stopCurrentAudio } = await import('./tts-providers/audio-playback');
+	const mock = makeAudioMock();
+	mock.instance.play.mockImplementation(() => Promise.resolve());
+	vi.stubGlobal('Audio', mock.constructor);
+	const revoke = vi.spyOn(URL, 'revokeObjectURL');
+	const a = new AbortController();
+	try {
+		const pending = playAudioBlob(FAKE_BLOB, { signal: a.signal });
+		stopCurrentAudio();
+		await pending;
+		expect(revoke).toHaveBeenCalledTimes(1);
+		a.abort();
+		expect(revoke).toHaveBeenCalledTimes(1);
+	} finally {
+		vi.unstubAllGlobals();
+		vi.restoreAllMocks();
+	}
+});

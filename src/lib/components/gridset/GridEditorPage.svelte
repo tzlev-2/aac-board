@@ -1,60 +1,20 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
 	import GridSetView from '$lib/components/gridset/GridSetView.svelte';
 	import GridSetCellEditor from '../../../routes/grid/GridSetCellEditor.svelte';
-	import EditorDecision from '../../../routes/grid/EditorDecision.svelte';
-	import { createGridSetEditor } from '../../../routes/grid/gridset-editor.svelte';
+	import { applicationSession } from '$lib/gridset/application-session.svelte';
 	import { messages } from '../../../routes/grid/editor-messages';
-	const editor = createGridSetEditor();
+	const session = applicationSession();
+	const editor = session.editor;
 	const pages = $derived(Object.keys(editor.gridSet.pages));
-	const samples = ['org-1.gridset', 'org-2.gridset', 'org-3.gridset', 'b037.gridset'];
-	onMount(() => {
-		editor.loadUrl('/org-1.gridset', 'org-1.gridset');
-	});
-	function files(input: HTMLInputElement) {
-		const file = input.files?.[0];
-		input.value = '';
-		if (file) editor.loadFile(file);
-	}
-	function drop(event: DragEvent) {
-		event.preventDefault();
-		const file = event.dataTransfer?.files?.[0];
-		if (file) editor.loadFile(file);
-	}
 </script>
 
-<svelte:head><title>Grid AAC Clone</title></svelte:head>
+<svelte:head><title>{session.active?.label} — Grid AAC Clone</title></svelte:head>
 
 <div class="grid-page" dir="rtl">
-	<div
-		class="dropzone"
-		role="group"
-		aria-label={messages.load}
-		ondragover={(e) => e.preventDefault()}
-		ondrop={drop}
-	>
-		<label
-			>{messages.load}<input
-				aria-label={messages.load}
-				type="file"
-				disabled={editor.saving}
-				accept=".gridset,application/json,.json"
-				onchange={(e) => files(e.currentTarget)}
-			/></label
-		>
-		<div class="samples">
-			{#each samples as name, i (name)}<button
-					type="button"
-					disabled={editor.saving}
-					onclick={() => editor.loadUrl('/' + name, name)}>{messages.samples[i]}</button
-				>{/each}
-		</div>
-		{#if editor.loading}<p data-testid="grid-loading" role="status">{messages.loading}</p>
-		{:else if editor.sourceName}<p data-testid="grid-source">
-				{editor.sourceName} · {pages.length}
-				{messages.pages}
-			</p>{/if}
-	</div>
+	<header>
+		<h1 data-testid="grid-source" tabindex="-1">{session.active?.label}</h1>
+		<a href="/">{messages.selector}</a>
+	</header>
 	<div class="toolbar">
 		<a href="/settings" class="settings-link">{messages.settings}</a>
 		<button
@@ -95,11 +55,6 @@
 		>
 	</div>
 	{#if !editor.source}<p class="hint">{messages.sourceMissing}</p>{/if}
-	{#if editor.error}<p class="error" role="alert">{editor.error}</p>{/if}
-	{#if editor.downloaded}<p role="status" data-testid="grid-download">
-			{messages.downloaded}
-			{editor.downloaded}
-		</p>{/if}
 	<div class="workspace">
 		<div class="board">
 			{#key editor.gridSet}<GridSetView
@@ -107,7 +62,7 @@
 					editing={editor.editing || editor.busy}
 					selection={editor.selection}
 					onSelectCell={editor.select}
-					onRuntimeReady={editor.runtimeReady}
+					retainedRuntime={editor.runtime ?? undefined}
 				/>{/key}
 		</div>
 		{#if editor.editing}
@@ -127,13 +82,6 @@
 			{:else}<aside class="choose-cell">{messages.select}</aside>{/if}
 		{/if}
 	</div>
-	{#if editor.pending}
-		<EditorDecision
-			kind={editor.pending}
-			invalid={Boolean(editor.draftError)}
-			onChoice={editor.resolvePending}
-		/>
-	{/if}
 </div>
 
 <style>
@@ -146,20 +94,28 @@
 		block-size: 100dvh;
 		min-block-size: 500px;
 	}
-	.dropzone {
-		border: 2px dashed #999;
-		border-radius: 8px;
-		padding: 6px 10px;
+	header {
+		display: flex;
+		align-items: center;
+		gap: 12px;
+		flex-wrap: wrap;
 	}
-	.samples,
+	h1 {
+		font-size: 1rem;
+		margin: 0;
+		overflow-wrap: anywhere;
+	}
+	a {
+		min-block-size: 44px;
+		display: inline-flex;
+		align-items: center;
+		padding-inline: 8px;
+	}
 	.toolbar {
 		display: flex;
 		gap: 8px;
 		align-items: center;
 		flex-wrap: wrap;
-	}
-	.samples {
-		margin-block-start: 6px;
 	}
 	.toolbar label {
 		display: flex;
@@ -193,12 +149,6 @@
 		cursor: default;
 		opacity: 0.6;
 	}
-	p {
-		margin-block: 4px;
-	}
-	.error {
-		color: #a21a1a;
-	}
 	.hint {
 		font-size: 0.9rem;
 	}
@@ -219,7 +169,7 @@
 		padding: 10px;
 		box-sizing: border-box;
 	}
-	:is(button, input, select):focus-visible {
+	:is(button, select):focus-visible {
 		outline: 3px solid #075dcc;
 		outline-offset: 2px;
 	}

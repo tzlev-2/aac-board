@@ -99,6 +99,7 @@ test('360px touch editing keeps 44px targets inside the grid through save and re
 	const bytes = await page.evaluate(
 		() => (window as unknown as { uiZipBytes: Promise<number[]> }).uiZipBytes
 	);
+	await page.getByRole('link', { name: messages.selector, exact: true }).click();
 	await page.locator('input[type=file]').setInputFiles({
 		name: 'six-column-edited.gridset',
 		mimeType: 'application/zip',
